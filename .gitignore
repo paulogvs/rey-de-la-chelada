@@ -1,0 +1,63 @@
+# ── Rey de la Chelada — Gitignore ──────────────────────────
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Build output
+dist/
+build/
+.next/
+
+# OS
+Thumbs.db
+desktop.ini
+*.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# PM2
+.pm2/
+pm2-*.json
+
+# SQLite databases (data)
+*.db
+*.db-journal
+*.sqlite
+data/
+
+# Windows-specific
+*.exe
+*.dll
+nssm.exe
+
+# PWA
+sw.js
+sw.js.map
+workbox-*.js
+
+# State (coordination file, not git history)
+STATE.md
+
+# Claude memory
+.claude/memory/private/
+.claude/memory/local/
+
+# Secrets
+*.pem
+*.key
+secrets/

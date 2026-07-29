@@ -1,0 +1,51 @@
+{
+  "app_name": "Rey de la Chelada",
+  "app_id": "rey-de-la-chelada",
+  "brand_level": 2,
+  "primary_color": "#D4AF37",
+  "secondary_color": "#2B1B10",
+  "accent_color": "#E08B27",
+  "background_color": "#1A0F0A",
+  "text_color": "#F4E8C1",
+  "logo": "logo/rey_de_la_chelada_logo.png",
+  "version": "1.0.0",
+  "forch_branding": {
+    "level": 2,
+    "hub_url": "https://forch-i-a-hub.vercel.app/",
+    "author": "Paulo Velasco",
+    "country": "Bolivia",
+    "sello": "Built with FORCH.i by Paulo Velasco",
+    "badge_path": "/badges/forch-i.svg",
+    "badge_in_footer": true,
+    "credit_in_readme": true,
+    "always_link_to_hub": true
+  },
+  "design_system_base": "restaurant-golden-amber",
+  "design_system_path": "./DESIGN.md",
+  "legal": {
+    "auto_generate": true,
+    "jurisdiction_primary": "Bolivia",
+    "documents_required": [
+      "privacy-policy",
+      "terms-of-service",
+      "acceptable-use-policy"
+    ]
+  },
+  "stack": {
+    "language": "TypeScript",
+    "framework": "React 19 + Express 5",
+    "deployment": "Windows Self-Hosted (PM2 + nssm)"
+  },
+  "ecosystem_dependencies": {
+    "agents_count": 264,
+    "skills_count": 475,
+    "rules_count": 44,
+    "mcp_servers": 20,
+    "orchestrator": "@forchi"
+  },
+  "last_review": {
+    "date": "2026-07-29",
+    "reviewer": "@forchi",
+    "status": "PENDING"
+  }
+}

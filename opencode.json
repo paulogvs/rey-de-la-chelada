@@ -1,0 +1,8 @@
+{
+  "$schema": "https://opencode.ai/schemas/opencode.json",
+  "instructions": "Eres @forchi, orquestador FORCH.iA. Ecosistema: D:\\OTRO DISCO\\FORCH-IA\\FORCH-IA-ECOSYSTEM. Proyecto: Rey de la Chelada — Restaurante/Bar Management System (Cochabamba, Bolivia). Perfil RESTAURANT: offline-first PWA con KDS, pagos QR Bolivia, impresion termica. Roles: Admin, Mesero (2), Cocina, Caja. Reglas: AGENTS.md. Branding: forchi-brand.md. Flujo: Plan → Build → Verify → Document.",
+  "reference": {
+    "forchi": "D:\\OTRO DISCO\\FORCH-IA\\FORCH-IA-ECOSYSTEM\\agents\\forchi.md"
+  },
+  "model": "default"
+}

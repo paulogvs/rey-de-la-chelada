@@ -1,0 +1,25 @@
+# ── Rey de la Chelada — Git Attributes ─────────────────────
+# Force CRLF for Windows batch files
+*.bat    text eol=crlf
+*.cmd    text eol=crlf
+*.ps1    text eol=crlf
+*.vbs    text eol=crlf
+
+# Source code: LF
+*.js     text eol=lf
+*.ts     text eol=lf
+*.tsx    text eol=lf
+*.json   text eol=lf
+*.css    text eol=lf
+*.md     text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.html   text eol=lf
+
+# Binaries
+*.png    binary
+*.jpg    binary
+*.ico    binary
+*.woff2  binary
+package-lock.json binary
+pnpm-lock.yaml   binary
