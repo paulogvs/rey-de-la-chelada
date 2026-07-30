@@ -126,12 +126,20 @@ export interface RestaurantConfig {
     email: string;
   };
 
-  /** Moneda */
+  /**
+   * Moneda
+   *
+   * Bolivia usa el Boliviano (BOB).
+   * Código ISO: BOB
+   * Símbolo local: "Bs" (NO "Bs." — se muestra como "Bs 25.00")
+   * El precio SIEMPRE incluye IVA (13%) — ver taxes.iva.includedInPrices
+   * No se usa $, USD ni ninguna otra moneda.
+   */
   currency: {
-    code: string;
-    symbol: string;
-    name: string;
-    decimals: number;
+    code: string;     // 'BOB' — código ISO 4217
+    symbol: string;   // 'Bs' — símbolo de visualización
+    name: string;     // 'Boliviano'
+    decimals: number; // 2 — centavos
   };
 
   /** Impuestos */
@@ -187,7 +195,7 @@ export const DEFAULT_CONFIG: RestaurantConfig = {
 
   currency: {
     code: 'BOB',
-    symbol: 'Bs.',
+    symbol: 'Bs',      // Se muestra como "Bs" sin punto
     name: 'Boliviano',
     decimals: 2,
   },

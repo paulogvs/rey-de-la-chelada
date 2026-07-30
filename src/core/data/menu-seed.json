@@ -1,0 +1,281 @@
+{
+  "restobar": {
+    "nombre": "El Rey de la Chelada",
+    "tipo": "Resto-Bar",
+    "moneda": "BOB",
+    "mostrar_moneda": "Bs",
+    "menu": {
+      "BAR": {
+        "descripcion_area": "Preparación de bebidas, micheladas y tragos de autor",
+        "categorias": [
+          {
+            "nombre_categoria": "Micheladas de la Casa",
+            "items": [
+              {
+                "id": "BAR-001",
+                "nombre": "Cheve-Chango",
+                "subtitulo": "Tamarindo & Mango",
+                "descripcion": "Base cítrica y dulce con mango y tamarindo",
+                "ingredientes": ["355 ml Cerveza", "Mango", "Tamarindo", "Limón", "Chamoy", "Chile en polvo"],
+                "decoracion_garnish": ["Brocheta de gomitas/dulces", "Escarchado de chile y chamoy"],
+                "precio": null,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-002",
+                "nombre": "Elixir Azteca",
+                "subtitulo": "Pepino & Albahaca",
+                "descripcion": "Refrescante, herbal y ligera",
+                "ingredientes": ["355 ml Cerveza", "Pepino", "Albahaca", "Limón", "Sal de limón", "Sal de grano"],
+                "decoracion_garnish": ["Rodajas de pepino fresco", "Hojas de albahaca", "Escarchado de sal"],
+                "precio": null,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-003",
+                "nombre": "Negra Ahumada",
+                "subtitulo": "Mezcal & Sal de Gusano",
+                "descripcion": "Perfil ahumado e intenso",
+                "ingredientes": ["355 ml Cerveza negra/oscura", "Mezcal", "Salsa inglesa", "Limón", "Sal de gusano", "Salsa picante"],
+                "decoracion_garnish": ["Rodaja de naranja/limón deshidratado", "Chile ají seco", "Escarchado de sal de gusano"],
+                "precio": null,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-004",
+                "nombre": "Sandía-Loca",
+                "subtitulo": "Sandía & Chamoy",
+                "descripcion": "Dulce, ácida y picante, estilo veraniego",
+                "ingredientes": ["355 ml Cerveza", "Sandía", "Chamoy", "Limón", "Gomitas", "Chile en polvo"],
+                "decoracion_garnish": ["Triángulo de sandía", "Brocheta de gomitas dulces", "Escarchado de chamoy"],
+                "precio": null,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-005",
+                "nombre": "Sandía Ice",
+                "subtitulo": "Con Skittles & Pelón",
+                "descripcion": "Ultra refrescante con toppings de confitería",
+                "ingredientes": ["355 ml Cerveza", "Sandía congelada", "Limón", "Skittles", "Tamarindo/Pelón Pelo Rico"],
+                "decoracion_garnish": ["Tubo de tamarindo/Pelón", "Dulces Skittles", "Sandía"],
+                "precio": null,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-006",
+                "nombre": "Candy-Cheve",
+                "subtitulo": "Sandía & Algodón de Azúcar",
+                "descripcion": "Experiencia dulce y llamativa",
+                "ingredientes": ["355 ml Cerveza", "Sandía", "Jarabe dulce", "Limón", "Algodón de azúcar", "Caramelo"],
+                "decoracion_garnish": ["Nube de algodón de azúcar rosa", "Paleta dulce / Lollipop", "Escarchado rosa"],
+                "precio": null,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-007",
+                "nombre": "Piña Ahumada & Chipotle",
+                "subtitulo": "Piña & Chipotle",
+                "descripcion": "Toque ahumado y picante tropical",
+                "ingredientes": ["355 ml Cerveza", "Piña", "Chipotle", "Limón", "Chamoy", "Sal de chile"],
+                "decoracion_garnish": ["Brocheta de piña asada/ahumada", "Chile picante", "Escarchado de sal de chile"],
+                "precio": null,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-008",
+                "nombre": "Isla Donada",
+                "subtitulo": "Dulce, cítrica y muy refrescante",
+                "receta_tecnica": {
+                  "base": "355 ml Cerveza Lager",
+                  "mezcla": ["60 ml puré de piña", "30 ml pulpa de maracuyá", "20 ml jugo de limón", "15 ml jarabe de agave", "2 gotas salsa inglesa", "2 gotas salsa picante (opcional)"]
+                },
+                "decoracion_garnish": ["Triángulo de piña", "Rodaja de limón", "Hoja de piña", "Flor comestible"],
+                "precio": null,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-009",
+                "nombre": "Mango Sunset",
+                "subtitulo": "Tropical, dulce y ligeramente picante",
+                "receta_tecnica": {
+                  "base": "355 ml Cerveza Rubia",
+                  "mezcla": ["70 ml puré de mango", "20 ml jugo de limón", "15 ml jugo de naranja", "10 ml chamoy", "2 gotas salsa inglesa", "Tajín al gusto"]
+                },
+                "decoracion_garnish": ["Cubos de mango", "Chile en polvo", "Brocheta de mango", "Hoja de menta"],
+                "precio": null,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-010",
+                "nombre": "Maracuyá Paradise",
+                "subtitulo": "Ácida, aromática y muy fresca",
+                "receta_tecnica": {
+                  "base": "355 ml Cerveza Lager",
+                  "mezcla": ["70 ml pulpa de maracuyá", "20 ml jugo de limón", "15 ml jarabe simple", "Agua con gas (opcional)"]
+                },
+                "decoracion_garnish": ["Maracuyá abierta", "Rodaja de limón", "Romero fresco"],
+                "precio": null,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-011",
+                "nombre": "Sandía Beach",
+                "subtitulo": "Muy refrescante, ideal para verano",
+                "receta_tecnica": {
+                  "base": "355 ml Cerveza Clara",
+                  "mezcla": ["80 ml jugo de sandía", "20 ml jugo de limón", "10 ml jarabe simple", "2 gotas salsa inglesa"]
+                },
+                "decoracion_garnish": ["Triángulo de sandía", "Hojas de menta", "Brocheta de sandía"],
+                "precio": null,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-012",
+                "nombre": "Tamarindo Volcano",
+                "subtitulo": "Dulce, ácido y con un toque picante",
+                "receta_tecnica": {
+                  "base": "355 ml Cerveza Ámbar",
+                  "mezcla": ["60 ml pulpa de tamarindo", "20 ml jugo de limón", "15 ml chamoy", "Salsa inglesa al gusto", "Salsa picante al gusto"]
+                },
+                "decoracion_garnish": ["Dulce de tamarindo", "Chile seco", "Rodaja de limón"],
+                "precio": null,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-013",
+                "nombre": "Costa Tropical",
+                "subtitulo": "Combinación de frutas exóticas y equilibrada",
+                "receta_tecnica": {
+                  "base": "355 ml Cerveza Clara",
+                  "mezcla": ["30 ml puré de mango", "30 ml puré de piña", "30 ml pulpa de maracuyá", "20 ml jugo de limón", "10 ml chamoy"]
+                },
+                "decoracion_garnish": ["Piña", "Mango", "Maracuyá", "Flores tropicales"],
+                "precio": null,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-014",
+                "nombre": "Marea Roja",
+                "subtitulo": "Refrescante, dulce, ácida y picante",
+                "receta_tecnica": {
+                  "base": "355 ml Cerveza Clara",
+                  "mezcla": ["60 ml jugo de sandía", "30 ml pulpa de tamarindo", "20 ml jugo de limón", "15 ml chamoy", "Tajín al gusto"]
+                },
+                "decoracion_garnish": ["Rodaja de sandía", "Brocheta de fruta", "Chile en polvo"],
+                "precio": null,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-015",
+                "nombre": "Paraíso Maya",
+                "subtitulo": "Exótica, dulce y ligeramente especiada",
+                "receta_tecnica": {
+                  "base": "355 ml Cerveza Clara",
+                  "mezcla": ["40 ml puré de piña", "40 ml puré de mango", "20 ml pulpa de tamarindo", "20 ml jugo de limón", "10 ml chamoy"]
+                },
+                "decoracion_garnish": ["Piña deshidratada", "Canela en rama", "Flor tropical"],
+                "precio": null,
+                "area": "bar",
+                "tiene_ice": true
+              }
+            ]
+          }
+        ]
+      },
+      "COCINA": {
+        "descripcion_area": "Platos calientes, fríos, picoteos, tablas y sándwiches",
+        "categorias": [
+          {
+            "nombre_categoria": "Ensaladas",
+            "items": [
+              { "id": "COC-001", "nombre": "César Tradicional", "ingredientes": ["Lechuga crespa", "Abundante pollo salteado"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-002", "nombre": "King César", "ingredientes": ["Lechuga", "Crutones", "Pollo salteado", "Aliño César"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-003", "nombre": "El Rey", "ingredientes": ["Mix verde", "Lechuga crespa", "Rácula", "Berros", "Manzana verde", "Corona de palta", "Pollo", "Nueces"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-004", "nombre": "Romántica", "ingredientes": ["Corazones de tomate", "Queso de cabra", "Albahaca", "Aceitunas verdes", "Nueces", "Almendras"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-005", "nombre": "Ensalada Surtida", "ingredientes": ["Verduras de estación a elección del chef"], "precio": null, "area": "cocina", "tiene_ice": false }
+            ]
+          },
+          {
+            "nombre_categoria": "Tablas y Canastas",
+            "items": [
+              { "id": "COC-006", "nombre": "Canasta Rey", "ingredientes": ["Cama de papas fritas", "Pollo o carne", "Queso derretido", "Tocino crocante", "Cebollín picado"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-007", "nombre": "Canasta Mixta", "ingredientes": ["Cama de papas fritas", "Pollo", "Carne", "Queso derretido", "Tocino crocante", "Cebollín picado"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-008", "nombre": "Pichanaca para 2", "ingredientes": ["Papas fritas", "Carne", "Pollo", "Salchichas", "Queso fundido", "Huevo frito", "Cebolla frita"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-009", "nombre": "Pichanga para 4", "ingredientes": ["Papas fritas", "Carne", "Pollo", "Salchichas", "Queso fundido", "Huevo frito", "Cebolla frita", "Palta"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-010", "nombre": "Tabla Fría", "ingredientes": ["Aceitunas", "Pechuga ahumada", "Salame", "Queso", "Pepinillos"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-011", "nombre": "Tabla Rey", "ingredientes": ["Suculentos trozos de lomo vetado", "Trozos de pechuga de pollo", "Camarones al pil pil", "4 empanadas de queso", "Chips de camote"], "precio": null, "area": "cocina", "tiene_ice": false }
+            ]
+          },
+          {
+            "nombre_categoria": "Burgers & Sandwiches",
+            "items": [
+              { "id": "COC-012", "nombre": "Barro Luco", "ingredientes": ["Carne", "Abundante queso fundido"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-013", "nombre": "Broaster Chicken", "ingredientes": ["Pechuga de pollo crocante", "Tomate", "Lechuga"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-014", "nombre": "Americano", "ingredientes": ["Carne", "Huevo frito", "Queso fundido", "Jamón"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-015", "nombre": "Carnívoro Burguer", "ingredientes": ["Doble carne", "Tocino crocante", "Queso cheddar", "Cebolla caramelizada"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-016", "nombre": "Especial", "ingredientes": ["Carne", "Tomate", "Mayonesa"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-017", "nombre": "Italiano", "ingredientes": ["Carne", "Tomate", "Palta", "Mayonesa"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-018", "nombre": "Completo", "ingredientes": ["Carne", "Tomate", "Palta", "Chucrut", "Mayonesa"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-019", "nombre": "Chacarero", "ingredientes": ["Carne", "Tomate", "Porotos verdes", "Ají verde", "Mayonesa"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-020", "nombre": "Brasileño", "ingredientes": ["Carne", "Queso fundido", "Palta", "Mayonesa"], "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-021", "nombre": "La Crispy", "ingredientes": ["Pollo frito crocante con tocino", "Queso cheddar fundido", "Mayonesa"], "precio": null, "area": "cocina", "tiene_ice": false }
+            ]
+          },
+          {
+            "nombre_categoria": "Quesadillas",
+            "items": [
+              { "id": "COC-022", "nombre": "Quesadilla Carne", "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-023", "nombre": "Quesadilla Pollo", "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-024", "nombre": "Quesadilla Mixta", "precio": null, "area": "cocina", "tiene_ice": false }
+            ]
+          },
+          {
+            "nombre_categoria": "Pizzas",
+            "variantes_tamanos": ["Mediana", "Familiar", "XL"],
+            "items": [
+              { "id": "COC-025", "nombre": "La Rey", "ingredientes": ["Salsa pomodoro", "Carne", "Queso fundido", "Champiñones", "Pimentón", "Orégano"], "precios": { "mediana": null, "familiar": null, "xl": null }, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-026", "nombre": "Vegetariana", "ingredientes": ["Salsa pomodoro", "Queso fundido", "Verduras variadas", "Orégano"], "precios": { "mediana": null, "familiar": null, "xl": null }, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-027", "nombre": "La Tóxica", "ingredientes": ["Salsa pomodoro", "Queso fundido", "Pepperoni", "Salame", "Jamón", "Chorizo", "Tocino", "Aceitunas negras", "Orégano"], "precios": { "mediana": null, "familiar": null, "xl": null }, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-028", "nombre": "Hawaiana", "ingredientes": ["Salsa pomodoro", "Queso", "Jamón cocido", "Piña tropical", "Orégano"], "precios": { "mediana": null, "familiar": null, "xl": null }, "area": "cocina", "tiene_ice": false }
+            ]
+          },
+          {
+            "nombre_categoria": "Empanadas",
+            "items": [
+              { "id": "COC-029", "nombre": "Camarón Queso", "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-030", "nombre": "Choclo Crema, Queso", "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-031", "nombre": "Carne Queso", "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-032", "nombre": "Pollo Queso", "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-033", "nombre": "Casi Chaparrita", "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-034", "nombre": "Champiñón Queso", "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-035", "nombre": "Queso", "precio": null, "area": "cocina", "tiene_ice": false }
+            ]
+          },
+          {
+            "nombre_categoria": "Salsas y Extras",
+            "items": [
+              { "id": "COC-036", "nombre": "Salsa BBQ", "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-037", "nombre": "Salsa Verde", "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-038", "nombre": "Extra Queso", "precio": null, "area": "cocina", "tiene_ice": false },
+              { "id": "COC-039", "nombre": "Doble Tocino", "precio": null, "area": "cocina", "tiene_ice": false }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

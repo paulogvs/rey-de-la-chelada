@@ -16,8 +16,15 @@ export { default as orderEngine, OrderEngine } from './OrderEngine';
  * Initialize all engines (called once at app startup)
  * Loads persisted state from localStorage/IndexedDB/PostgreSQL
  */
-export function initializeEngines(): void {
+export async function initializeEngines(): Promise<void> {
+  // Load seed menu data (first-time setup)
+  try {
+    const { loadSeedToEngine } = await import('@/core/data/data-loader');
+    loadSeedToEngine();
+  } catch (e) {
+    console.warn('[Engine] Seed data load skipped (will load from DB in production)');
+  }
   console.log('[Engine] All engines initialized');
-  // Phase 2: Load from persistence layer
-  // Phase 3: Sync with server
+  // Phase 2: Load from persistence layer (future)
+  // Phase 3: Sync with server (future)
 }

@@ -98,16 +98,27 @@ export interface MenuItem {
   id: string;
   categoryId: string;
   name: string;
+  subtitle?: string;         // Subtítulo o tagline del producto
   description: string;
-  price: number;            // Final price with IVA included (BOB)
-  ivaPercentage: number;    // 13% default for Bolivia
+  price: number | null;      // Final price with IVA included (BOB), null si es item con variantes
+  currency: string;          // 'BOB' — se muestra como "Bs"
+  ivaPercentage: number;     // 13% default for Bolivia
   imageUrl: string | null;
   isActive: boolean;
-  isAvailable: boolean;     // Temporarily out of stock
+  isAvailable: boolean;      // Temporarily out of stock
   modifierGroups: ModifierGroup[];
-  tags: string[];           // e.g. ['popular', 'new', 'recommended']
-  preparationTime: number;  // Minutes
+  tags: string[];            // e.g. ['popular', 'new', 'recommended']
+  preparationTime: number;   // Minutes
   sortOrder: number;
+  area?: 'bar' | 'cocina';   // Para enrutar al KDS correcto
+  ingredientes?: string[];   // Lista de ingredientes para mostrar
+  garnish?: string[];        // Decoración/garnish para items de barra
+  receta_tecnica?: {         // Receta técnica (solo barra)
+    base?: string;
+    mezcla?: string[];
+  };
+  sizeVariants?: Record<string, number | null>;  // Para items con variantes de tamaño (ej: pizzas)
+  hasIce?: boolean;           // Sujeto a ICE (Impuesto al Consumo Específico)
 }
 
 /** A line item in an order (product + modifiers) */

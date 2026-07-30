@@ -34,11 +34,11 @@ desktop.ini
 .pm2/
 pm2-*.json
 
-# SQLite databases (data)
+# SQLite databases (only root /data/)
 *.db
 *.db-journal
 *.sqlite
-data/
+/data/
 
 # Windows-specific
 *.exe
@@ -61,3 +61,6 @@ STATE.md
 *.pem
 *.key
 secrets/
+
+# Local agent state
+.serena/
