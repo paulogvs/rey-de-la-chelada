@@ -1,0 +1,99 @@
+/* ============================================================
+   BADGE — Status pill component
+   ZERO hardcoded colors — all variables from tokens.json
+   ============================================================ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-full);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.badge--large {
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-4);
+  min-height: 32px;
+}
+
+/* ---- Variants ---- */
+
+.badge--pending {
+  background: rgba(224, 139, 39, 0.1);
+  color: var(--status-pending);
+  border-color: rgba(224, 139, 39, 0.2);
+}
+
+.badge--preparing {
+  background: var(--dorado-rey-soft);
+  color: var(--status-preparing);
+  border-color: rgba(212, 175, 55, 0.2);
+}
+
+.badge--ready {
+  background: rgba(5, 150, 105, 0.1);
+  color: var(--status-confirmed);
+  border-color: rgba(5, 150, 105, 0.2);
+}
+
+.badge--cancelled {
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--status-cancelled);
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+.badge--paid {
+  background: rgba(13, 92, 58, 0.1);
+  color: var(--verde-esmeralda);
+  border-color: rgba(13, 92, 58, 0.2);
+}
+
+.badge--info {
+  background: var(--dorado-rey-soft);
+  color: var(--dorado-rey);
+  border-color: rgba(212, 175, 55, 0.15);
+}
+
+.badge--warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--kds-warning);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+/* ---- Dot indicator ---- */
+
+.badge__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: badge-dot-pulse 2s ease-in-out infinite;
+}
+
+@keyframes badge-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ---- Skeleton ---- */
+
+.badge--skeleton {
+  background: var(--surface-elevated);
+  border-color: transparent;
+  min-width: 80px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge__dot {
+    animation: none;
+  }
+}

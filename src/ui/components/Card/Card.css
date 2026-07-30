@@ -1,0 +1,114 @@
+/* ============================================================
+   CARD — Shared Component
+   ZERO hardcoded colors — all variables from tokens.json
+   ============================================================ */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: all var(--duration-fast) var(--ease-out);
+  overflow: hidden;
+}
+
+.card--padded {
+  padding: var(--space-4);
+}
+
+.card--elevated {
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-md);
+}
+
+.card--clickable {
+  cursor: pointer;
+  min-height: var(--touch-min-target);
+}
+
+.card--clickable:hover {
+  border-color: var(--border-hover);
+  background: var(--surface-soft);
+}
+
+.card--clickable:active {
+  transform: scale(0.98);
+}
+
+/* ---- Status border variants ---- */
+
+.card--status-pending {
+  border-left: 4px solid var(--status-pending);
+}
+
+.card--status-preparing {
+  border-left: 4px solid var(--status-preparing);
+}
+
+.card--status-ready {
+  border-left: 4px solid var(--status-confirmed);
+}
+
+.card--status-cancelled {
+  border-left: 4px solid var(--status-cancelled);
+}
+
+.card--status-paid {
+  border-left: 4px solid var(--verde-esmeralda);
+}
+
+/* ---- Layout ---- */
+
+.card__header {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.card__body {
+  padding: var(--space-4);
+}
+
+.card__footer {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+/* ---- Skeleton ---- */
+
+.card--skeleton {
+  pointer-events: none;
+}
+
+.skeleton-line {
+  height: 14px;
+  margin-bottom: var(--space-3);
+  background: linear-gradient(90deg,
+    var(--surface) 25%,
+    var(--surface-elevated) 50%,
+    var(--surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-line:last-child {
+  margin-bottom: 0;
+}
+
+.skeleton-line--w60 { width: 60%; }
+.skeleton-line--w80 { width: 80%; }
+.skeleton-line--w40 { width: 40%; }
+.skeleton-line--w100 { width: 100%; }
+
+@keyframes skeleton-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line {
+    animation: none;
+    background: var(--surface-elevated);
+  }
+}

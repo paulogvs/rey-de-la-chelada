@@ -7,23 +7,40 @@
  * - Mientras la mesa tenga un pedido ACTIVO, funciones interactivas disponibles
  * - Sin pedido activo → solo lectura del menú
  * - El token expira en 3h (configurable) pero se renueva con pedido activo
+ * - Persistencia en localStorage
+ * - Call waiter con debounce anti-spam
+ * - Retry logic para errores de conexión
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { securityEngine } from '@/core/config';
 import { orderEngine } from '@/core/engine';
 import type { Order } from '@/core/types';
+
+const SESSION_STORAGE_KEY = 'rdlc-table-session';
 
 export interface TableSession {
   tableNumber: number;
   sessionId: string;
   hasActiveOrder: boolean;
   activeOrder: Order | null;
-  isReadOnly: boolean;   // true = solo menú, sin funciones interactivas
+  isReadOnly: boolean;
   canCallWaiter: boolean;
   canRequestBill: boolean;
   isValid: boolean;
   error?: string;
+  /** Retry loading session */
+  retry: () => void;
+  /** Call waiter function */
+  callWaiter: () => Promise<void>;
+  /** Request bill function */
+  requestBill: () => Promise<void>;
+}
+
+interface PersistedSession {
+  tableNumber: number;
+  sessionId: string;
+  lastValidated: string;
 }
 
 /** Parsea la URL actual para extraer mesa y session ID */
@@ -37,6 +54,40 @@ function getSessionFromUrl(): { tableNumber: number | null; sessionId: string | 
   };
 }
 
+/** Persist session to localStorage */
+function persistSession(tableNumber: number, sessionId: string): void {
+  try {
+    const data: PersistedSession = {
+      tableNumber,
+      sessionId,
+      lastValidated: new Date().toISOString(),
+    };
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // localStorage not available
+  }
+}
+
+/** Clear persisted session */
+function clearPersistedSession(): void {
+  try {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/** Get persisted session */
+function getPersistedSession(): PersistedSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as PersistedSession;
+  } catch {
+    return null;
+  }
+}
+
 export function useTableSession(): TableSession {
   const [session, setSession] = useState<TableSession>({
     tableNumber: 0,
@@ -47,17 +98,45 @@ export function useTableSession(): TableSession {
     canCallWaiter: false,
     canRequestBill: false,
     isValid: false,
+    error: undefined,
+    retry: () => {},
+    callWaiter: async () => {},
+    requestBill: async () => {},
   });
 
-  // Efecto: suscribirse a cambios de pedidos
-  useEffect(() => {
+  const callWaiterDebounceRef = useRef<number>(0);
+  const retryCountRef = useRef(0);
+  const MAX_RETRIES = 3;
+
+  // Evaluate session state
+  const evaluateSession = useCallback(() => {
     const { tableNumber, sessionId } = getSessionFromUrl();
+    
     if (!tableNumber || !sessionId) {
-      setSession(prev => ({ ...prev, isValid: false, error: 'QR inválido. Escanea el código de la mesa.' }));
+      // Try persisted session
+      const persisted = getPersistedSession();
+      if (persisted) {
+        setSession(prev => ({
+          ...prev,
+          tableNumber: persisted.tableNumber,
+          sessionId: persisted.sessionId,
+          isValid: false,
+          error: 'Sesión expirada. Escanea el QR de la mesa.',
+        }));
+        return;
+      }
+      setSession(prev => ({
+        ...prev,
+        isValid: false,
+        error: 'QR inválido. Escanea el código de la mesa.',
+      }));
       return;
     }
 
-    function evaluateSession() {
+    // Persist for future visits
+    persistSession(tableNumber, sessionId);
+
+    try {
       // Buscar pedido activo en esta mesa
       const tableOrders = orderEngine.getTableOrders(`table-${tableNumber}`);
       const activeOrder = tableOrders.find(o =>
@@ -79,10 +158,37 @@ export function useTableSession(): TableSession {
         canRequestBill: hasActiveOrder && validation.valid,
         isValid: validation.valid,
         error: validation.valid ? undefined : validation.reason,
+        retry: evaluateSession,
+        callWaiter: async () => { /* debounced below */ },
+        requestBill: async () => { /* debounced below */ },
       });
-    }
 
-    // Evaluación inicial
+      // Reset retry count on success
+      retryCountRef.current = 0;
+    } catch (err) {
+      console.error('[useTableSession] Error evaluating session:', err);
+      
+      // Retry logic
+      if (retryCountRef.current < MAX_RETRIES) {
+        retryCountRef.current++;
+        setTimeout(evaluateSession, 1000 * Math.pow(2, retryCountRef.current));
+      }
+
+      setSession(prev => ({
+        ...prev,
+        tableNumber,
+        sessionId,
+        isValid: false,
+        error: 'Error al validar la sesión. Reintentando...',
+        retry: evaluateSession,
+        callWaiter: async () => {},
+        requestBill: async () => {},
+      }));
+    }
+  }, []);
+
+  // Initialize
+  useEffect(() => {
     evaluateSession();
 
     // Suscribirse a cambios en órdenes
@@ -95,32 +201,52 @@ export function useTableSession(): TableSession {
       unsubscribe();
       clearInterval(interval);
     };
-  }, []);
+  }, [evaluateSession]);
 
-  /** Llamar al mesero */
-  const callWaiter = useCallback(async () => {
-    if (!session.canCallWaiter) return;
+  // Call waiter con debounce (prevent spam)
+  const callWaiter = useCallback(async (): Promise<void> => {
+    const now = Date.now();
+    if (now - callWaiterDebounceRef.current < 10000) {
+      throw new Error('Ya notificaste al mesero. Espera unos segundos.');
+    }
+    callWaiterDebounceRef.current = now;
 
-    // Disparar notificación vía WebSocket al mesero asignado
-    console.log(`[Clientes] Mesa ${session.tableNumber} llama al mesero`);
+    return new Promise((resolve, reject) => {
+      try {
+        console.log(`[Clientes] Mesa ${session.tableNumber} llama al mesero`);
+        // Aquí se integrará con WebSocket
+        // ws.send({ type: 'call_waiter', table: session.tableNumber, orderId: session.activeOrder?.id });
+        
+        // Simulate async network call
+        setTimeout(() => {
+          resolve();
+        }, 500);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }, [session.tableNumber, session.activeOrder?.id]);
 
-    // Aquí se integrará con WebSocket
-    // ws.send({ type: 'call_waiter', table: session.tableNumber, orderId: session.activeOrder?.id });
+  // Request bill
+  const requestBill = useCallback(async (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      try {
+        console.log(`[Clientes] Mesa ${session.tableNumber} solicita la cuenta`);
+        // Aquí se integrará con WebSocket
+        // ws.send({ type: 'request_bill', table: session.tableNumber, orderId: session.activeOrder?.id });
+        
+        setTimeout(() => {
+          resolve();
+        }, 500);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }, [session.tableNumber, session.activeOrder?.id]);
 
-    alert('✅ Mesero notificado. Espera un momento por favor.');
-  }, [session]);
-
-  /** Pedir la cuenta */
-  const requestBill = useCallback(async () => {
-    if (!session.canRequestBill) return;
-
-    console.log(`[Clientes] Mesa ${session.tableNumber} solicita la cuenta`);
-
-    // Aquí se integrará con WebSocket
-    // ws.send({ type: 'request_bill', table: session.tableNumber, orderId: session.activeOrder?.id });
-
-    alert('✅ Cuenta solicitada. Tu mesero vendrá en breve.');
-  }, [session]);
-
-  return session;
+  return {
+    ...session,
+    callWaiter,
+    requestBill,
+  };
 }

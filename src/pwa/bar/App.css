@@ -1,0 +1,127 @@
+/* ============================================================
+   PWA BAR — Bar Display System
+   ZERO hardcoded colors — all variables from tokens.json
+   ============================================================ */
+
+.bar-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+.bar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border-bottom: 2px solid var(--ambar-cerveza);
+  flex-shrink: 0;
+}
+
+.bar-header__left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.bar-header__left h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  color: var(--ambar-cerveza);
+  margin: 0;
+}
+
+.bar-header__right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.bar-header__audio {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  min-width: var(--touch-min-target);
+  min-height: var(--touch-min-target);
+  font-size: var(--text-lg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bar-header__audio:hover {
+  border-color: var(--ambar-cerveza);
+}
+
+.bar-orders {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-3);
+}
+
+.bar-orders__grid {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+}
+
+.bar-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.bar-empty__icon {
+  font-size: 64px;
+  margin-bottom: var(--space-4);
+  opacity: 0.5;
+}
+
+.bar-empty h2 {
+  font-family: var(--font-display);
+  margin: 0 0 var(--space-2);
+  color: var(--text-muted);
+}
+
+.bar-empty p {
+  font-size: var(--text-lg);
+  opacity: 0.6;
+}
+
+.bar-footer {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.bar-footer__hint {
+  margin-left: auto;
+  opacity: 0.5;
+  font-style: italic;
+}
+
+@media (max-width: 1100px) {
+  .bar-orders__grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .bar-orders__grid {
+    grid-template-columns: 1fr !important;
+  }
+}

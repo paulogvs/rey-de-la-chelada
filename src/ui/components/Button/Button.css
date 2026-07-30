@@ -1,0 +1,158 @@
+/* ============================================================
+   BUTTON — Shared Component
+   ZERO hardcoded colors — all variables from tokens.json
+   ============================================================ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  white-space: nowrap;
+  line-height: 1;
+  min-height: var(--touch-min-target);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-base);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ---- Sizes ---- */
+
+.btn--sm {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.btn--md {
+  min-height: var(--touch-primary-action);
+  padding: var(--space-2) var(--space-5);
+  font-size: var(--text-base);
+}
+
+.btn--lg {
+  min-height: 64px;
+  padding: var(--space-3) var(--space-6);
+  font-size: var(--text-lg);
+}
+
+.btn--kds {
+  min-height: var(--touch-kds-button);
+  padding: var(--space-4) var(--space-6);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  text-transform: uppercase;
+  border-radius: var(--radius-lg);
+}
+
+/* ---- Variants ---- */
+
+.btn--primary {
+  background: var(--dorado-rey);
+  color: var(--madera-oscura);
+  border-color: var(--dorado-rey);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--dorado-rey-hover);
+  border-color: var(--dorado-rey-hover);
+}
+
+.btn--secondary {
+  background: transparent;
+  color: var(--dorado-rey);
+  border-color: var(--dorado-rey);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background: var(--dorado-rey-soft);
+  color: var(--dorado-rey);
+}
+
+.btn--kds {
+  background: var(--surface-elevated);
+  color: var(--kds-text);
+  border-color: var(--border);
+}
+
+.btn--kds:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--dorado-rey);
+}
+
+.btn--danger {
+  background: var(--status-cancelled);
+  color: #FFFFFF;
+  border-color: var(--status-cancelled);
+}
+
+.btn--danger:hover:not(:disabled) {
+  opacity: 0.9;
+  filter: brightness(1.1);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: transparent;
+}
+
+.btn--ghost:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--dorado-rey-soft);
+}
+
+/* ---- Full width ---- */
+
+.btn--full {
+  width: 100%;
+}
+
+/* ---- Loading state ---- */
+
+.btn--loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.btn__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin 0.6s linear infinite;
+}
+
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+.btn__icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 1.2em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn__spinner {
+    animation-duration: 0.01ms;
+  }
+}

@@ -48,6 +48,54 @@ export interface TaxConfig {
   includedInPrices: boolean;
 }
 
+export interface ICEConfig {
+  /** Impuesto al Consumo Específico — aplica a bebidas alcohólicas */
+  enabled: boolean;
+  /** Tasa por litro de alcohol puro en BOB */
+  ratePerLiterOfPureAlcohol: number;
+  /** Porcentaje ad valorem (1% = 0.01) */
+  adValoremRate: number;
+  /** Categorías de producto que aplican ICE */
+  applicableCategories: string[];
+}
+
+export interface TippingConfig {
+  enabled: boolean;
+  /** Opciones de propina predeterminadas (porcentajes) */
+  presetPercentages: number[];
+  /** Permitir propina personalizada */
+  allowCustom: boolean;
+  /** La propina NO está sujeta a IVA */
+  subjectToIva: boolean;
+}
+
+export interface SFEConfig {
+  /** Sistema de Facturación Electrónica — Bolivia SIN */
+  enabled: boolean;
+  /** Código Único de Inicio de Sesión (emitido por SIN) */
+  cuis: string;
+  /** Código Único de Facturación Diaria */
+  cufd: string;
+  /** Código Único de Facturación (por factura) */
+  cuf: string;
+  /** Código de control (generado por SIN) */
+  controlCode: string;
+  /** Número de autorización de dosificación */
+  authorizationNumber: string;
+  /** Fecha límite de vigencia de dosificación */
+  validityDate: string;
+  /** Llave de dosificación (para generar códigos de control) */
+  dosingKey: string;
+  /** Modalidad: 'computarizada' | 'prevalorada' | 'ambas' */
+  modality: 'computarizada' | 'prevalorada' | 'ambas';
+  /** Límite para factura con NIT (Bs. 1,000) */
+  nitThreshold: number;
+  /** Código de sucursal (0 = casa matriz) */
+  branchCode: number;
+  /** Código del punto de venta (0 = caja principal) */
+  pointOfSaleCode: number;
+}
+
 export interface ThemeConfig {
   defaultPalette: string;
   defaultTheme: 'dark' | 'light';
@@ -89,7 +137,14 @@ export interface RestaurantConfig {
   /** Impuestos */
   taxes: {
     iva: TaxConfig;
+    ice?: ICEConfig;
   };
+
+  /** Propinas */
+  tipping: TippingConfig;
+
+  /** Facturación electrónica (SFE — SIN Bolivia) */
+  invoicing: SFEConfig;
 
   /** Horarios por día */
   businessHours: BusinessHours;
@@ -143,6 +198,34 @@ export const DEFAULT_CONFIG: RestaurantConfig = {
       label: 'IVA',
       includedInPrices: true,
     },
+    ice: {
+      enabled: true,
+      ratePerLiterOfPureAlcohol: 4.03,
+      adValoremRate: 0.01,
+      applicableCategories: ['cervezas', 'destilados', 'vinos', 'licores'],
+    },
+  },
+
+  tipping: {
+    enabled: true,
+    presetPercentages: [0, 5, 10, 15],
+    allowCustom: true,
+    subjectToIva: false,
+  },
+
+  invoicing: {
+    enabled: false,
+    cuis: '',
+    cufd: '',
+    cuf: '',
+    controlCode: '',
+    authorizationNumber: '',
+    validityDate: '',
+    dosingKey: '',
+    modality: 'computarizada',
+    nitThreshold: 1000,
+    branchCode: 0,
+    pointOfSaleCode: 0,
   },
 
   businessHours: {
@@ -250,6 +333,37 @@ class AppConfig {
   priceWithoutIva(priceWithIva: number): number {
     const rate = this.config.taxes.iva.percentage / 100;
     return Math.round((priceWithIva / (1 + rate)) * 100) / 100;
+  }
+
+  /**
+   * Calcula IVA desde un precio que YA incluye IVA.
+   * priceWithIVA / 1.13 = withoutIVA
+   * IVA = priceWithIVA - withoutIVA
+   */
+  calculateIVA(priceWithIVA: number): { base: number; iva: number; total: number } {
+    const rate = this.config.taxes.iva.percentage / 100;
+    const base = Math.round((priceWithIVA / (1 + rate)) * 100) / 100;
+    const iva = Math.round((priceWithIVA - base) * 100) / 100;
+    return { base, iva, total: priceWithIVA };
+  }
+
+  /**
+   * Calcula ICE (Impuesto al Consumo Específico) para bebidas alcohólicas.
+   * ICE = (volumenLitros * porcentajeAlcohol * tasaPorLitroAlcoholPuro) + (precio * tasaAdValorem)
+   *
+   * @param volumeLiters - Volumen total en litros
+   * @param alcoholPercentage - Porcentaje de alcohol (0-100), ej: 5 para cerveza al 5%
+   * @param price - Precio del producto (con IVA incluido si corresponde)
+   */
+  calculateICE(volumeLiters: number, alcoholPercentage: number, price: number): number {
+    const ice = this.config.taxes.ice;
+    if (!ice || !ice.enabled) return 0;
+
+    const pureAlcoholLiters = volumeLiters * (alcoholPercentage / 100);
+    const specificTax = pureAlcoholLiters * ice.ratePerLiterOfPureAlcohol;
+    const adValoremTax = price * ice.adValoremRate;
+
+    return Math.round((specificTax + adValoremTax) * 100) / 100;
   }
 
   /** Merge deep simple */

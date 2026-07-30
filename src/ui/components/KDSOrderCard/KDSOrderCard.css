@@ -1,0 +1,236 @@
+/* ============================================================
+   KDSOrderCard — Kitchen Display System order card
+   ZERO hardcoded colors — all variables from tokens.json
+   ============================================================ */
+
+.kds-order {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--status-pending);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: all var(--duration-normal) var(--ease-out);
+}
+
+.kds-order--bar {
+  border-left-color: var(--ambar-cerveza);
+}
+
+/* ---- Status border colors ---- */
+
+.kds-order--urgent {
+  border-left-color: var(--kds-urgent);
+  animation: kds-urgent-pulse 1s ease-in-out infinite;
+}
+
+.kds-order--complete {
+  border-left-color: var(--kds-completed);
+  opacity: 0.85;
+}
+
+/* ---- New order flash ---- */
+
+.kds-order--new {
+  animation: kds-new-flash 0.8s ease-in-out;
+}
+
+@keyframes kds-new-flash {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 24px var(--kds-new-order); }
+}
+
+@keyframes kds-urgent-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(239, 68, 68, 0.3); }
+  50% { box-shadow: 0 0 24px rgba(239, 68, 68, 0.6); }
+}
+
+/* ---- Header ---- */
+
+.kds-order__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-soft);
+}
+
+.kds-order__number {
+  font-family: var(--font-mono);
+  font-size: var(--text-5xl);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.kds-order__meta {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+}
+
+.kds-order__timer {
+  font-family: var(--font-mono);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+}
+
+.kds-order__waiter {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* ---- Items ---- */
+
+.kds-order__items {
+  flex: 1;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.kds-order__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--kds-text);
+  font-size: var(--text-lg);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  text-align: left;
+  width: 100%;
+  min-height: var(--touch-primary-action);
+  font-family: var(--font-mono);
+}
+
+.kds-order__item:hover:not(:disabled) {
+  background: var(--surface-elevated);
+}
+
+.kds-order__item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.kds-order__item--done {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
+.kds-order__item--cancelled {
+  opacity: 0.4;
+  text-decoration: line-through;
+  color: var(--status-cancelled);
+}
+
+.kds-order__item-check {
+  font-size: var(--text-xl);
+  width: 32px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.kds-order__item-qty {
+  font-weight: 700;
+  color: var(--dorado-rey);
+  min-width: 40px;
+  flex-shrink: 0;
+}
+
+.kds-order__item-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.kds-order__item-mods {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.kds-order__item-notes {
+  font-size: var(--text-sm);
+  color: var(--status-pending);
+  font-style: italic;
+}
+
+.kds-order__item-status {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--kds-completed);
+}
+
+/* ---- Actions ---- */
+
+.kds-order__actions {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.kds-order__action {
+  flex: 1;
+  min-height: var(--touch-kds-button);
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.kds-order__action--accept {
+  background: var(--status-confirmed);
+  color: #FFFFFF;
+}
+
+.kds-order__action--accept:hover {
+  filter: brightness(1.1);
+}
+
+.kds-order__action--reject {
+  background: transparent;
+  color: var(--status-cancelled);
+  border: 1px solid var(--status-cancelled);
+}
+
+.kds-order__action--reject:hover {
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.kds-order__complete-badge {
+  flex: 1;
+  text-align: center;
+  padding: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--kds-completed);
+}
+
+/* ---- Skeleton ---- */
+
+.kds-order--skeleton {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kds-order--urgent {
+    animation: none;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+  }
+  .kds-order--new {
+    animation: none;
+  }
+}

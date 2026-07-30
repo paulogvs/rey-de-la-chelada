@@ -1,0 +1,82 @@
+/* ============================================================
+   QuantityStepper — +/- controls
+   ZERO hardcoded colors — all variables from tokens.json
+   ============================================================ */
+
+.qty-stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+/* ---- Sizes ---- */
+
+.qty-stepper--sm .qty-stepper__btn,
+.qty-stepper--sm .qty-stepper__value {
+  min-width: 36px;
+  min-height: 36px;
+  font-size: var(--text-sm);
+}
+
+.qty-stepper--md .qty-stepper__btn,
+.qty-stepper--md .qty-stepper__value {
+  min-width: var(--touch-min-target);
+  min-height: var(--touch-min-target);
+  font-size: var(--text-lg);
+}
+
+.qty-stepper--lg .qty-stepper__btn,
+.qty-stepper--lg .qty-stepper__value {
+  min-width: 56px;
+  min-height: 56px;
+  font-size: var(--text-2xl);
+}
+
+/* ---- Button ---- */
+
+.qty-stepper__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--dorado-rey);
+  cursor: pointer;
+  font-weight: 700;
+  transition: all var(--duration-fast) var(--ease-out);
+  padding: 0;
+}
+
+.qty-stepper__btn:hover:not(:disabled) {
+  background: var(--dorado-rey-soft);
+}
+
+.qty-stepper__btn:disabled {
+  color: var(--text-muted);
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.qty-stepper__btn:active:not(:disabled) {
+  background: var(--dorado-rey);
+  color: var(--madera-oscura);
+}
+
+/* ---- Value display ---- */
+
+.qty-stepper__value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text-strong);
+  background: var(--surface-soft);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  min-width: 48px;
+  user-select: none;
+}

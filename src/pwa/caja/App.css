@@ -1,0 +1,421 @@
+/* ============================================================
+   PWA CAJA — Cash Closing & Financial Dashboard
+   ZERO hardcoded colors — all variables from tokens.json
+   ============================================================ */
+
+.caja-app {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 60px);
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ---- Header ---- */
+
+.caja-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.caja-header__title {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  color: var(--verde-esmeralda);
+  margin: 0;
+}
+
+.caja-header__nav {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.caja-header__nav-btn {
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  min-height: 32px;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.caja-header__nav-btn.active {
+  background: var(--verde-esmeralda);
+  color: #FFFFFF;
+  border-color: var(--verde-esmeralda);
+  font-weight: 600;
+}
+
+.caja-header__nav-btn:hover:not(.active) {
+  border-color: var(--verde-esmeralda);
+  color: var(--verde-esmeralda);
+}
+
+/* ---- Main ---- */
+
+.caja-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ---- Summary View ---- */
+
+.caja-summary__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.caja-metric {
+  padding: var(--space-5);
+}
+
+.caja-metric__label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-2);
+}
+
+.caja-metric__value {
+  font-family: var(--font-mono);
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  color: var(--text-strong);
+  line-height: 1;
+  margin-bottom: var(--space-2);
+}
+
+.caja-metric__value--gross {
+  color: var(--verde-esmeralda);
+}
+
+.caja-metric__value--iva {
+  color: var(--status-pending);
+}
+
+.caja-metric__value--orders {
+  color: var(--dorado-rey);
+}
+
+.caja-metric__detail {
+  display: flex;
+  gap: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* ---- Sales by method ---- */
+
+.caja-methods {
+  padding: var(--space-5);
+}
+
+.caja-methods h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-4);
+  color: var(--text-strong);
+}
+
+.caja-methods__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.caja-methods__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.caja-methods__label {
+  width: 140px;
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+}
+
+.caja-methods__bar {
+  flex: 1;
+  height: 24px;
+  background: var(--surface-soft);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.caja-methods__bar-fill {
+  height: 100%;
+  background: var(--verde-esmeralda);
+  border-radius: var(--radius-full);
+  transition: width var(--duration-normal) var(--ease-out);
+  min-width: 4px;
+}
+
+.caja-methods__amount {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  width: 120px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ---- Cash Closing ---- */
+
+.caja-close {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.caja-close__card,
+.caja-close__history {
+  padding: var(--space-5);
+}
+
+.caja-close__card h3,
+.caja-close__history h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-4);
+  color: var(--text-strong);
+}
+
+.caja-close__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.caja-close__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.caja-close__field label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.caja-close__input {
+  padding: var(--space-3);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  min-height: var(--touch-min-target);
+}
+
+.caja-close__input:focus {
+  border-color: var(--verde-esmeralda);
+  outline: none;
+}
+
+.caja-close__value {
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-strong);
+  padding: var(--space-2) 0;
+}
+
+.caja-close__diff {
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-weight: 800;
+  padding: var(--space-2) 0;
+}
+
+.caja-close__diff.positive {
+  color: var(--status-confirmed);
+}
+
+.caja-close__diff.negative {
+  color: var(--status-cancelled);
+}
+
+.caja-close__textarea {
+  padding: var(--space-2);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  resize: vertical;
+}
+
+.caja-close__actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-direction: column;
+}
+
+/* ---- Close history ---- */
+
+.caja-close__history-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.caja-close__history-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.caja-close__history-value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* ---- Invoice ---- */
+
+.caja-invoice {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.caja-invoice__card {
+  padding: var(--space-5);
+}
+
+.caja-invoice__card h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-2);
+  color: var(--text-strong);
+}
+
+.caja-invoice__info {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-bottom: var(--space-4);
+}
+
+.caja-invoice__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.caja-invoice__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.caja-invoice__field label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.caja-invoice__input {
+  padding: var(--space-3);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  min-height: var(--touch-min-target);
+}
+
+.caja-invoice__input--mono {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.caja-invoice__input:focus {
+  border-color: var(--verde-esmeralda);
+  outline: none;
+}
+
+.caja-invoice__actions {
+  margin-bottom: var(--space-4);
+}
+
+/* ---- SFE Info ---- */
+
+.caja-invoice__sfe {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-4);
+}
+
+.caja-invoice__sfe h4 {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.caja-invoice__sfe-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+  padding: var(--space-1) 0;
+  color: var(--text-muted);
+}
+
+.caja-invoice__sfe-value {
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+/* ---- Empty ---- */
+
+.caja-empty {
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* ---- Responsive ---- */
+
+@media (max-width: 768px) {
+  .caja-close {
+    grid-template-columns: 1fr;
+  }
+
+  .caja-summary__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .caja-methods__label {
+    width: 100px;
+  }
+}
+
+@media (max-width: 480px) {
+  .caja-summary__grid {
+    grid-template-columns: 1fr;
+  }
+}

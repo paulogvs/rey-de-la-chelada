@@ -14,7 +14,7 @@
 
 // App Config (SSOT del restaurante)
 export { default as appConfig, AppConfig, DEFAULT_CONFIG } from './app.config';
-export type { RestaurantConfig, PwaModule, PwaModuleId, TaxConfig, BusinessHours, ClientModuleConfig } from './app.config';
+export type { RestaurantConfig, PwaModule, PwaModuleId, TaxConfig, ICEConfig, TippingConfig, SFEConfig, BusinessHours, ClientModuleConfig } from './app.config';
 
 // PWA Registry
 export { PWA_REGISTRY, getPwaRegistration, getAllManifests, getActivePwaModules } from './pwa-registry';

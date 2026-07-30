@@ -1,0 +1,68 @@
+/* ============================================================
+   QRDisplay — QR code component
+   ZERO hardcoded colors — all variables from tokens.json
+   ============================================================ */
+
+.qr-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.qr-display__canvas {
+  border-radius: var(--radius-md);
+  background: var(--bg);
+}
+
+.qr-display__label {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* ---- Skeleton ---- */
+
+.qr-display__skeleton {
+  background: linear-gradient(90deg,
+    var(--surface) 25%,
+    var(--surface-elevated) 50%,
+    var(--surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+
+/* ---- Error state ---- */
+
+.qr-display--error {
+  opacity: 0.7;
+}
+
+.qr-display__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-soft);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-4xl);
+}
+
+.qr-display__error-text {
+  font-size: var(--text-sm);
+  color: var(--status-cancelled);
+}
+
+@keyframes skeleton-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qr-display__skeleton {
+    animation: none;
+    background: var(--surface-elevated);
+  }
+}

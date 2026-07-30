@@ -1,0 +1,138 @@
+/* ============================================================
+   PriceDisplay — Price with IVA breakdown and tip
+   ZERO hardcoded colors — all variables from tokens.json
+   ============================================================ */
+
+.price-display {
+  font-family: var(--font-mono);
+}
+
+.price-display--large .price-display__amount {
+  font-size: var(--text-4xl);
+  font-weight: 700;
+}
+
+/* ---- Main price ---- */
+
+.price-display__main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.price-display__amount {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--dorado-rey);
+}
+
+.price-display__toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  font-family: var(--font-body);
+  color: var(--text-muted);
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.price-display__toggle:hover {
+  border-color: var(--dorado-rey);
+  color: var(--dorado-rey);
+}
+
+/* ---- IVA Breakdown ---- */
+
+.price-display__breakdown {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface-soft);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.price-display__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-1) 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.price-display__row--total {
+  color: var(--text-strong);
+  font-weight: 600;
+  font-size: var(--text-base);
+}
+
+.price-display__row--tip {
+  color: var(--status-pending);
+}
+
+.price-display__value {
+  font-weight: 600;
+}
+
+.price-display__divider {
+  height: 1px;
+  background: var(--border);
+  margin: var(--space-2) 0;
+}
+
+/* ---- Tip Selection ---- */
+
+.price-display__tip {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.price-display__tip-label {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.price-display__tip-options {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.price-display__tip-btn {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.price-display__tip-btn.active {
+  background: var(--dorado-rey);
+  color: var(--madera-oscura);
+  border-color: var(--dorado-rey);
+  font-weight: 600;
+}
+
+.price-display__tip-btn:hover:not(.active) {
+  border-color: var(--dorado-rey);
+  color: var(--dorado-rey);
+}
+
+.price-display__note {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: var(--space-1);
+  font-style: italic;
+}
