@@ -1,0 +1,164 @@
+/* ============================================================
+   REY DE LA CHELADA — Design Tokens (CSS Custom Properties)
+   
+   GENERATED FROM tokens.json — DO NOT EDIT DIRECTLY
+   Change tokens.json → this file updates automatically
+   
+   Artículo II: ZERO HARDCODED VALUES
+   No hex/rgb/hsl values in src/ — use --variable-name only
+   ============================================================ */
+
+/* ---- Theme Transition ---- */
+*,
+*::before,
+*::after {
+  transition: background-color var(--duration-theme, 600ms) var(--ease-in-out, cubic-bezier(0.4, 0, 0.2, 1)),
+              color var(--duration-theme, 600ms) var(--ease-in-out),
+              border-color var(--duration-theme, 600ms) var(--ease-in-out),
+              box-shadow var(--duration-theme, 600ms) var(--ease-in-out);
+}
+
+/* ---- HTML Base ---- */
+html {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text);
+  background-color: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---- Reduced Motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---- Scrollbar (Dark Theme) ---- */
+[data-theme="dark"]::-webkit-scrollbar {
+  width: 8px;
+}
+[data-theme="dark"]::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+[data-theme="dark"]::-webkit-scrollbar-thumb {
+  background: var(--surface-elevated);
+  border-radius: var(--radius-full);
+}
+
+/* ---- Selection ---- */
+::selection {
+  background: var(--dorado-rey-soft);
+  color: var(--text-strong);
+}
+
+/* ---- Focus Styles ---- */
+:focus-visible {
+  outline: 2px solid var(--dorado-rey);
+  outline-offset: 2px;
+}
+
+/* ---- Typography ---- */
+h1, h2, h3 {
+  font-family: var(--font-display);
+  color: var(--text-strong);
+  line-height: 1.2;
+}
+
+h1 { font-size: var(--text-4xl); }
+h2 { font-size: var(--text-3xl); }
+h3 { font-size: var(--text-2xl); }
+h4 { font-size: var(--text-xl); }
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--text);
+  background-color: var(--bg);
+  min-height: 100vh;
+}
+
+code, pre, .mono {
+  font-family: var(--font-mono);
+}
+
+/* ---- KDS (Kitchen Display) Special ---- */
+.kds-screen {
+  background: var(--kds-bg);
+  color: var(--kds-text);
+  font-size: var(--text-2xl);
+}
+
+.kds-screen h1 {
+  font-size: var(--text-5xl);
+}
+
+/* ---- Touch Targets (WCAG 2.2) ---- */
+button, 
+a, 
+.clickable,
+.touch-target {
+  min-height: var(--touch-min-target);
+  min-width: var(--touch-min-target);
+}
+
+.touch-primary {
+  min-height: var(--touch-primary-action);
+}
+
+.touch-kds {
+  min-height: var(--touch-kds-button);
+}
+
+/* ---- Status Colors Helpers ---- */
+.status-pending      { color: var(--status-pending); }
+.status-confirmed    { color: var(--status-confirmed); }
+.status-cancelled    { color: var(--status-cancelled); }
+.status-preparing    { color: var(--status-preparing); }
+.status-delivered    { color: var(--status-delivered); }
+
+.bg-status-pending      { background-color: var(--status-pending); }
+.bg-status-confirmed    { background-color: var(--status-confirmed); }
+.bg-status-cancelled    { background-color: var(--status-cancelled); }
+.bg-status-preparing    { background-color: var(--status-preparing); }
+.bg-status-delivered    { background-color: var(--status-delivered); }
+
+/* ---- Glassmorphism ---- */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+}
+
+/* ---- Logo & Brand ---- */
+.brand-text {
+  font-family: var(--font-display);
+  color: var(--dorado-rey);
+}
+
+/* ---- FORCH.i Badge ---- */
+.forchi-badge {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-align: center;
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--border);
+  margin-top: var(--space-12);
+}
+
+.forchi-badge a {
+  color: var(--dorado-rey);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+/* ---- Utilities ---- */
+.text-center { text-align: center; }
+.text-muted  { color: var(--text-muted); }
+.text-strong { color: var(--text-strong); }

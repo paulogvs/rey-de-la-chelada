@@ -1,0 +1,371 @@
+/**
+ * ORDER ENGINE — SSOT for all order operations
+ * 
+ * Artículo I: SSOT — Every order state change passes through here
+ * Artículo VI: Observability — Fail loud, never silent
+ * 
+ * Manages: order lifecycle, KDS events, payments, offline sync
+ */
+
+import type {
+  Order,
+  OrderLineItem,
+  OrderStatus,
+  KDSStatus,
+  Payment,
+  PaymentMethod,
+  KDSEvent,
+  SyncEvent,
+} from '../types';
+
+class OrderEngine {
+  private orders: Map<string, Order> = new Map();
+  private payments: Map<string, Payment> = new Map();
+  private listeners: Set<() => void> = new Set();
+  private kdsListeners: Set<(event: KDSEvent) => void> = new Set();
+  private syncQueue: SyncEvent[] = [];
+
+  // ============================================================
+  // ORDER CRUD
+  // ============================================================
+
+  /** Create a new order */
+  createOrder(params: {
+    tableId: string;
+    tableNumber: number;
+    waiterId: string;
+    waiterName: string;
+    guestCount?: number;
+    notes?: string;
+    localId?: string;
+  }): Order {
+    const now = new Date().toISOString();
+
+    const order: Order = {
+      id: `order-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      tableId: params.tableId,
+      tableNumber: params.tableNumber,
+      waiterId: params.waiterId,
+      waiterName: params.waiterName,
+      items: [],
+      status: 'draft',
+      subtotal: 0,
+      ivaAmount: 0,
+      discount: 0,
+      discountReason: '',
+      total: 0,
+      paymentMethod: null,
+      paymentReference: null,
+      isPaid: false,
+      paidAt: null,
+      notes: params.notes || '',
+      guestCount: params.guestCount || 1,
+      createdAt: now,
+      updatedAt: now,
+      syncedAt: null,
+      localId: params.localId || `local-${Date.now()}`,
+    };
+
+    this.orders.set(order.id, order);
+    this._notify();
+    return order;
+  }
+
+  /** Add item to an order */
+  addItem(orderId: string, item: OrderLineItem): boolean {
+    const order = this.orders.get(orderId);
+    if (!order || order.isPaid) return false;
+
+    order.items.push(item);
+    this._recalculateOrder(order);
+    this._notify();
+    return true;
+  }
+
+  /** Remove item from an order */
+  removeItem(orderId: string, itemId: string): boolean {
+    const order = this.orders.get(orderId);
+    if (!order || order.isPaid) return false;
+
+    order.items = order.items.filter(i => i.id !== itemId);
+    this._recalculateOrder(order);
+    this._notify();
+    return true;
+  }
+
+  /** Update item quantity */
+  updateItemQuantity(orderId: string, itemId: string, quantity: number): boolean {
+    const order = this.orders.get(orderId);
+    if (!order || order.isPaid) return false;
+    if (quantity < 1) return this.removeItem(orderId, itemId);
+
+    const item = order.items.find(i => i.id === itemId);
+    if (!item) return false;
+
+    item.quantity = quantity;
+    item.subtotal = (item.unitPrice + item.modifiers.reduce((s, m) => s + m.priceAdjustment, 0)) * quantity;
+    this._recalculateOrder(order);
+    this._notify();
+    return true;
+  }
+
+  /** Confirm order (send to KDS) */
+  confirmOrder(orderId: string): boolean {
+    const order = this.orders.get(orderId);
+    if (!order || order.status !== 'draft') return false;
+
+    order.status = 'confirmed';
+    order.updatedAt = new Date().toISOString();
+
+    // Set all items to pending for KDS
+    order.items.forEach(item => {
+      item.status = 'pending';
+    });
+
+    // Fire KDS event
+    this._fireKDSEvent({
+      type: 'new_order',
+      orderId: order.id,
+      tableNumber: order.tableNumber,
+      items: order.items,
+      timestamp: new Date().toISOString(),
+    });
+
+    this._notify();
+    return true;
+  }
+
+  /** Update item status (cocina marks as preparing/ready) */
+  updateItemStatus(orderId: string, itemId: string, status: KDSStatus): boolean {
+    const order = this.orders.get(orderId);
+    if (!order) return false;
+
+    const item = order.items.find(i => i.id === itemId);
+    if (!item) return false;
+
+    item.status = status;
+    order.updatedAt = new Date().toISOString();
+
+    // Check if all items are delivered
+    const allDelivered = order.items.every(i => 
+      ['delivered', 'cancelled'].includes(i.status)
+    );
+    if (allDelivered) {
+      order.status = 'served';
+    }
+
+    this._fireKDSEvent({
+      type: 'status_change',
+      orderId: order.id,
+      tableNumber: order.tableNumber,
+      items: [item],
+      timestamp: new Date().toISOString(),
+    });
+
+    this._notify();
+    return true;
+  }
+
+  /** Apply discount */
+  setDiscount(orderId: string, amount: number, reason: string): boolean {
+    const order = this.orders.get(orderId);
+    if (!order || order.isPaid) return false;
+
+    order.discount = Math.min(amount, order.subtotal);
+    order.discountReason = reason;
+    this._recalculateOrder(order);
+    this._notify();
+    return true;
+  }
+
+  // ============================================================
+  // PAYMENT
+  // ============================================================
+
+  /** Process payment for an order */
+  processPayment(orderId: string, method: PaymentMethod, reference?: string): Payment | null {
+    const order = this.orders.get(orderId);
+    if (!order || order.isPaid) return null;
+
+    const now = new Date().toISOString();
+    const payment: Payment = {
+      id: `pay-${Date.now()}`,
+      orderId: order.id,
+      method,
+      amount: order.total,
+      ivaAmount: order.ivaAmount,
+      reference: reference || '',
+      status: 'completed',
+      processedBy: order.waiterId,
+      processedAt: now,
+      notes: '',
+      syncedAt: null,
+    };
+
+    this.payments.set(payment.id, payment);
+    order.paymentMethod = method;
+    order.paymentReference = reference || null;
+    order.isPaid = true;
+    order.paidAt = now;
+    order.status = 'paid';
+    order.updatedAt = now;
+
+    this._notify();
+    return payment;
+  }
+
+  /** Get payment by ID */
+  getPayment(id: string): Payment | undefined {
+    return this.payments.get(id);
+  }
+
+  /** Get payments for an order */
+  getOrderPayments(orderId: string): Payment[] {
+    return Array.from(this.payments.values()).filter(p => p.orderId === orderId);
+  }
+
+  // ============================================================
+  // QUERIES
+  // ============================================================
+
+  /** Get active orders (confirmed, preparing, ready) */
+  getActiveOrders(): Order[] {
+    return Array.from(this.orders.values()).filter(o =>
+      ['draft', 'confirmed', 'preparing', 'ready', 'served'].includes(o.status)
+    );
+  }
+
+  /** Get orders for KDS display */
+  getKDSOrders(): Order[] {
+    return Array.from(this.orders.values()).filter(o =>
+      ['confirmed', 'preparing', 'ready'].includes(o.status)
+    ).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }
+
+  /** Get orders by table */
+  getTableOrders(tableId: string): Order[] {
+    return Array.from(this.orders.values()).filter(o => o.tableId === tableId);
+  }
+
+  /** Get today's orders */
+  getTodayOrders(): Order[] {
+    const today = new Date().toISOString().split('T')[0];
+    return Array.from(this.orders.values()).filter(o =>
+      o.createdAt.startsWith(today)
+    );
+  }
+
+  /** Get a single order */
+  getOrder(orderId: string): Order | undefined {
+    return this.orders.get(orderId);
+  }
+
+  // ============================================================
+  // OFFLINE SYNC
+  // ============================================================
+
+  /** Queue a sync event for offline-to-online bridge */
+  queueSync(event: SyncEvent): void {
+    this.syncQueue.push(event);
+  }
+
+  /** Get pending sync events */
+  getSyncQueue(): SyncEvent[] {
+    return [...this.syncQueue];
+  }
+
+  /** Mark sync events as processed */
+  clearSyncQueue(ids: string[]): void {
+    this.syncQueue = this.syncQueue.filter(e => !ids.includes(e.localId));
+  }
+
+  /** Import order from sync */
+  importOrder(order: Order): void {
+    this.orders.set(order.id, order);
+    this._notify();
+  }
+
+  /** Export all orders for sync */
+  exportOrders(): Order[] {
+    return Array.from(this.orders.values());
+  }
+
+  /** Get daily sales summary */
+  getDailySummary(date?: string) {
+    const day = date || new Date().toISOString().split('T')[0];
+    const dayOrders = Array.from(this.orders.values())
+      .filter(o => o.createdAt.startsWith(day) && o.isPaid);
+
+    const methods: Record<string, number> = {};
+    let total = 0;
+    let totalIva = 0;
+
+    dayOrders.forEach(order => {
+      total += order.total;
+      totalIva += order.ivaAmount;
+      const method = order.paymentMethod || 'unknown';
+      methods[method] = (methods[method] || 0) + order.total;
+    });
+
+    return {
+      date: day,
+      totalOrders: dayOrders.length,
+      totalSales: Math.round(total * 100) / 100,
+      totalIva: Math.round(totalIva * 100) / 100,
+      byMethod: methods,
+      averageTicket: dayOrders.length > 0 
+        ? Math.round((total / dayOrders.length) * 100) / 100 
+        : 0,
+    };
+  }
+
+  // ============================================================
+  // INTERNAL
+  // ============================================================
+
+  /** Recalculate order totals */
+  private _recalculateOrder(order: Order): void {
+    order.subtotal = Math.round(
+      order.items.reduce((sum, item) => sum + item.subtotal, 0) * 100
+    ) / 100;
+
+    order.ivaAmount = Math.round(
+      order.items.reduce((sum, item) => {
+        // IVA is included in price, so we need to extract it
+        const ivaInItem = item.subtotal - (item.subtotal / 1.13);
+        return sum + ivaInItem;
+      }, 0) * 100
+    ) / 100;
+
+    order.total = Math.round(
+      (order.subtotal - order.discount) * 100
+    ) / 100;
+
+    order.updatedAt = new Date().toISOString();
+  }
+
+  /** Fire KDS event to listeners */
+  private _fireKDSEvent(event: KDSEvent): void {
+    this.kdsListeners.forEach(cb => cb(event));
+  }
+
+  /** Subscribe to KDS events */
+  onKDSEvent(callback: (event: KDSEvent) => void): () => void {
+    this.kdsListeners.add(callback);
+    return () => this.kdsListeners.delete(callback);
+  }
+
+  /** Subscribe to order changes */
+  onChange(callback: () => void): () => void {
+    this.listeners.add(callback);
+    return () => this.listeners.delete(callback);
+  }
+
+  private _notify(): void {
+    this.listeners.forEach(cb => cb());
+  }
+}
+
+const orderEngine = new OrderEngine();
+export default orderEngine;
+export { OrderEngine };

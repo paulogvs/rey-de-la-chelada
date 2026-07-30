@@ -23,6 +23,33 @@ description: >
 
 ---
 
+## 0. DYNAMIC TOKEN SYSTEM — CRITICAL ARCHITECTURE
+
+> **Esta app NO tiene colores hardcodeados. NUNCA.**
+> Todos los valores visuales se definen en `src/ui/tokens/tokens.json` y se aplican como CSS custom properties.
+> Si cambias el JSON → TODA la app se actualiza (colores, bg, dark mode, espaciados, tipografías).
+
+```
+tokens.json (DATA fuente — el único lugar con hex values)
+    ↓  theme.js aplica en runtime
+CSS Custom Properties (--dorado-rey, --bg, --surface, --text, etc.)
+    ↓  Componentes las consumen
+UI (NUNCA hex/rgb/hsl directo — solo var(--variable))
+```
+
+### Dark Mode = Default
+- Entorno de restaurante = poca luz → **dark mode es el canvas por defecto**
+- Light mode disponible para administración desde PC con luz natural
+- Transición: 600ms entre temas, nada abrupto
+- Background dinámico: `--bg` cambia con el tema, todo se ajusta armónicamente
+
+### Paleta Cambiable en Tiempo Real
+- `themeManager.setPalette('otra-paleta')` → toda la UI se actualiza
+- `themeManager.toggleTheme()` → dark/light mode con transición
+- Las paletas se definen en `tokens.json.palettes` — puedes tener múltiples
+
+---
+
 ## 1. Visual Theme & Atmosphere
 
 | Atributo | Valor |
@@ -138,22 +165,22 @@ Los colores fueron extraídos del logo de Rey de la Chelada (corona dorada, jarr
 ## 4. Component Stylings
 
 ### Buttons
-- **Primary**: Gold background (`#D4AF37`), dark text, 48px min height
-- **Secondary**: Gold border, transparent bg, 48px min height
+- **Primary**: Background `var(--dorado-rey)`, text `var(--madera-oscura)`, 48px min height
+- **Secondary**: Border `var(--dorado-rey)`, transparent bg, 48px min height
 - **KDS**: 64px min height, uppercase, bold
 
 ### Cards
-- **Menu Item**: Dark surface, gold hairline border, 16px radius, 48px min height
-- **KDS Order**: Black bg, colored left border by status, 24px padding
+- **Menu Item**: Background `var(--surface)`, border `var(--border)`, radius `var(--radius-lg)`, 48px min height
+- **KDS Order**: Background `var(--kds-bg)`, colored left border by status, padding `var(--space-6)`
 
-### Table Map
-- 64px circles, color-coded by status, white bold numbers
+### Table Grid
+- 60px circles/squares, background `var(--surface)`, color-coded by status via `var(--status-*)`, bold numbers
 
 ### Navigation
-- Sidebar icons (tablet) or bottom nav (phone), glass effect
+- Bottom nav (phone/tablet), background `var(--glass-bg)` with `backdrop-filter: var(--glass-blur)`
 
 ### Status Badges
-- Pill shape, colored bg, JetBrains Mono, uppercase
+- Pill shape, background `var(--status-*)` / 10% opacity, text `var(--status-*)`, JetBrains Mono, uppercase
 
 ---
 

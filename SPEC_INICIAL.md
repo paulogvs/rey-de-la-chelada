@@ -11,6 +11,56 @@
 - **Architecture**: Modular Monolith with offline-first PWA
 - **Deployment Profile**: RESTAURANT (Windows Self-Hosted + Local Network)
 
+## 1b. Design System — Dynamic Palette
+
+> **La app NO tiene colores hardcodeados.** Todos los colores, espaciados, tipografías y dimensiones se definen en `src/ui/tokens/tokens.json` y se aplican como CSS custom properties.
+
+### Dynamic Palette Architecture
+```
+tokens.json (DATA)          ← Cambias aquí y se actualiza TODO el sistema
+  ↓
+theme.js (Runtime)           ← Aplica como CSS variables en :root
+  ↓
+tokens.css (CSS Custom Props) ← --dorado-rey, --surface, --text, etc.  
+  ↓
+Componentes (React/TSX)      ← Usan var(--variable), NUNCA hex/rgb
+```
+
+### Características del sistema de tokens:
+- **Paleta dinámica**: Cambias el JSON → toda la app se actualiza
+- **Background dinámico**: `--bg` cambia con dark/light mode
+- **Modo oscuro es DEFAULT**: Entorno de restaurante = baja luz
+- **Transición suave**: 600ms entre temas, nada abrupto
+- **Paleta derivada del logo**: Los 5 colores (Dorado Rey #D4AF37, Madera Oscura #2B1B10, Ámbar Cerveza #E08B27, Crema Espuma #F4E8C1, Verde Esmeralda #0D5C3A)
+
+### Artículo II — ZERO HARDCODED VALUES
+- ✅ 0 colores hex en `src/`
+- ✅ 0 `font-size` en px directos en componentes
+- ✅ 0 espaciados mágicos
+- ✅ 0 tipografías por nombre directo
+- ✅ Verificado por pre-commit hook
+
+## 1c. Table Architecture — Number-Based (Not Visual Map)
+
+> **Las mesas son entidades lógicas controladas por número, NO por posición visual.**
+> El layout se reconfigura desde el panel de admin sin perder datos.
+
+### How it works:
+```
+Admin configura:
+├── Total mesas (ej: 10)
+├── Columnas del grid (ej: 5)
+├── Secciones (ej: interior, barra, terraza)
+└── Capacidad por defecto (ej: 4 personas)
+
+Mesero ve:
+└── Grid de tarjetas ordenadas por número
+    └── Cada tarjeta muestra: #, estado (color), capacidad
+    └── Click → abre el pedido de esa mesa
+
+Sin mapa visual. Sin drag-and-drop. Sin posiciones absolutas.
+```
+
 ## 2. Business Context
 - **Mesas**: 10 mesas
 - **Meseros por turno**: 2
@@ -26,7 +76,7 @@
 ## 3. Core Features
 ### Phase 1 — MVP (6-8 semanas)
 - [ ] FR01: Digital Menu with categories, photos, prices, modifiers (preparada/sencilla)
-- [ ] FR02: Table Map (visual salon layout — 10 mesas, naming)
+- [ ] FR02: Table Grid (number-based, NOT visual map — 10 mesas configurables, admin reordena)
 - [ ] FR03: Order Taking (offline-first with IndexedDB)
 - [ ] FR04: KDS (Kitchen Display System) — real-time orders to cocina
 - [ ] FR05: Payment processing (QR Bolivia + Cash + POS + Transferencia)
