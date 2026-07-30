@@ -1,7 +1,7 @@
 # AGENTS.md — Rey de la Chelada
 
 > **SSOT — Este archivo GANA sobre cualquier otro.**
-> Creado: 2026-07-29 | Versión: 1.0.0 | Stack: React 19 + Express 5 + SQLite + PWA
+> Creado: 2026-07-29 | Versión: 1.1.0 | Stack: React 19 + Express 5 + SQLite + Multi-PWA
 
 ---
 
@@ -41,10 +41,12 @@ rey-de-la-chelada/
 ├── update.bat              ← Auto-update
 ├── backup.bat              ← Daily backup
 ├── src/
-│   ├── core/engine/        ← SSOT — motor de datos único
-│   ├── core/types/         ← Tipos compartidos
+│   ├── core/
+│   │   ├── config/         ← SSOT Config (app.config, pwa-registry, capabilities, security)
+│   │   ├── engine/         ← SSOT — motor de datos único (Table, Menu, Order)
+│   │   └── types/          ← Tipos compartidos (Table, Order, MenuItem, KDS, etc.)
 │   ├── modules/
-│   │   ├── salon/          ← Mesas (10), mapa
+│   │   ├── salon/          ← Mesas (10), TableGrid
 │   │   ├── orders/         ← Pedidos, KDS
 │   │   ├── menu/           ← Productos, precios
 │   │   ├── payments/       ← QR, efectivo, POS
@@ -52,15 +54,44 @@ rey-de-la-chelada/
 │   │   ├── staff/          ← Roles, turnos
 │   │   ├── reports/        ← Corte de caja
 │   │   └── sync/           ← Offline sync
-│   └── ui/
-│       ├── components/     ← Shared components
-│       └── pages/          ← Views
-├── server/                 ← Express API
+│   ├── ui/
+│   │   ├── components/     ← Shared components
+│   │   ├── pages/          ← Views
+│   │   └── tokens/         ← Design tokens dinámicos (tokens.json → theme.js)
+│   └── pwa/                ← Multi-PWA entry points
+│       ├── _shared/        ← Bootstrap, hooks, layouts compartidos
+│       ├── clientes/       ← Menú Digital (público)
+│       ├── cocina/         ← KDS Cocina
+│       ├── bar/            ← Barra
+│       ├── meseros/        ← Mesas + pedidos
+│       ├── caja/           ← Corte de caja
+│       └── admin/          ← Administración
+├── server/                 ← Express API (multi-PWA routing)
 ├── tests/
 ├── docs/
 ├── legal/
 └── logo/                   ← rey_de_la_chelada_logo.png
 ```
+
+## 3b. MULTI-PWA ARCHITECTURE
+
+La app sirve **6 PWAs independientes** desde un mismo servidor (monolito):
+
+| PWA | Ruta | Propósito | Perfil visual |
+|-----|------|-----------|---------------|
+| **Clientes** | `/clientes/` | Menú digital público | minimal, portrait |
+| **Cocina** | `/cocina/` | KDS Kitchen Display | fullscreen, kds |
+| **Bar** | `/bar/` | Órdenes de barra | kds, landscape |
+| **Meseros** | `/meseros/` | Mesas + pedidos + cobros | touch, standalone |
+| **Caja** | `/caja/` | Corte de caja | default |
+| **Admin** | `/admin/` | Configuración + reportes | default |
+
+Cada PWA comparte el mismo motor SSOT (`src/core/engine/`) y configuración global (`src/core/config/`), pero tiene su propio manifest, service worker y entry point.
+
+### Seguridad del módulo clientes
+- "El pedido activo es el permiso" — sin pedido activo, solo menú en modo lectura
+- QR token de 3h se renueva automáticamente con pedido activo
+- No requiere WiFi ni IP tracking
 
 ## 4. CODE STYLE
 
