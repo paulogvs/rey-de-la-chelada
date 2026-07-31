@@ -1,0 +1,280 @@
+/**
+ * ═══════════════════════════════════════════════════════════
+ *  Menu Routes — Catálogo de productos (público + admin)
+ *
+ *  GET    /api/menu/categories        → Categorías activas
+ *  GET    /api/menu/items             → Items activos (filtrable)
+ *  GET    /api/menu/items/:id         → Item específico
+ *  POST   /api/menu/categories        → Crear categoría (admin)
+ *  PUT    /api/menu/categories/:id    → Actualizar categoría (admin)
+ *  POST   /api/menu/items             → Crear item (admin)
+ *  PUT    /api/menu/items/:id         → Actualizar item (admin)
+ *  PATCH  /api/menu/items/:id/toggle  → Activar/desactivar (admin)
+ * ═══════════════════════════════════════════════════════════
+ */
+
+import { Router } from 'express';
+import { getDb } from '../db/index.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
+
+const router = Router();
+
+// ============================================================
+// GET /api/menu/categories — Categorías activas
+// ============================================================
+
+router.get('/categories', (req, res) => {
+  try {
+    const db = getDb();
+    const categories = db.prepare(
+      'SELECT id, name, description, icon, sort_order FROM menu_categories WHERE active = 1 ORDER BY sort_order ASC'
+    ).all();
+    res.json({ success: true, categories });
+  } catch (err) {
+    console.error('[Menu] Categories error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al obtener categorías', code: 'CATEGORIES_ERROR' });
+  }
+});
+
+// ============================================================
+// GET /api/menu/items — Items activos (filtrable por categoría)
+// ============================================================
+
+router.get('/items', (req, res) => {
+  try {
+    const db = getDb();
+    const { category_id, search, available } = req.query;
+
+    let sql = `
+      SELECT mi.id, mi.name, mi.description, mi.price, mi.price_type,
+             mi.image_url, mi.sort_order, mi.available, mc.name as category_name,
+             mc.id as category_id
+      FROM menu_items mi
+      JOIN menu_categories mc ON mi.category_id = mc.id
+      WHERE mi.active = 1
+    `;
+    const params = [];
+
+    if (category_id) {
+      sql += ' AND mi.category_id = ?';
+      params.push(category_id);
+    }
+
+    if (search) {
+      sql += ' AND (mi.name LIKE ? OR mi.description LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+
+    if (available === 'true') {
+      sql += ' AND mi.available = 1';
+    }
+
+    sql += ' ORDER BY mc.sort_order ASC, mi.sort_order ASC';
+
+    const items = db.prepare(sql).all(...params);
+    res.json({ success: true, items });
+  } catch (err) {
+    console.error('[Menu] Items error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al obtener items', code: 'ITEMS_ERROR' });
+  }
+});
+
+// ============================================================
+// GET /api/menu/items/:id — Item específico
+// ============================================================
+
+router.get('/items/:id', (req, res) => {
+  try {
+    const db = getDb();
+    const item = db.prepare(`
+      SELECT mi.*, mc.name as category_name
+      FROM menu_items mi
+      JOIN menu_categories mc ON mi.category_id = mc.id
+      WHERE mi.id = ? AND mi.active = 1
+    `).get(req.params.id);
+
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item no encontrado', code: 'ITEM_NOT_FOUND' });
+    }
+
+    // Get modifiers for this item
+    const modifiers = db.prepare(`
+      SELECT mg.id, mg.name, mg.min_select, mg.max_select,
+             mo.id as option_id, mo.name as option_name, mo.price_adjustment as option_price
+      FROM modifier_groups mg
+      LEFT JOIN modifier_options mo ON mg.id = mo.group_id
+      WHERE mg.item_id = ?
+      ORDER BY mg.sort_order, mo.sort_order
+    `).all(item.id);
+
+    res.json({ success: true, item, modifiers });
+  } catch (err) {
+    console.error('[Menu] Item detail error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al obtener item', code: 'ITEM_DETAIL_ERROR' });
+  }
+});
+
+// ============================================================
+// Admin: POST /api/menu/categories
+// ============================================================
+
+router.post('/categories', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const { name, description, icon, sort_order } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, error: 'Nombre requerido', code: 'NAME_REQUIRED' });
+    }
+
+    const db = getDb();
+    const result = db.prepare(
+      'INSERT INTO menu_categories (name, description, icon, sort_order) VALUES (?, ?, ?, ?)'
+    ).run(name, description || '', icon || '', sort_order || 0);
+
+    const category = db.prepare('SELECT * FROM menu_categories WHERE id = ?').get(result.lastInsertRowid);
+    res.status(201).json({ success: true, category });
+  } catch (err) {
+    console.error('[Menu] Create category error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al crear categoría', code: 'CATEGORY_CREATE_ERROR' });
+  }
+});
+
+// ============================================================
+// Admin: PUT /api/menu/categories/:id
+// ============================================================
+
+router.put('/categories/:id', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const { name, description, icon, sort_order, active } = req.body;
+    const db = getDb();
+
+    const existing = db.prepare('SELECT id FROM menu_categories WHERE id = ?').get(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Categoría no encontrada', code: 'CATEGORY_NOT_FOUND' });
+    }
+
+    const updates = [];
+    const params = [];
+    if (name) { updates.push('name = ?'); params.push(name); }
+    if (description !== undefined) { updates.push('description = ?'); params.push(description); }
+    if (icon !== undefined) { updates.push('icon = ?'); params.push(icon); }
+    if (sort_order !== undefined) { updates.push('sort_order = ?'); params.push(sort_order); }
+    if (active !== undefined) { updates.push('active = ?'); params.push(active ? 1 : 0); }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, error: 'Nada que actualizar', code: 'NO_UPDATES' });
+    }
+
+    params.push(req.params.id);
+    db.prepare(`UPDATE menu_categories SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+
+    const updated = db.prepare('SELECT * FROM menu_categories WHERE id = ?').get(req.params.id);
+    res.json({ success: true, category: updated });
+  } catch (err) {
+    console.error('[Menu] Update category error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al actualizar categoría', code: 'CATEGORY_UPDATE_ERROR' });
+  }
+});
+
+// ============================================================
+// Admin: POST /api/menu/items
+// ============================================================
+
+router.post('/items', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const { name, description, price, price_type, category_id, image_url, sort_order } = req.body;
+
+    if (!name || price === undefined || !category_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nombre, precio y categoría son requeridos',
+        code: 'ITEM_DATA_REQUIRED',
+      });
+    }
+
+    const db = getDb();
+
+    // Verify category exists
+    const cat = db.prepare('SELECT id FROM menu_categories WHERE id = ?').get(category_id);
+    if (!cat) {
+      return res.status(404).json({ success: false, error: 'Categoría no encontrada', code: 'CATEGORY_NOT_FOUND' });
+    }
+
+    const result = db.prepare(
+      'INSERT INTO menu_items (name, description, price, price_type, category_id, image_url, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(name, description || '', price, price_type || 'unit', category_id, image_url || '', sort_order || 0);
+
+    const item = db.prepare('SELECT * FROM menu_items WHERE id = ?').get(result.lastInsertRowid);
+    res.status(201).json({ success: true, item });
+  } catch (err) {
+    console.error('[Menu] Create item error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al crear item', code: 'ITEM_CREATE_ERROR' });
+  }
+});
+
+// ============================================================
+// Admin: PUT /api/menu/items/:id
+// ============================================================
+
+router.put('/items/:id', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const { name, description, price, price_type, category_id, image_url, sort_order, available } = req.body;
+    const db = getDb();
+
+    const existing = db.prepare('SELECT id FROM menu_items WHERE id = ?').get(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Item no encontrado', code: 'ITEM_NOT_FOUND' });
+    }
+
+    const updates = [];
+    const params = [];
+    if (name) { updates.push('name = ?'); params.push(name); }
+    if (description !== undefined) { updates.push('description = ?'); params.push(description); }
+    if (price !== undefined) { updates.push('price = ?'); params.push(price); }
+    if (price_type) { updates.push('price_type = ?'); params.push(price_type); }
+    if (category_id) { updates.push('category_id = ?'); params.push(category_id); }
+    if (image_url !== undefined) { updates.push('image_url = ?'); params.push(image_url); }
+    if (sort_order !== undefined) { updates.push('sort_order = ?'); params.push(sort_order); }
+    if (available !== undefined) { updates.push('available = ?'); params.push(available ? 1 : 0); }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, error: 'Nada que actualizar', code: 'NO_UPDATES' });
+    }
+
+    params.push(req.params.id);
+    db.prepare(`UPDATE menu_items SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+
+    const updated = db.prepare('SELECT * FROM menu_items WHERE id = ?').get(req.params.id);
+    res.json({ success: true, item: updated });
+  } catch (err) {
+    console.error('[Menu] Update item error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al actualizar item', code: 'ITEM_UPDATE_ERROR' });
+  }
+});
+
+// ============================================================
+// Admin: PATCH /api/menu/items/:id/toggle — Activar/desactivar
+// ============================================================
+
+router.patch('/items/:id/toggle', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const db = getDb();
+    const item = db.prepare('SELECT id, active FROM menu_items WHERE id = ?').get(req.params.id);
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item no encontrado', code: 'ITEM_NOT_FOUND' });
+    }
+
+    const newActive = item.active ? 0 : 1;
+    db.prepare('UPDATE menu_items SET active = ? WHERE id = ?').run(newActive, req.params.id);
+
+    res.json({
+      success: true,
+      active: !!newActive,
+      message: `Item ${newActive ? 'activado' : 'desactivado'}`,
+    });
+  } catch (err) {
+    console.error('[Menu] Toggle error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al cambiar estado', code: 'ITEM_TOGGLE_ERROR' });
+  }
+});
+
+export default router;

@@ -40,14 +40,20 @@ export function QRDisplay({
     if (!canvasRef.current || loading) return;
 
     try {
-      // Dynamic import to avoid SSR issues
+      // Read colors from CSS custom properties (Artículo II: ZERO HARDCODED VALUES)
+      // Canvas API doesn't support CSS variables, so we read the computed values
+      const root = document.documentElement;
+      const computed = getComputedStyle(root);
+      const qrDark = computed.getPropertyValue('--dorado-rey').trim() || '#D4AF37';
+      const qrLight = computed.getPropertyValue('--bg').trim() || '#1A0F0A';
+
       import('qrcode').then(QRCode => {
         QRCode.toCanvas(canvasRef.current, data, {
           width: size,
           margin: 2,
           color: {
-            dark: '#D4AF37',  // dorado-rey
-            light: '#1A0F0A', // bg dark
+            dark: qrDark,
+            light: qrLight,
           },
           errorCorrectionLevel: errorCorrection,
         }, (err: Error | null) => {

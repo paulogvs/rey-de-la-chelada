@@ -51,18 +51,18 @@ export interface ClientSession {
 }
 
 // ============================================================
-# ⚠️ NOTA DE SEGURIDAD CRÍTICA
-#
-#  El QR token NO es criptográficamente seguro por diseño.
-#  Es un token de conveniencia: permite acceso rápido.
-#  La SEGURIDAD REAL está en que sin pedido activo
-#  NO hay funciones interactivas (llamar mesero, pedir cuenta).
-#
-#  Si en el futuro necesitas más seguridad:
-#  - Agrega JWT firmado con HMAC
-#  - Agrega rate limiting por mesa
-#  - Agrega verificación de que el cliente está en la red local
-# ============================================================
+// ⚠️ NOTA DE SEGURIDAD CRÍTICA
+//
+//  El QR token NO es criptográficamente seguro por diseño.
+//  Es un token de conveniencia: permite acceso rápido.
+//  La SEGURIDAD REAL está en que sin pedido activo
+//  NO hay funciones interactivas (llamar mesero, pedir cuenta).
+//
+//  Si en el futuro necesitas más seguridad:
+//  - Agrega JWT firmado con HMAC
+//  - Agrega rate limiting por mesa
+//  - Agrega verificación de que el cliente está en la red local
+// ============================================================
 
 class SecurityEngine {
   private activeSessions: Map<string, ClientSession> = new Map();

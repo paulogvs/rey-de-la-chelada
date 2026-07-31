@@ -17,6 +17,8 @@
  *
  *  Artículo I:  SSOT — Monolito que sirve múltiples PWAs
  *  Artículo IV: Simplicidad — Un solo servidor, un solo deploy
+ *  Artículo VI: Observabilidad — Fail loud, never silent
+ *  Artículo VII: Secrets Boundary — Config desde .env
  * ═══════════════════════════════════════════════════════════
  */
 
@@ -28,6 +30,13 @@ import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+// ── Middleware ────────────────────────────────────────────
+import { apiLimiter, authLimiter, corsOptions, helmetCspConfig, securityHeaders } from './middleware/security.js';
+import { requireAuth, optionalAuth } from './middleware/auth.js';
+
+// ── Database ──────────────────────────────────────────────
+import { getDb } from './db/index.js';
 
 // ============================================================
 // Setup
@@ -44,13 +53,50 @@ const PORT = process.env.PORT || 3001;
 const DIST_DIR = path.join(__dirname, '..', 'dist');
 
 // ============================================================
+// Initialize Database
+// ============================================================
+
+let db;
+try {
+  db = getDb();
+  console.log('[DB] Database connected and schema applied');
+} catch (err) {
+  console.error('[DB] Failed to initialize database:', err.message);
+  // Non-blocking — app can still run in dev mode
+}
+
+// ============================================================
 // Middleware global
 // ============================================================
 
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors());
+// Seguridad: helmet con CSP configurado
+app.use(helmet(helmetCspConfig));
+
+// CORS restringido
+app.use(cors(corsOptions));
+
+// Headers de seguridad adicionales
+app.use(securityHeaders);
+
+// Logging
 app.use(morgan('combined'));
-app.use(express.json());
+
+// Body parsing
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// Rate limiting global para /api/*
+app.use('/api', apiLimiter);
+
+// ============================================================
+// Static Files
+// ============================================================
+
+// Badges (FORCH.i)
+app.use('/badges', express.static(path.join(__dirname, '..', 'public', 'badges'), { maxAge: '7d' }));
+
+// Icons compartidos
+app.use('/icons', express.static(path.join(DIST_DIR, 'icons'), { maxAge: '7d' }));
 
 // ============================================================
 // PWA Routes — Cada una sirve su propio directorio
@@ -64,9 +110,6 @@ const PWA_ROUTES = [
   { path: '/caja',     dir: 'caja' },
   { path: '/admin',    dir: 'admin' },
 ];
-
-// Static files compartidos (icons, fonts, etc.)
-app.use('/icons', express.static(path.join(DIST_DIR, 'icons'), { maxAge: '7d' }));
 
 // Cada PWA sirve sus estáticos desde su carpeta
 for (const pwa of PWA_ROUTES) {
@@ -83,33 +126,55 @@ for (const pwa of PWA_ROUTES) {
 // API Routes
 // ============================================================
 
-// Health check
+// Health check (público)
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     app: 'Rey de la Chelada',
     version: '1.0.0',
+    database: db ? 'connected' : 'disconnected',
     pwAs: PWA_ROUTES.map(p => p.path),
+    uptime: process.uptime(),
   });
 });
 
-// API routes — se registrarán aquí
-// app.use('/api/salon', salonRoutes);
-// app.use('/api/orders', orderRoutes);
-// app.use('/api/menu', menuRoutes);
-// app.use('/api/payments', paymentRoutes);
-// app.use('/api/inventory', inventoryRoutes);
-// app.use('/api/staff', staffRoutes);
-// app.use('/api/reports', reportRoutes);
-// app.use('/api/sync', syncRoutes);
-
-// QR Token generation endpoint
+// QR Token generation endpoint (público — genera URLs para imprimir en mesas)
 app.get('/api/qr-table/:tableNumber', (req, res) => {
   const { tableNumber } = req.params;
+  const num = parseInt(tableNumber, 10);
+  if (isNaN(num) || num < 1 || num > 50) {
+    return res.status(400).json({
+      success: false,
+      error: 'Número de mesa inválido (1-50)',
+      code: 'INVALID_TABLE_NUMBER',
+    });
+  }
+
   const baseUrl = `${req.protocol}://${req.hostname}:${PORT}`;
-  const qrUrl = `${baseUrl}/clientes?mesa=${tableNumber}&sid=sess_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
-  res.json({ tableNumber, qrUrl });
+  const qrUrl = `${baseUrl}/clientes?mesa=${num}`;
+  res.json({ success: true, tableNumber: num, qrUrl });
 });
+
+// ── Route imports ─────────────────────────────────────────
+import authRoutes from './routes/auth.js';
+import tablesRoutes from './routes/tables.js';
+import menuRoutes from './routes/menu.js';
+import ordersRoutes from './routes/orders.js';
+import paymentsRoutes from './routes/payments.js';
+import staffRoutes from './routes/staff.js';
+import syncRoutes from './routes/sync.js';
+import reportsRoutes from './routes/reports.js';
+import { requireRole } from './middleware/auth.js';
+
+// ── Route registration ────────────────────────────────────
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/tables', tablesRoutes);          // Auth handled inside
+app.use('/api/menu', menuRoutes);              // Public read, admin write (handled inside)
+app.use('/api/orders', ordersRoutes);
+app.use('/api/payments', paymentsRoutes);
+app.use('/api/staff', staffRoutes);
+app.use('/api/sync', syncRoutes);
+app.use('/api/reports', reportsRoutes);
 
 // ============================================================
 // WebSocket — KDS Real-Time
@@ -123,17 +188,34 @@ wss.on('connection', (ws, req) => {
 
   console.log(`[KDS] ${pwaId} connected`);
 
+  // Send initial connection confirmation
+  ws.send(JSON.stringify({
+    type: 'connected',
+    module: pwaId,
+    timestamp: new Date().toISOString(),
+  }));
+
   ws.on('message', (message) => {
-    // Broadcast a todos los KDS clients
-    wss.clients.forEach((client) => {
-      if (client !== ws && client.readyState === 1) {
-        client.send(message);
-      }
-    });
+    try {
+      const parsed = JSON.parse(message.toString());
+
+      // Broadcast a todos los KDS clients
+      wss.clients.forEach((client) => {
+        if (client !== ws && client.readyState === 1) {
+          client.send(JSON.stringify(parsed));
+        }
+      });
+    } catch (err) {
+      console.error('[KDS] Invalid message:', err.message);
+    }
   });
 
   ws.on('close', () => {
     console.log(`[KDS] ${pwaId} disconnected`);
+  });
+
+  ws.on('error', (err) => {
+    console.error(`[KDS] ${pwaId} error:`, err.message);
   });
 });
 
@@ -141,9 +223,46 @@ wss.on('connection', (ws, req) => {
 // Error handling
 // ============================================================
 
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Ruta no encontrada',
+    code: 'NOT_FOUND',
+    path: req.path,
+  });
+});
+
+// Error handler global
 app.use((err, req, res, _next) => {
   console.error('[Server] Error:', err);
-  res.status(500).json({ error: 'Internal server error' });
+
+  // Errores conocidos
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({
+      success: false,
+      error: 'JSON inválido en el cuerpo de la solicitud',
+      code: 'INVALID_JSON',
+    });
+  }
+
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({
+      success: false,
+      error: 'Archivo demasiado grande',
+      code: 'FILE_TOO_LARGE',
+    });
+  }
+
+  // Error genérico
+  res.status(err.status || 500).json({
+    success: false,
+    error: process.env.NODE_ENV === 'production'
+      ? 'Error interno del servidor'
+      : err.message,
+    code: 'INTERNAL_ERROR',
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
+  });
 });
 
 // ============================================================
@@ -164,7 +283,12 @@ server.listen(PORT, '0.0.0.0', () => {
   ║  ⚙️ /admin      → Admin             ║
   ║  📱 /clientes   → Menú Digital      ║
   ║                                      ║
+  ║  🔒 Security: helmet + rate-limit    ║
+  ║  🗄️  Database: SQLite                ║
+  ║                                      ║
   ║  🚀 http://localhost:${PORT}          ║
   ╚══════════════════════════════════════╝
   `);
 });
+
+export { app, server, wss };

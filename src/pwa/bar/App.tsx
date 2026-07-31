@@ -8,7 +8,8 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { bootstrapPwa, setCurrentPwaModule } from '../_shared/bootstrap';
+import { bootstrapPwa } from '../_shared/bootstrap';
+import { setCurrentPwaModule } from '../_shared/hooks/useCapability';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { orderEngine } from '@/core/engine';
 import { KDSOrderCard, KDSOrderCardSkeleton } from '@/ui/components/KDSOrderCard';

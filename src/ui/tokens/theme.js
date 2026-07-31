@@ -164,10 +164,13 @@ class ThemeManager {
       this._setProp(root, `--duration-${key}`, val);
     });
 
-    // 11. Glassmorphism
-    this._setProp(root, '--glass-bg', `rgba(43, 27, 16, 0.6)`);
-    this._setProp(root, '--glass-border', `rgba(212, 175, 55, 0.15)`);
-    this._setProp(root, '--glass-blur', `blur(20px) saturate(180%)`);
+    // 11. Glassmorphism (from tokens.json SSOT — theme-aware)
+    const glass = palette.glassmorphism?.[theme];
+    if (glass) {
+      this._setProp(root, '--glass-bg', this._rgba(glass.bg));
+      this._setProp(root, '--glass-border', this._rgba(glass.border));
+      this._setProp(root, '--glass-blur', glass.blur);
+    }
 
     // 12. Touch targets
     Object.entries(this._tokens.touch).forEach(([key, val]) => {

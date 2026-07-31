@@ -13,6 +13,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // ============================================================
 // PWA Modules (from our registry — source of truth)
@@ -74,7 +78,7 @@ export default defineConfig({
 
   resolve: {
     alias: {
-      '@': '/src',
+      '@': path.resolve(__dirname, 'src'),
     },
   },
 

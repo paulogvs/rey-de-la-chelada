@@ -10,7 +10,8 @@
  */
 
 import React from 'react';
-import { bootstrapPwa, setCurrentPwaModule } from '../_shared/bootstrap';
+import { bootstrapPwa } from '../_shared/bootstrap';
+import { setCurrentPwaModule } from '../_shared/hooks/useCapability';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { MenuPage } from './pages/MenuPage';
 

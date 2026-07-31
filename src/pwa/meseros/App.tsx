@@ -11,7 +11,8 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { bootstrapPwa, setCurrentPwaModule } from '../_shared/bootstrap';
+import { bootstrapPwa } from '../_shared/bootstrap';
+import { setCurrentPwaModule } from '../_shared/hooks/useCapability';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { TableGrid } from '@/modules/salon/components/TableGrid';
 import { ForchiBadge } from '@/ui/components/ForchiBadge';

@@ -21,7 +21,7 @@ export function ForchiBadge({ variant = 'default', className = '' }: ForchiBadge
     <div className={classes}>
       <span>Built with </span>
       <a
-        href="https://github.com/paulogvs/FORCH-IA-ECOSYSTEM"
+        href="https://forch-i-a-hub.vercel.app/"
         target="_blank"
         rel="noopener noreferrer"
       >

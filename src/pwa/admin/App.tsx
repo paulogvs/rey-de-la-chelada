@@ -9,7 +9,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { bootstrapPwa, setCurrentPwaModule } from '../_shared/bootstrap';
+import { bootstrapPwa } from '../_shared/bootstrap';
+import { setCurrentPwaModule } from '../_shared/hooks/useCapability';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { orderEngine, tableEngine, menuEngine } from '@/core/engine';
 import { appConfig } from '@/core/config';
