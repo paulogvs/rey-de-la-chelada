@@ -10,10 +10,17 @@
  *  POST   /api/orders/:id/items     → Agregar item a pedido
  *  DELETE /api/orders/:id/items/:itemId → Quitar item
  *  GET    /api/orders/kds/:module   → KDS view (cocina/bar)
+ *
+ *  Alineado al SSOT: server/db/schema.js
+ *  orders.status:  draft, confirmed, preparing, ready, served, paid, cancelled
+ *  order_items.status: pending, preparing, ready, delivered, cancelled
+ *  IVA: orders.iva_amount (13% sobre subtotal)
+ *  KDS: el módulo (cocina/bar) sale de menu_items.area
  * ═══════════════════════════════════════════════════════════
  */
 
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 
@@ -23,19 +30,62 @@ const router = Router();
 // Helpers
 // ============================================================
 
-const ORDER_STATUSES = ['pendiente', 'en_preparacion', 'listo', 'servido', 'completado', 'cancelado'];
-const KDS_MODULES = { cocina: 'cocina', bar: 'bar' };
+// Mapeo de estados al schema (se acepta español o canónico)
+const ORDER_STATUS_MAP = {
+  pendiente: 'confirmed', en_preparacion: 'preparing', listo: 'ready',
+  servido: 'served', completado: 'paid', cancelado: 'cancelled',
+  draft: 'draft', called: 'called', confirmed: 'confirmed', preparing: 'preparing',
+  ready: 'ready', served: 'served', paid: 'paid', cancelled: 'cancelled',
+};
 
-/**
- * Broadcast an order update via WebSocket
- */
-function broadcastOrderUpdate(orderId, action) {
-  // The WebSocket server is attached to the HTTP server
-  // Clients poll or use WS — handled at server level
-  // This function exists for future WS-based push
-  if (process.send) {
-    process.send({ type: 'order_update', orderId, action, timestamp: new Date().toISOString() });
-  }
+const ITEM_STATUS_MAP = {
+  pendiente: 'pending', en_preparacion: 'preparing', listo: 'ready',
+  servido: 'delivered', cancelado: 'cancelled',
+  pending: 'pending', preparing: 'preparing', ready: 'ready',
+  delivered: 'delivered', cancelled: 'cancelled',
+};
+
+const KDS_MODULES = { cocina: 'cocina', bar: 'bar', kds: 'all' };
+
+const IVA_RATE = 0.13;
+
+function round2(n) {
+  return Math.round(n * 100) / 100;
+}
+
+/** Recalcula subtotal/iva/total de un pedido */
+function recalcOrder(db, orderId) {
+  const items = db.prepare('SELECT COALESCE(SUM(subtotal), 0) as subtotal FROM order_items WHERE order_id = ?').get(orderId);
+  const subtotal = round2(items.subtotal || 0);
+  const iva = round2(subtotal * IVA_RATE);
+  const total = round2(subtotal + iva);
+  db.prepare('UPDATE orders SET subtotal = ?, iva_amount = ?, total = ? WHERE id = ?')
+    .run(subtotal, iva, total, orderId);
+  return { subtotal, iva, total };
+}
+
+/** Helper para armar la respuesta de un pedido con items */
+function buildOrder(db, orderId) {
+  const order = db.prepare(`
+    SELECT o.*, t.number as table_number, s.display_name as waiter_name_resolved
+    FROM orders o
+    LEFT JOIN tables t ON o.table_id = t.id
+    LEFT JOIN staff s ON o.waiter_id = s.id
+    WHERE o.id = ?
+  `).get(orderId);
+
+  if (!order) return null;
+
+  order.items = db.prepare(`
+    SELECT oi.*, mi.name as item_name, mi.area as kds_module
+    FROM order_items oi
+    LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+    WHERE oi.order_id = ?
+    ORDER BY oi.created_at ASC
+  `).all(orderId);
+
+  order.payments = db.prepare('SELECT * FROM payments WHERE order_id = ?').all(orderId);
+  return order;
 }
 
 // ============================================================
@@ -48,19 +98,16 @@ router.get('/', requireAuth, (req, res) => {
     const { status, table_id, date_from, date_to, limit } = req.query;
 
     let sql = `
-      SELECT o.id, o.table_id, t.number as table_number, o.status, o.notes,
-             o.subtotal, o.tax, o.total, o.payment_status,
-             o.created_by, s.display_name as created_by_name,
-             o.created_at, o.updated_at
+      SELECT o.*, t.number as table_number, s.display_name as waiter_name_resolved
       FROM orders o
       LEFT JOIN tables t ON o.table_id = t.id
-      LEFT JOIN staff s ON o.created_by = s.id
+      LEFT JOIN staff s ON o.waiter_id = s.id
       WHERE 1=1
     `;
     const params = [];
 
     if (status) {
-      const statuses = status.split(',');
+      const statuses = status.split(',').map(s => ORDER_STATUS_MAP[s.trim()] || s.trim());
       sql += ` AND o.status IN (${statuses.map(() => '?').join(',')})`;
       params.push(...statuses);
     }
@@ -81,12 +128,9 @@ router.get('/', requireAuth, (req, res) => {
     // Attach items to each order
     for (const order of orders) {
       order.items = db.prepare(`
-        SELECT oi.id, oi.menu_item_id, mi.name as item_name, mi.price,
-               oi.quantity, oi.unit_price, oi.subtotal as item_subtotal,
-               oi.notes as item_notes, oi.status as item_status,
-               oi.modifiers, oi.kds_module, oi.created_at as item_created_at
+        SELECT oi.*, mi.name as item_name, mi.area as kds_module
         FROM order_items oi
-        JOIN menu_items mi ON oi.menu_item_id = mi.id
+        LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
         WHERE oi.order_id = ?
         ORDER BY oi.created_at ASC
       `).all(order.id);
@@ -100,36 +144,92 @@ router.get('/', requireAuth, (req, res) => {
 });
 
 // ============================================================
+// GET /api/orders/kds/:module — KDS View (cocina/bar)
+// NOTA: debe registrarse ANTES de GET /:id (orden de Express)
+// ============================================================
+
+router.get('/kds/:module', requireAuth, requireRole('admin', 'kds'), (req, res) => {
+  try {
+    const module = req.params.module;
+    if (!KDS_MODULES[module]) {
+      return res.status(400).json({ success: false, error: 'Módulo KDS inválido. Use: cocina, bar, kds', code: 'INVALID_KDS_MODULE' });
+    }
+
+    const db = getDb();
+    const moduleFilter = KDS_MODULES[module]; // 'cocina', 'bar', or 'all'
+
+    let sql = `
+      SELECT DISTINCT o.id, o.table_id, t.number as table_number, o.status,
+             o.notes, o.created_at, o.waiter_id, s.display_name as waiter_name_resolved
+      FROM orders o
+      JOIN order_items oi ON o.id = oi.order_id
+      JOIN menu_items mi ON oi.menu_item_id = mi.id
+      LEFT JOIN tables t ON o.table_id = t.id
+      LEFT JOIN staff s ON o.waiter_id = s.id
+      WHERE o.status IN ('confirmed', 'preparing', 'ready')
+    `;
+    const params = [];
+
+    if (moduleFilter !== 'all') {
+      sql += ' AND mi.area = ?';
+      params.push(moduleFilter);
+    }
+
+    sql += ` ORDER BY
+        CASE o.status
+          WHEN 'confirmed' THEN 1
+          WHEN 'preparing' THEN 2
+          WHEN 'ready' THEN 3
+        END,
+        o.created_at ASC`;
+
+    const orders = db.prepare(sql).all(...params);
+
+    // Attach KDS items for each order
+    for (const order of orders) {
+      let itemSql = `
+        SELECT oi.id, oi.menu_item_id, mi.name as item_name, oi.quantity,
+               oi.unit_price, oi.preparation_notes as item_notes, oi.status as item_status,
+               oi.modifiers_json, oi.created_at, mi.area as kds_module
+        FROM order_items oi
+        JOIN menu_items mi ON oi.menu_item_id = mi.id
+        WHERE oi.order_id = ?
+      `;
+      const itemParams = [order.id];
+
+      if (moduleFilter !== 'all') {
+        itemSql += ' AND mi.area = ?';
+        itemParams.push(moduleFilter);
+      }
+
+      itemSql += ' ORDER BY oi.created_at ASC';
+      order.items = db.prepare(itemSql).all(...itemParams);
+
+      // Calculate wait time
+      const created = new Date(order.created_at);
+      const now = new Date();
+      order.wait_minutes = Math.floor((now - created) / 60000);
+    }
+
+    res.json({ success: true, module, orders });
+  } catch (err) {
+    console.error('[Orders] KDS error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al obtener KDS', code: 'KDS_ERROR' });
+  }
+});
+
+// ============================================================
 // GET /api/orders/:id — Pedido específico
 // ============================================================
 
 router.get('/:id', requireAuth, (req, res) => {
   try {
     const db = getDb();
-    const order = db.prepare(`
-      SELECT o.*, t.number as table_number, s.display_name as created_by_name
-      FROM orders o
-      LEFT JOIN tables t ON o.table_id = t.id
-      LEFT JOIN staff s ON o.created_by = s.id
-      WHERE o.id = ?
-    `).get(req.params.id);
+    const order = buildOrder(db, req.params.id);
 
     if (!order) {
       return res.status(404).json({ success: false, error: 'Pedido no encontrado', code: 'ORDER_NOT_FOUND' });
     }
-
-    order.items = db.prepare(`
-      SELECT oi.*, mi.name as item_name
-      FROM order_items oi
-      JOIN menu_items mi ON oi.menu_item_id = mi.id
-      WHERE oi.order_id = ?
-      ORDER BY oi.created_at ASC
-    `).all(order.id);
-
-    // Payment info if any
-    order.payments = db.prepare(`
-      SELECT * FROM payments WHERE order_id = ?
-    `).all(order.id);
 
     res.json({ success: true, order });
   } catch (err) {
@@ -144,7 +244,7 @@ router.get('/:id', requireAuth, (req, res) => {
 
 router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
   try {
-    const { table_id, items, notes } = req.body;
+    const { table_id, items, notes, guest_count, local_id } = req.body;
 
     if (!table_id) {
       return res.status(400).json({ success: false, error: 'Mesa requerida', code: 'TABLE_REQUIRED' });
@@ -156,8 +256,8 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
 
     const db = getDb();
 
-    // Verify table exists and is available
-    const table = db.prepare('SELECT id, status FROM tables WHERE id = ?').get(table_id);
+    // Verify table exists
+    const table = db.prepare('SELECT id, number, status FROM tables WHERE id = ?').get(table_id);
     if (!table) {
       return res.status(404).json({ success: false, error: 'Mesa no encontrada', code: 'TABLE_NOT_FOUND' });
     }
@@ -167,76 +267,63 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
     const orderItems = [];
 
     for (const item of items) {
-      const menuItem = db.prepare('SELECT id, name, price, category_id FROM menu_items WHERE id = ? AND active = 1').get(item.menu_item_id);
+      const menuItem = db.prepare(
+        'SELECT id, name, price, category_id, area FROM menu_items WHERE id = ? AND is_active = 1'
+      ).get(item.menu_item_id);
       if (!menuItem) {
         return res.status(400).json({ success: false, error: `Item inválido: ${item.menu_item_id}`, code: 'INVALID_MENU_ITEM' });
       }
 
       const quantity = item.quantity || 1;
-      const unitPrice = menuItem.price;
-      const itemSubtotal = unitPrice * quantity;
-
-      // Determine KDS module based on category
-      const cat = db.prepare('SELECT name FROM menu_categories WHERE id = ?').get(menuItem.category_id);
-      const kdsModule = cat && (cat.name.toLowerCase().includes('bar') || cat.name.toLowerCase().includes('tragos') || cat.name.toLowerCase().includes('cerveza'))
-        ? 'bar' : 'cocina';
+      const unitPrice = menuItem.price || 0;
+      const itemSubtotal = round2(unitPrice * quantity);
 
       subtotal += itemSubtotal;
 
       orderItems.push({
+        id: item.id || randomUUID(),
         menu_item_id: menuItem.id,
-        item_name: menuItem.name,
+        menu_item_name: menuItem.name,
         quantity,
         unit_price: unitPrice,
         subtotal: itemSubtotal,
-        notes: item.notes || '',
-        modifiers: item.modifiers ? JSON.stringify(item.modifiers) : null,
-        kds_module: item.kds_module || kdsModule,
+        modifiers_json: item.modifiers ? JSON.stringify(item.modifiers) : null,
+        preparation_notes: item.notes || item.preparation_notes || '',
+        status: 'pending',
+        kds_module: item.kds_module || menuItem.area || 'cocina',
       });
     }
 
-    const tax = Math.round(subtotal * 0.13 * 100) / 100; // 13% IVA
-    const total = subtotal + tax;
+    const iva = round2(subtotal * IVA_RATE);
+    const total = round2(subtotal + iva);
+    const orderId = randomUUID();
 
-    const orderResult = db.prepare(`
-      INSERT INTO orders (table_id, status, notes, subtotal, tax, total, payment_status, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(table_id, 'pendiente', notes || '', subtotal, tax, total, 'pendiente', req.user.sub);
+    db.prepare(`
+      INSERT INTO orders (id, table_id, table_number, waiter_id, waiter_name, status,
+                          subtotal, iva_amount, discount, discount_reason, total,
+                          notes, guest_count, local_id, is_paid)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, '', ?, ?, ?, ?, 0)
+    `).run(
+      orderId, table_id, table.number, req.user.sub,
+      req.user.displayName || req.user.username,
+      'draft', subtotal, iva, total,
+      notes || '', guest_count || 1, local_id || orderId
+    );
 
-    const orderId = orderResult.lastInsertRowid;
-
-    // Insert order items
     const insertItem = db.prepare(`
-      INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, notes, modifiers, kds_module)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
+                               unit_price, modifiers_json, subtotal, status, preparation_notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-
     for (const oi of orderItems) {
-      insertItem.run(orderId, oi.menu_item_id, oi.quantity, oi.unit_price, oi.subtotal, oi.notes, oi.modifiers, oi.kds_module);
+      insertItem.run(oi.id, orderId, oi.menu_item_id, oi.menu_item_name, oi.quantity,
+                     oi.unit_price, oi.modifiers_json, oi.subtotal, oi.status, oi.preparation_notes);
     }
 
-    // Update table status to ocupada
-    db.prepare('UPDATE tables SET status = ? WHERE id = ?').run('ocupada', table_id);
+    // Mark table as occupied
+    db.prepare("UPDATE tables SET status = 'occupied', current_order_id = ? WHERE id = ?").run(orderId, table_id);
 
-    // Return created order
-    const order = db.prepare(`
-      SELECT o.*, t.number as table_number, s.display_name as created_by_name
-      FROM orders o
-      LEFT JOIN tables t ON o.table_id = t.id
-      LEFT JOIN staff s ON o.created_by = s.id
-      WHERE o.id = ?
-    `).get(orderId);
-
-    order.items = db.prepare(`
-      SELECT oi.*, mi.name as item_name
-      FROM order_items oi
-      JOIN menu_items mi ON oi.menu_item_id = mi.id
-      WHERE oi.order_id = ?
-      ORDER BY oi.created_at ASC
-    `).all(orderId);
-
-    broadcastOrderUpdate(orderId, 'created');
-
+    const order = buildOrder(db, orderId);
     res.status(201).json({ success: true, order });
   } catch (err) {
     console.error('[Orders] Create error:', err.message);
@@ -258,50 +345,111 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
       return res.status(404).json({ success: false, error: 'Pedido no encontrado', code: 'ORDER_NOT_FOUND' });
     }
 
-    if (['completado', 'cancelado'].includes(existing.status)) {
+    if (['paid', 'cancelled'].includes(existing.status)) {
       return res.status(409).json({ success: false, error: 'Pedido ya completado o cancelado', code: 'ORDER_CLOSED' });
     }
 
     // Update notes
     if (notes !== undefined) {
-      db.prepare('UPDATE orders SET notes = ? WHERE id = ?').run(notes, req.params.id);
+      db.prepare("UPDATE orders SET notes = ? WHERE id = ?").run(notes, req.params.id);
     }
 
     // Replace items if provided
     if (items && Array.isArray(items) && items.length > 0) {
-      // Delete existing items
       db.prepare('DELETE FROM order_items WHERE order_id = ?').run(req.params.id);
 
-      let subtotal = 0;
       const insertItem = db.prepare(`
-        INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, notes, modifiers, kds_module)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
+                                 unit_price, modifiers_json, subtotal, status, preparation_notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       for (const item of items) {
-        const menuItem = db.prepare('SELECT id, name, price FROM menu_items WHERE id = ? AND active = 1').get(item.menu_item_id);
+        const menuItem = db.prepare('SELECT id, name, price FROM menu_items WHERE id = ? AND is_active = 1').get(item.menu_item_id);
         if (!menuItem) continue;
 
         const quantity = item.quantity || 1;
-        const unitPrice = menuItem.price;
-        const itemSubtotal = unitPrice * quantity;
-        subtotal += itemSubtotal;
+        const unitPrice = menuItem.price || 0;
+        const itemSubtotal = round2(unitPrice * quantity);
 
-        insertItem.run(req.params.id, menuItem.id, quantity, unitPrice, itemSubtotal, item.notes || '', null, 'cocina');
+        insertItem.run(randomUUID(), req.params.id, menuItem.id, menuItem.name, quantity,
+                       unitPrice, item.modifiers ? JSON.stringify(item.modifiers) : null,
+                       itemSubtotal, 'pending', item.notes || item.preparation_notes || '');
       }
 
-      const tax = Math.round(subtotal * 0.13 * 100) / 100;
-      const total = subtotal + tax;
-      db.prepare('UPDATE orders SET subtotal = ?, tax = ?, total = ? WHERE id = ?').run(subtotal, tax, total, req.params.id);
+      recalcOrder(db, req.params.id);
     }
 
-    const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
-    broadcastOrderUpdate(updated.id, 'updated');
-
+    const updated = buildOrder(db, req.params.id);
     res.json({ success: true, order: updated });
   } catch (err) {
     console.error('[Orders] Update error:', err.message);
     res.status(500).json({ success: false, error: 'Error al actualizar pedido', code: 'ORDER_UPDATE_ERROR' });
+  }
+});
+
+// ============================================================
+// PATCH /api/orders/:id/submit — draft → called (client sends to mesero)
+// ============================================================
+
+router.patch('/:id/submit', requireAuth, (req, res) => {
+  try {
+    const db = getDb();
+    const existing = db.prepare('SELECT id, status, table_id FROM orders WHERE id = ?').get(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Pedido no encontrado', code: 'ORDER_NOT_FOUND' });
+    }
+
+    if (existing.status !== 'draft') {
+      return res.status(409).json({
+        success: false,
+        error: `Solo se pueden enviar pedidos en borrador. Estado actual: ${existing.status}`,
+        code: 'ORDER_NOT_DRAFT',
+        current: existing.status,
+      });
+    }
+
+    db.prepare("UPDATE orders SET status = 'called', updated_at = datetime('now') WHERE id = ?")
+      .run(req.params.id);
+
+    res.json({ success: true, status: 'called', message: 'Pedido enviado al mesero' });
+  } catch (err) {
+    console.error('[Orders] Submit error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al enviar pedido', code: 'ORDER_SUBMIT_ERROR' });
+  }
+});
+
+// ============================================================
+// PATCH /api/orders/:id/confirm — called → confirmed (mesero action)
+// ============================================================
+
+router.patch('/:id/confirm', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
+  try {
+    const db = getDb();
+    const existing = db.prepare('SELECT id, status, table_id FROM orders WHERE id = ?').get(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Pedido no encontrado', code: 'ORDER_NOT_FOUND' });
+    }
+
+    if (existing.status !== 'called') {
+      return res.status(409).json({
+        success: false,
+        error: `Solo se pueden confirmar pedidos llamados. Estado actual: ${existing.status}`,
+        code: 'ORDER_NOT_CALLED',
+        current: existing.status,
+      });
+    }
+
+    db.prepare("UPDATE orders SET status = 'confirmed', updated_at = datetime('now') WHERE id = ?")
+      .run(req.params.id);
+
+    // Mark table as ordered
+    db.prepare("UPDATE tables SET status = 'ordered' WHERE id = ?").run(existing.table_id);
+
+    res.json({ success: true, status: 'confirmed', message: 'Pedido confirmado' });
+  } catch (err) {
+    console.error('[Orders] Confirm error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al confirmar pedido', code: 'ORDER_CONFIRM_ERROR' });
   }
 });
 
@@ -313,10 +461,11 @@ router.patch('/:id/status', requireAuth, (req, res) => {
   try {
     const { status } = req.body;
 
-    if (!status || !ORDER_STATUSES.includes(status)) {
+    const canonical = ORDER_STATUS_MAP[status];
+    if (!canonical) {
       return res.status(400).json({
         success: false,
-        error: `Estado inválido. Use: ${ORDER_STATUSES.join(', ')}`,
+        error: `Estado inválido. Use: ${Object.keys(ORDER_STATUS_MAP).join(', ')}`,
         code: 'INVALID_STATUS',
       });
     }
@@ -327,38 +476,44 @@ router.patch('/:id/status', requireAuth, (req, res) => {
       return res.status(404).json({ success: false, error: 'Pedido no encontrado', code: 'ORDER_NOT_FOUND' });
     }
 
-    // Enforce status flow
-    const flow = ['pendiente', 'en_preparacion', 'listo', 'servido', 'completado'];
+    // Enforce status flow (forward only; cancel any time)
+    const flow = ['draft', 'called', 'confirmed', 'preparing', 'ready', 'served', 'paid'];
     const currentIdx = flow.indexOf(existing.status);
-    const nextIdx = flow.indexOf(status);
+    const nextIdx = flow.indexOf(canonical);
 
-    // Allow cancel at any time, but enforce forward flow otherwise
-    if (status !== 'cancelado' && nextIdx < currentIdx) {
+    if (canonical !== 'cancelled' && nextIdx < currentIdx) {
       return res.status(409).json({
         success: false,
         error: 'No se puede retroceder el estado del pedido',
         code: 'STATUS_FLOW_ERROR',
         current: existing.status,
-        requested: status,
+        requested: canonical,
       });
     }
 
-    db.prepare('UPDATE orders SET status = ? WHERE id = ?').run(status, req.params.id);
+    const now = new Date().toISOString();
+    db.prepare("UPDATE orders SET status = ?, synced_at = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(canonical, now, req.params.id);
 
-    // If completed, free the table (if no other active orders)
-    if (status === 'completado') {
+    // If paid, mark is_paid
+    if (canonical === 'paid') {
+      db.prepare("UPDATE orders SET is_paid = 1, paid_at = COALESCE(paid_at, datetime('now')) WHERE id = ?")
+        .run(req.params.id);
+    }
+
+    // If paid or cancelled, free the table (if no other active orders)
+    if (canonical === 'paid' || canonical === 'cancelled') {
       const activeOrders = db.prepare(
-        'SELECT id FROM orders WHERE table_id = ? AND status NOT IN (?, ?)'
-      ).get(existing.table_id, 'completado', 'cancelado');
+        "SELECT id FROM orders WHERE table_id = ? AND status NOT IN ('paid','cancelled') AND id != ?"
+      ).get(existing.table_id, req.params.id);
 
       if (!activeOrders) {
-        db.prepare('UPDATE tables SET status = ? WHERE id = ?').run('disponible', existing.table_id);
+        db.prepare("UPDATE tables SET status = 'free', current_order_id = NULL WHERE id = ?")
+          .run(existing.table_id);
       }
     }
 
-    broadcastOrderUpdate(req.params.id, `status:${status}`);
-
-    res.json({ success: true, status, message: `Pedido ${status}` });
+    res.json({ success: true, status: canonical, message: `Pedido ${canonical}` });
   } catch (err) {
     console.error('[Orders] Status error:', err.message);
     res.status(500).json({ success: false, error: 'Error al cambiar estado', code: 'ORDER_STATUS_ERROR' });
@@ -371,7 +526,7 @@ router.patch('/:id/status', requireAuth, (req, res) => {
 
 router.post('/:id/items', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
   try {
-    const { menu_item_id, quantity, notes } = req.body;
+    const { menu_item_id, quantity, notes, modifiers } = req.body;
 
     if (!menu_item_id) {
       return res.status(400).json({ success: false, error: 'Item requerido', code: 'ITEM_REQUIRED' });
@@ -383,32 +538,27 @@ router.post('/:id/items', requireAuth, requireRole('admin', 'mesero'), (req, res
       return res.status(404).json({ success: false, error: 'Pedido no encontrado', code: 'ORDER_NOT_FOUND' });
     }
 
-    if (['completado', 'cancelado'].includes(order.status)) {
+    if (['paid', 'cancelled'].includes(order.status)) {
       return res.status(409).json({ success: false, error: 'Pedido cerrado', code: 'ORDER_CLOSED' });
     }
 
-    const menuItem = db.prepare('SELECT id, name, price FROM menu_items WHERE id = ? AND active = 1').get(menu_item_id);
+    const menuItem = db.prepare('SELECT id, name, price FROM menu_items WHERE id = ? AND is_active = 1').get(menu_item_id);
     if (!menuItem) {
       return res.status(404).json({ success: false, error: 'Item de menú no encontrado', code: 'MENU_ITEM_NOT_FOUND' });
     }
 
     const qty = quantity || 1;
-    const unitPrice = menuItem.price;
-    const itemSubtotal = unitPrice * qty;
+    const unitPrice = menuItem.price || 0;
+    const itemSubtotal = round2(unitPrice * qty);
 
     db.prepare(`
-      INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, notes)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(req.params.id, menuItem.id, qty, unitPrice, itemSubtotal, notes || '');
+      INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
+                               unit_price, modifiers_json, subtotal, status, preparation_notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+    `).run(randomUUID(), req.params.id, menuItem.id, menuItem.name, qty, unitPrice,
+           modifiers ? JSON.stringify(modifiers) : null, itemSubtotal, notes || '');
 
-    // Recalculate order totals
-    const items = db.prepare('SELECT SUM(subtotal) as total_items FROM order_items WHERE order_id = ?').get(req.params.id);
-    const newSubtotal = items.total_items || 0;
-    const newTax = Math.round(newSubtotal * 0.13 * 100) / 100;
-    const newTotal = newSubtotal + newTax;
-    db.prepare('UPDATE orders SET subtotal = ?, tax = ?, total = ? WHERE id = ?').run(newSubtotal, newTax, newTotal, req.params.id);
-
-    broadcastOrderUpdate(req.params.id, 'item_added');
+    recalcOrder(db, req.params.id);
 
     res.status(201).json({ success: true, message: 'Item agregado al pedido' });
   } catch (err) {
@@ -430,74 +580,12 @@ router.delete('/:id/items/:itemId', requireAuth, requireRole('admin', 'mesero'),
     }
 
     db.prepare('DELETE FROM order_items WHERE id = ?').run(req.params.itemId);
-
-    // Recalculate
-    const items = db.prepare('SELECT SUM(subtotal) as total_items FROM order_items WHERE order_id = ?').get(req.params.id);
-    const newSubtotal = items.total_items || 0;
-    const newTax = Math.round(newSubtotal * 0.13 * 100) / 100;
-    const newTotal = newSubtotal + newTax;
-    db.prepare('UPDATE orders SET subtotal = ?, tax = ?, total = ? WHERE id = ?').run(newSubtotal, newTax, newTotal, req.params.id);
-
-    broadcastOrderUpdate(req.params.id, 'item_removed');
+    recalcOrder(db, req.params.id);
 
     res.json({ success: true, message: 'Item eliminado del pedido' });
   } catch (err) {
     console.error('[Orders] Remove item error:', err.message);
     res.status(500).json({ success: false, error: 'Error al eliminar item', code: 'ORDER_REMOVE_ITEM_ERROR' });
-  }
-});
-
-// ============================================================
-// GET /api/orders/kds/:module — KDS View
-// ============================================================
-
-router.get('/kds/:module', requireAuth, requireRole('admin', 'cocina', 'bartender'), (req, res) => {
-  try {
-    const module = req.params.module;
-    if (!KDS_MODULES[module]) {
-      return res.status(400).json({ success: false, error: 'Módulo KDS inválido. Use: cocina, bar', code: 'INVALID_KDS_MODULE' });
-    }
-
-    const db = getDb();
-    const orders = db.prepare(`
-      SELECT DISTINCT o.id, o.table_id, t.number as table_number, o.status,
-             o.notes, o.created_at, o.created_by
-      FROM orders o
-      JOIN order_items oi ON o.id = oi.order_id
-      LEFT JOIN tables t ON o.table_id = t.id
-      WHERE oi.kds_module = ?
-        AND o.status IN ('pendiente', 'en_preparacion', 'listo')
-      ORDER BY
-        CASE o.status
-          WHEN 'pendiente' THEN 1
-          WHEN 'en_preparacion' THEN 2
-          WHEN 'listo' THEN 3
-        END,
-        o.created_at ASC
-    `).all(module);
-
-    // Attach KDS items for each order
-    for (const order of orders) {
-      order.items = db.prepare(`
-        SELECT oi.id, oi.menu_item_id, mi.name as item_name, oi.quantity,
-               oi.unit_price, oi.notes as item_notes, oi.status as item_status,
-               oi.modifiers, oi.created_at
-        FROM order_items oi
-        JOIN menu_items mi ON oi.menu_item_id = mi.id
-        WHERE oi.order_id = ? AND oi.kds_module = ?
-        ORDER BY oi.created_at ASC
-      `).all(order.id, module);
-
-      // Calculate wait time
-      const created = new Date(order.created_at);
-      const now = new Date();
-      order.wait_minutes = Math.floor((now - created) / 60000);
-    }
-
-    res.json({ success: true, module, orders });
-  } catch (err) {
-    console.error('[Orders] KDS error:', err.message);
-    res.status(500).json({ success: false, error: 'Error al obtener KDS', code: 'KDS_ERROR' });
   }
 });
 

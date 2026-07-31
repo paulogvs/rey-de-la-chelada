@@ -3,6 +3,7 @@
  *
  * "El pedido activo es el permiso"
  * - Menú siempre visible (offline-first)
+ * - Draft order with OrderBar + OrderSummary
  * - Llamar mesero con debounce anti-spam
  * - Pedir cuenta con confirmación
  * - Loading/empty/error states con componentes compartidos
@@ -17,6 +18,8 @@ import { MenuItemCard, MenuItemCardSkeleton, MenuItemCardEmpty } from '@/ui/comp
 import { Badge } from '@/ui/components/Badge';
 import { ToastInline } from '@/ui/components/Toast';
 import { ForchiBadge } from '@/ui/components/ForchiBadge';
+import { OrderBar } from '@/ui/components/OrderBar';
+import { OrderSummary } from '@/ui/components/OrderSummary';
 import './MenuPage.css';
 
 /** Category filter bar item */
@@ -46,9 +49,11 @@ function CategoryButton({
 function ItemDetailModal({
   item,
   onClose,
+  onAdd,
 }: {
   item: MenuItem;
   onClose: () => void;
+  onAdd: (item: MenuItem) => void;
 }) {
   return (
     <div className="clientes-detail-overlay" onClick={onClose}>
@@ -63,7 +68,7 @@ function ItemDetailModal({
         <p className="clientes-detail__desc">{item.description}</p>
 
         <div className="clientes-detail__price">
-          Bs. {item.price.toFixed(2)}
+          {item.price != null ? `Bs. ${item.price.toFixed(2)}` : '—'}
         </div>
 
         {item.tags.length > 0 && (
@@ -96,9 +101,25 @@ function ItemDetailModal({
             ))}
           </div>
         )}
+
+        <button
+          className="clientes-detail__add-btn"
+          onClick={() => { onAdd(item); onClose(); }}
+        >
+          Agregar al pedido
+        </button>
       </div>
     </div>
   );
+}
+
+/** Draft item type for local state */
+interface DraftItem {
+  id: string;
+  menuItemId: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
 }
 
 export function MenuPage() {
@@ -111,6 +132,11 @@ export function MenuPage() {
   const [detailItem, setDetailItem] = useState<MenuItem | null>(null);
   const [callFeedback, setCallFeedback] = useState<string | null>(null);
   const [billFeedback, setBillFeedback] = useState<string | null>(null);
+
+  // Draft order state
+  const [draftItems, setDraftItems] = useState<DraftItem[]>([]);
+  const [showSummary, setShowSummary] = useState(false);
+  const [sending, setSending] = useState(false);
 
   // Cargar menú
   const loadMenu = useCallback(() => {
@@ -145,6 +171,76 @@ export function MenuPage() {
   const filteredItems = selectedCategory
     ? items.filter(i => i.categoryId === selectedCategory && i.isActive && i.isAvailable)
     : items.filter(i => i.isActive && i.isAvailable);
+
+  // Add item to draft
+  const handleAddToDraft = useCallback((item: MenuItem) => {
+    const price = item.price ?? 0;
+    setDraftItems(prev => {
+      const existing = prev.find(d => d.menuItemId === item.id);
+      if (existing) {
+        return prev.map(d =>
+          d.menuItemId === item.id
+            ? { ...d, quantity: d.quantity + 1 }
+            : d
+        );
+      }
+      return [...prev, {
+        id: `draft-${Date.now()}-${item.id}`,
+        menuItemId: item.id,
+        name: item.name,
+        quantity: 1,
+        unitPrice: price,
+      }];
+    });
+  }, []);
+
+  // Draft totals
+  const draftTotal = draftItems.reduce((sum, d) => sum + d.unitPrice * d.quantity, 0);
+  const draftIva = Math.round(draftTotal * 0.13 * 100) / 100;
+  const draftTotalWithIva = Math.round((draftTotal + draftIva) * 100) / 100;
+  const draftItemCount = draftItems.reduce((sum, d) => sum + d.quantity, 0);
+
+  // Send draft to waiter
+  const handleSendDraft = useCallback(async () => {
+    if (draftItems.length === 0 || !session.tableId) return;
+    setSending(true);
+    try {
+      // Create order via API
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table_id: session.tableId,
+          items: draftItems.map(d => ({
+            menu_item_id: d.menuItemId,
+            quantity: d.quantity,
+          })),
+          guest_count: 1,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Error al crear pedido');
+
+      const data = await response.json();
+      if (data.success && data.order) {
+        // Submit the order (draft → called)
+        await fetch(`/api/orders/${data.order.id}/submit`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      setDraftItems([]);
+      setShowSummary(false);
+      setCallFeedback('✅ Pedido enviado al mesero');
+      setTimeout(() => setCallFeedback(null), 3000);
+    } catch {
+      setCallFeedback('❌ Error al enviar pedido');
+      setTimeout(() => setCallFeedback(null), 3000);
+    } finally {
+      setSending(false);
+    }
+  }, [draftItems, session.tableId]);
 
   // Call waiter con feedback
   const handleCallWaiter = useCallback(async () => {
@@ -294,9 +390,39 @@ export function MenuPage() {
         </footer>
       )}
 
+      {/* Order Bar (draft) */}
+      <OrderBar
+        itemCount={draftItemCount}
+        total={draftTotalWithIva}
+        onSend={() => setShowSummary(true)}
+        sending={sending}
+      />
+
+      {/* Order Summary Modal */}
+      {showSummary && (
+        <OrderSummary
+          items={draftItems.map(d => ({
+            id: d.id,
+            name: d.name,
+            quantity: d.quantity,
+            unitPrice: d.unitPrice,
+            subtotal: d.unitPrice * d.quantity,
+          }))}
+          total={draftTotalWithIva}
+          ivaAmount={draftIva}
+          onConfirm={handleSendDraft}
+          onClose={() => setShowSummary(false)}
+          confirming={sending}
+        />
+      )}
+
       {/* Item detail modal */}
       {detailItem && (
-        <ItemDetailModal item={detailItem} onClose={() => setDetailItem(null)} />
+        <ItemDetailModal
+          item={detailItem}
+          onClose={() => setDetailItem(null)}
+          onAdd={handleAddToDraft}
+        />
       )}
 
       {/* FORCH.i badge */}

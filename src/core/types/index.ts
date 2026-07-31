@@ -20,10 +20,10 @@ export type TableStatus = 'free' | 'occupied' | 'ordered' | 'serving' | 'payment
 export type KDSStatus = 'pending' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
 
 /** Order status lifecycle */
-export type OrderStatus = 'draft' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'paid' | 'cancelled';
+export type OrderStatus = 'draft' | 'called' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'paid' | 'cancelled';
 
-/** System roles */
-export type UserRole = 'admin' | 'mesero' | 'cocina' | 'caja' | 'bartender';
+/** System roles (v2: 3 roles only) */
+export type UserRole = 'admin' | 'mesero' | 'kds';
 
 /** Payment methods */
 export type PaymentMethod = 'cash' | 'qr_yape' | 'qr_simple' | 'card' | 'transfer';
@@ -320,5 +320,22 @@ export interface Toast {
   type: 'success' | 'error' | 'warning' | 'info';
   message: string;
   duration: number;
+  createdAt: string;
+}
+
+// ============================================================
+// WAITER CALLS
+// ============================================================
+
+/** Waiter call (client requests waiter or bill) */
+export interface WaiterCall {
+  id: string;
+  tableId: string;
+  tableNumber: number;
+  sessionId: string;
+  callType: 'call_waiter' | 'request_bill';
+  status: 'pending' | 'accepted' | 'done' | 'cancelled';
+  acceptedBy: string | null;
+  acceptedAt: string | null;
   createdAt: string;
 }

@@ -4,17 +4,27 @@
  * Cada PWA (cocina, bar, meseros, caja, admin, clientes) es un
  * entry point independiente. Todas comparten el mismo motor SSOT.
  *
+ * FASE 3 fixes:
+ * - injectRegister: 'inline' → sin registerSW.js compartido (evita overwrite)
+ * - base/scope por módulo → cada PWA registra su propio sw.js en su ruta
+ * - runtimeCaching por método HTTP: GET NetworkFirst(60s), write NetworkOnly, estáticos CacheFirst
+ * - Post-build: mueve index.html/offline.html/sw.js a dist/[pwa]/ y
+ *   genera manifest.json desde PWA_REGISTRY (SSOT — Artículo I)
+ *
  * Build output: dist/[pwa-name]/ con su propio manifest + service worker
  *
  * Artículo I:  SSOT — Un solo build, múltiples PWAs
  * Artículo IV: Simplicidad — Simple rollup input map
  */
 
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
+import fs from 'fs';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { PWA_REGISTRY } from './src/core/config/pwa-registry';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -39,6 +49,108 @@ for (const mod of PWA_MODULES) {
 }
 
 // ============================================================
+// Helpers
+// ============================================================
+
+/** Hash de contenido (para revisiones de precache) */
+function contentHash(filePath: string): string {
+  try {
+    return crypto.createHash('md5').update(fs.readFileSync(filePath)).digest('hex').slice(0, 10);
+  } catch {
+    return String(Date.now());
+  }
+}
+
+/** Entrada de precache con revision para index.html/offline.html */
+function precacheEntry(modId: string, fileName: string): { url: string; revision: string } | null {
+  const srcFile = path.resolve(__dirname, 'src', 'pwa', modId, fileName);
+  if (!fs.existsSync(srcFile)) return null;
+  return { url: `${modId}/${fileName}`, revision: contentHash(srcFile) };
+}
+
+// ============================================================
+// Plugin post-build: estructura final de dist/
+// ============================================================
+function multiPwaOutput(): Plugin {
+  return {
+    name: 'rdlc-multi-pwa-output',
+    enforce: 'post',
+    apply: 'build',
+    // sequential: true → corre DESPUÉS de que vite-plugin-pwa (también
+    // sequential + post) haya generado los sw.js en closeBundle
+    closeBundle: {
+      sequential: true,
+      handler() {
+        const distRoot = path.resolve(__dirname, 'dist');
+
+        // ── 1. Mover HTML + offline.html a dist/[pwa]/ ─────────
+        const srcPwaRoot = path.join(distRoot, 'src', 'pwa');
+        for (const mod of PWA_MODULES) {
+          const destDir = path.join(distRoot, mod.id);
+          const srcHtml = path.join(srcPwaRoot, mod.id, 'index.html');
+          const srcOffline = path.join(__dirname, 'src', 'pwa', mod.id, 'offline.html');
+
+          if (!fs.existsSync(srcHtml)) continue;
+
+          fs.mkdirSync(destDir, { recursive: true });
+          fs.copyFileSync(srcHtml, path.join(destDir, 'index.html'));
+          if (fs.existsSync(srcOffline)) {
+            fs.copyFileSync(srcOffline, path.join(destDir, 'offline.html'));
+          }
+        }
+        // Limpiar el árbol intermedio dist/src/pwa
+        fs.rmSync(path.join(distRoot, 'src'), { recursive: true, force: true });
+
+        // ── 2. Replicar sw.js + workbox chunk en cada PWA ──────
+        // Cada módulo emite dist/[id]-sw.js (filename único) → dist/[id]/sw.js
+        for (const mod of PWA_MODULES) {
+          const modSwSrc = path.join(distRoot, `${mod.id}-sw.js`);
+          if (!fs.existsSync(modSwSrc)) continue;
+          const destDir = path.join(distRoot, mod.id);
+          fs.mkdirSync(destDir, { recursive: true });
+          fs.copyFileSync(modSwSrc, path.join(destDir, 'sw.js'));
+          // Chunks de workbox compartidos
+          const workboxChunks = fs.readdirSync(distRoot)
+            .filter(f => f.startsWith('workbox-') && f.endsWith('.js'));
+          for (const chunk of workboxChunks) {
+            fs.copyFileSync(path.join(distRoot, chunk), path.join(destDir, chunk));
+          }
+        }
+
+        // ── 2b. Limpiar SWs raíz (ya replicados por módulo) ────
+        for (const mod of PWA_MODULES) {
+          const rootSw = path.join(distRoot, `${mod.id}-sw.js`);
+          if (fs.existsSync(rootSw)) fs.rmSync(rootSw);
+        }
+        // Limpiar chunks workbox de la raíz (copiados a cada módulo)
+        const rootWorkbox = fs.readdirSync(distRoot)
+          .filter(f => f.startsWith('workbox-') && f.endsWith('.js'));
+        for (const chunk of rootWorkbox) {
+          fs.rmSync(path.join(distRoot, chunk));
+        }
+
+        // ── 3. Manifest.json desde PWA_REGISTRY (SSOT) ─────────
+        for (const mod of PWA_MODULES) {
+          const reg = PWA_REGISTRY[mod.id as keyof typeof PWA_REGISTRY];
+          if (!reg) continue;
+          const destDir = path.join(distRoot, mod.id);
+          fs.mkdirSync(destDir, { recursive: true });
+          fs.writeFileSync(
+            path.join(destDir, 'manifest.json'),
+            JSON.stringify(reg.manifest, null, 2),
+            'utf-8',
+          );
+        }
+
+        // ── 4. Limpieza: registerSW.js sobrante ────────────────
+        const leftover = path.join(distRoot, 'registerSW.js');
+        if (fs.existsSync(leftover)) fs.rmSync(leftover);
+      },
+    },
+  };
+}
+
+// ============================================================
 // Export Vite Config
 // ============================================================
 export default defineConfig({
@@ -49,31 +161,81 @@ export default defineConfig({
   plugins: [
     react(),
 
-    // PWA plugin para cada módulo
+    // PWA plugin para cada módulo — scope propio (FASE 3)
     ...PWA_MODULES.map(mod =>
       VitePWA({
-        // Scope a este módulo específico
+    // Scope a este módulo específico: sw.js se sirve en /[pwa]/sw.js
+        base: mod.base,
+        scope: mod.base,
         includeAssets: ['icons/*.png', 'fonts/*.woff2'],
-        manifest: false,      // Lo generamos manualmente desde pwa-registry
+        manifest: false,      // Lo generamos desde pwa-registry (multiPwaOutput)
         registerType: 'autoUpdate',
+        // Registro manual desde bootstrapPwa() (module-scoped) — evita que
+        // cada plugin inyecte su registro en TODOS los html
+        injectRegister: false,
+        // Nombre único por módulo para que cada SW tenga SU precache/runtime
+        filename: `${mod.id}-sw.js`,
         workbox: {
-          globPatterns: [`${mod.id}/**/*.{js,css,html,png,svg}`],
+          globPatterns: [`${mod.id}/**/*.{js,css,png,svg}`],
           navigateFallback: `${mod.id}/offline.html`,
+          navigateFallbackAllowlist: [new RegExp(`^/${mod.id}/`)],
+          // Precachear shell (index.html + offline.html) con revision
+          additionalManifestEntries: [
+            precacheEntry(mod.id, 'index.html'),
+            precacheEntry(mod.id, 'offline.html'),
+          ].filter((e): e is { url: string; revision: string } => e !== null),
           runtimeCaching: [
+            // GET /api/* → NetworkFirst con expiración de 60s
             {
-              urlPattern: /\/api\//,
+              urlPattern: ({ url, request }) =>
+                url.pathname.startsWith('/api/') && request.method === 'GET',
               handler: 'NetworkFirst',
-              options: { cacheName: `${mod.id}-api` },
+              options: {
+                cacheName: `${mod.id}-api-get`,
+                expiration: {
+                  maxEntries: 100,
+                  maxAgeSeconds: 60,
+                },
+                networkTimeoutSeconds: 3,
+              },
             },
+            // POST/PUT/DELETE /api/* → NetworkOnly (nunca cachear writes)
+            {
+              urlPattern: ({ url, request }) =>
+                url.pathname.startsWith('/api/') && request.method !== 'GET',
+              handler: 'NetworkOnly',
+              options: { cacheName: `${mod.id}-api-write` },
+            },
+            // Estáticos → CacheFirst
+            {
+              urlPattern: /\.(?:js|css|png|svg|woff2|jpg|jpeg|webp)$/,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: `${mod.id}-static`,
+                expiration: {
+                  maxEntries: 200,
+                  maxAgeSeconds: 60 * 60 * 24 * 30, // 30 días
+                },
+              },
+            },
+            // Iconos compartidos → CacheFirst
             {
               urlPattern: /\/icons\//,
               handler: 'CacheFirst',
-              options: { cacheName: `${mod.id}-icons` },
+              options: {
+                cacheName: `${mod.id}-icons`,
+                expiration: {
+                  maxEntries: 30,
+                  maxAgeSeconds: 60 * 60 * 24 * 30,
+                },
+              },
             },
           ],
         },
       })
     ),
+
+    multiPwaOutput(),
   ],
 
   resolve: {

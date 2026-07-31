@@ -1,15 +1,16 @@
 /**
- * PWA COCINA — Kitchen Display System (KDS)
+ * PWA COCINA — Unified KDS (Kitchen Display System)
  *
- * Full-screen, landscape, no scroll
- * Orders as cards in a grid (2-4 columns)
- * Auto-sort by urgency (oldest first, urgent highlighted)
- * Sound alert on new order (Web Audio API)
- * Gold pulse flash on new order
- * Red pulse flash on urgent (>15 min)
- * Touch-friendly tap to mark items
- * WebSocket connection with auto-reconnect
- * Offline state indicator
+ * Shows all items from both cocina and bar areas, filtered by area tabs.
+ * Each item has its own status (pending → preparing → ready).
+ * "Listo" button per item marks as ready → WebSocket broadcast.
+ * Full-screen, landscape, no scroll.
+ * Auto-sort by urgency (oldest first, urgent highlighted).
+ * Sound alert on new order (Web Audio API).
+ * Gold pulse flash on new order. Red pulse flash on urgent (>15 min).
+ * Touch-friendly tap to mark items.
+ * WebSocket connection with auto-reconnect.
+ * Offline state indicator.
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -19,7 +20,7 @@ import { PwaLayout } from '../_shared/components/PwaLayout';
 import { orderEngine } from '@/core/engine';
 import { KDSOrderCard, KDSOrderCardSkeleton } from '@/ui/components/KDSOrderCard';
 import { Badge } from '@/ui/components/Badge';
-import type { Order, KDSEvent, OrderLineItem, KDSStatus } from '@/core/types';
+import type { Order, KDSEvent, KDSStatus } from '@/core/types';
 import './App.css';
 
 // ---- Audio System (Web Audio API) ----
@@ -34,7 +35,6 @@ class KDSAudio {
     return this.ctx;
   }
 
-  /** Play a beep at a specific frequency */
   private beep(frequency: number, duration: number, type: OscillatorType = 'sine') {
     try {
       const ctx = this.getContext();
@@ -53,18 +53,15 @@ class KDSAudio {
     }
   }
 
-  /** New order alert: double beep */
   newOrder() {
     this.beep(880, 0.15);
     setTimeout(() => this.beep(1100, 0.2), 150);
   }
 
-  /** Urgent alert: continuous pulse */
   urgent() {
     this.beep(440, 0.5, 'square');
   }
 
-  /** Order completed chime */
   completed() {
     this.beep(660, 0.2);
     setTimeout(() => this.beep(880, 0.3), 200);
@@ -75,12 +72,15 @@ const kdsAudio = new KDSAudio();
 
 // ---- KDS State ----
 
+type AreaFilter = 'all' | 'cocina' | 'bar';
+
 interface KDSState {
   orders: Order[];
   newOrderIds: Set<string>;
   urgentOrderIds: Set<string>;
   audioEnabled: boolean;
   isConnected: boolean;
+  areaFilter: AreaFilter;
 }
 
 export default function App() {
@@ -92,7 +92,8 @@ export default function App() {
     newOrderIds: new Set(),
     urgentOrderIds: new Set(),
     audioEnabled: true,
-    isConnected: true, // In production, connect to WebSocket
+    isConnected: true,
+    areaFilter: 'all',
   });
   const [loading, setLoading] = useState(true);
   const prevOrderIdsRef = useRef<Set<string>>(new Set());
@@ -101,8 +102,8 @@ export default function App() {
   const loadOrders = useCallback(() => {
     const kdsOrders = orderEngine.getKDSOrders();
     const now = Date.now();
-    
-    // Detect new orders (not in previous set)
+
+    // Detect new orders
     const currentIds = new Set(kdsOrders.map(o => o.id));
     const prevIds = prevOrderIdsRef.current;
     const newIds = new Set<string>();
@@ -110,7 +111,6 @@ export default function App() {
     kdsOrders.forEach(order => {
       if (!prevIds.has(order.id)) {
         newIds.add(order.id);
-        // Play sound for new order
         if (state.audioEnabled) {
           kdsAudio.newOrder();
         }
@@ -126,10 +126,8 @@ export default function App() {
       }
     });
 
-    // Play urgent sound if any urgent order not previously urgent
-    const prevUrgent = state.urgentOrderIds;
     urgentIds.forEach(id => {
-      if (!prevUrgent.has(id) && state.audioEnabled) {
+      if (!state.urgentOrderIds.has(id) && state.audioEnabled) {
         kdsAudio.urgent();
       }
     });
@@ -148,7 +146,6 @@ export default function App() {
   useEffect(() => {
     loadOrders();
     const unsubscribe = orderEngine.onChange(loadOrders);
-    // Refresh every 30s for timer updates
     const interval = setInterval(loadOrders, 30000);
     return () => {
       unsubscribe();
@@ -169,13 +166,8 @@ export default function App() {
   // Handle item status change
   const handleItemStatusChange = useCallback((orderId: string, itemId: string, status: KDSStatus) => {
     const success = orderEngine.updateItemStatus(orderId, itemId, status);
-    if (success && status === 'delivered') {
+    if (success && status === 'ready') {
       kdsAudio.completed();
-      // Visual feedback on the card
-      setState(prev => ({
-        ...prev,
-        newOrderIds: new Set(prev.newOrderIds),
-      }));
     }
   }, []);
 
@@ -183,13 +175,11 @@ export default function App() {
   const handleAcknowledge = useCallback((orderId: string) => {
     const order = orderEngine.getOrder(orderId);
     if (order && order.status === 'confirmed') {
-      // Move to preparing
       order.items.forEach(item => {
         if (item.status === 'pending') {
           orderEngine.updateItemStatus(orderId, item.id, 'preparing');
         }
       });
-      // Clear new order flag
       setState(prev => {
         const updated = new Set(prev.newOrderIds);
         updated.delete(orderId);
@@ -215,8 +205,19 @@ export default function App() {
     setState(prev => ({ ...prev, audioEnabled: !prev.audioEnabled }));
   }, []);
 
-  // Sort orders: urgent first, then by oldest
-  const sortedOrders = [...state.orders].sort((a, b) => {
+  // Filter orders by area
+  const filteredOrders = state.areaFilter === 'all'
+    ? state.orders
+    : state.orders.filter(order =>
+        order.items.some(item => {
+          // Determine area from item's kds_module or name heuristic
+          const module = 'kds_module' in item ? (item as { kds_module?: string }).kds_module : undefined;
+          return (module || 'cocina') === state.areaFilter;
+        })
+      );
+
+  // Sort: urgent first, then by oldest
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
     const aUrgent = state.urgentOrderIds.has(a.id);
     const bUrgent = state.urgentOrderIds.has(b.id);
     if (aUrgent && !bUrgent) return -1;
@@ -224,20 +225,48 @@ export default function App() {
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
 
+  // Count items by area
+  const cocinaCount = state.orders.reduce((sum, o) =>
+    sum + o.items.filter(i => 'kds_module' in i && (i as { kds_module?: string }).kds_module === 'cocina').length, 0);
+  const barCount = state.orders.reduce((sum, o) =>
+    sum + o.items.filter(i => 'kds_module' in i && (i as { kds_module?: string }).kds_module === 'bar').length, 0);
+
   return (
-    <PwaLayout title="Cocina — KDS">
+    <PwaLayout title="KDS Unificado">
       <div className="kds-screen">
         {/* Top bar */}
         <header className="kds-header">
           <div className="kds-header__left">
-            <h1 className="kds-header__title">KDS · Cocina</h1>
+            <h1 className="kds-header__title">KDS Unificado</h1>
             <Badge variant={state.isConnected ? 'ready' : 'cancelled'}>
               {state.isConnected ? 'Conectado' : 'Sin conexión'}
             </Badge>
           </div>
           <div className="kds-header__right">
+            {/* Area filter tabs */}
+            <div className="kds-header__tabs">
+              <button
+                className={`kds-header__tab ${state.areaFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setState(prev => ({ ...prev, areaFilter: 'all' }))}
+              >
+                Todos ({state.orders.length})
+              </button>
+              <button
+                className={`kds-header__tab ${state.areaFilter === 'cocina' ? 'active' : ''}`}
+                onClick={() => setState(prev => ({ ...prev, areaFilter: 'cocina' }))}
+              >
+                🍳 Cocina ({cocinaCount})
+              </button>
+              <button
+                className={`kds-header__tab ${state.areaFilter === 'bar' ? 'active' : ''}`}
+                onClick={() => setState(prev => ({ ...prev, areaFilter: 'bar' }))}
+              >
+                🍺 Bar ({barCount})
+              </button>
+            </div>
+
             <Badge variant="info" large>
-              {state.orders.length} pedidos
+              {filteredOrders.length} pedidos
             </Badge>
             {state.urgentOrderIds.size > 0 && (
               <Badge variant="warning" large>
@@ -288,7 +317,7 @@ export default function App() {
                   onItemStatusChange={handleItemStatusChange}
                   onAcknowledge={handleAcknowledge}
                   onReject={handleReject}
-                  variant="cocina"
+                  variant="kds"
                 />
               ))}
             </div>
@@ -298,7 +327,7 @@ export default function App() {
         {/* Footer stats */}
         <footer className="kds-footer">
           <span className="kds-footer__stat">
-            Pedidos activos: {state.orders.length}
+            Activos: {filteredOrders.length}
           </span>
           <span className="kds-footer__stat">
             Urgentes: {state.urgentOrderIds.size}

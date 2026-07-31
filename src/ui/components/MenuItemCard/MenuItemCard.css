@@ -188,3 +188,64 @@
     height: 120px;
   }
 }
+
+/* ---- Photo Variant ---- */
+
+.menu-item-card--photo {
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.menu-item-card__photo-image {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+
+.menu-item-card__photo-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.menu-item-card__photo-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  color: var(--text-inverse, #fff);
+}
+
+.menu-item-card__photo-price {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--dorado-rey);
+}
+
+.menu-item-card__photo-add {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--dorado-rey);
+  color: var(--madera-oscura);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+.menu-item-card__photo-info {
+  padding: var(--space-3);
+  text-align: left;
+  width: 100%;
+}

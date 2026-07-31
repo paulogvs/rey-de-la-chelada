@@ -117,7 +117,8 @@ for (const pwa of PWA_ROUTES) {
   app.use(pwa.path, express.static(pwaDir, { maxAge: '1d' }));
 
   // SPA fallback: cualquier ruta dentro del PWA sirve su index.html
-  app.use(`${pwa.path}/*`, (req, res) => {
+  // (Express 5: sin wildcards '/*' — mount en la misma ruta)
+  app.use(pwa.path, (req, res) => {
     res.sendFile(path.join(pwaDir, 'index.html'));
   });
 }
@@ -164,6 +165,7 @@ import paymentsRoutes from './routes/payments.js';
 import staffRoutes from './routes/staff.js';
 import syncRoutes from './routes/sync.js';
 import reportsRoutes from './routes/reports.js';
+import waiterCallsRoutes from './routes/waiter-calls.js';
 import { requireRole } from './middleware/auth.js';
 
 // ── Route registration ────────────────────────────────────
@@ -175,6 +177,7 @@ app.use('/api/payments', paymentsRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/waiter-calls', waiterCallsRoutes);
 
 // ============================================================
 // WebSocket — KDS Real-Time

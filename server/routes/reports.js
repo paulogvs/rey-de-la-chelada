@@ -6,6 +6,9 @@
  *  GET /api/reports/sales/range      → Ventas por rango
  *  GET /api/reports/items/popular    → Items más vendidos
  *  GET /api/reports/staff/performance → Rendimiento del personal
+ *
+ *  Alineado al SSOT: server/db/schema.js
+ *  (orders.status: paid/cancelled; pedido tomado por waiter_id)
  * ═══════════════════════════════════════════════════════════
  */
 
@@ -30,10 +33,10 @@ router.get('/sales/daily', requireAuth, requireRole('admin', 'caja'), (req, res)
     const summary = db.prepare(`
       SELECT
         COUNT(*) as total_orders,
-        SUM(CASE WHEN status = 'completado' THEN 1 ELSE 0 END) as completed_orders,
-        SUM(CASE WHEN status = 'cancelado' THEN 1 ELSE 0 END) as cancelled_orders,
+        SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as completed_orders,
+        SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_orders,
         SUM(total) as gross_revenue,
-        SUM(CASE WHEN status = 'completado' THEN total ELSE 0 END) as net_revenue
+        SUM(CASE WHEN status = 'paid' THEN total ELSE 0 END) as net_revenue
       FROM orders
       WHERE DATE(created_at) = ?
     `).get(targetDate);
@@ -42,7 +45,7 @@ router.get('/sales/daily', requireAuth, requireRole('admin', 'caja'), (req, res)
     const byMethod = db.prepare(`
       SELECT p.method, COUNT(*) as count, SUM(p.amount) as total
       FROM payments p
-      WHERE DATE(p.created_at) = ?
+      WHERE DATE(p.processed_at) = ?
       GROUP BY p.method
     `).all(targetDate);
 
@@ -95,7 +98,7 @@ router.get('/sales/range', requireAuth, requireRole('admin', 'caja'), (req, res)
         DATE(created_at) as date,
         COUNT(*) as orders,
         SUM(total) as revenue,
-        SUM(CASE WHEN status = 'cancelado' THEN 1 ELSE 0 END) as cancelled
+        SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled
       FROM orders
       WHERE DATE(created_at) >= ? AND DATE(created_at) <= ?
       GROUP BY DATE(created_at)
@@ -108,7 +111,7 @@ router.get('/sales/range', requireAuth, requireRole('admin', 'caja'), (req, res)
         SUM(total) as total_revenue,
         AVG(total) as avg_order
       FROM orders
-      WHERE DATE(created_at) >= ? AND DATE(created_at) <= ? AND status = 'completado'
+      WHERE DATE(created_at) >= ? AND DATE(created_at) <= ? AND status = 'paid'
     `).get(from, to);
 
     res.json({
@@ -157,7 +160,7 @@ router.get('/items/popular', requireAuth, requireRole('admin', 'caja'), (req, re
       JOIN menu_items mi ON oi.menu_item_id = mi.id
       LEFT JOIN menu_categories mc ON mi.category_id = mc.id
       JOIN orders o ON oi.order_id = o.id
-      WHERE o.status = 'completado'${dateFilter}
+      WHERE o.status = 'paid'${dateFilter}
       GROUP BY mi.id
       ORDER BY total_quantity DESC
       LIMIT ?
@@ -190,12 +193,12 @@ router.get('/staff/performance', requireAuth, requireRole('admin'), (req, res) =
       SELECT
         s.id, s.display_name, s.role,
         COUNT(o.id) as orders_taken,
-        SUM(CASE WHEN o.status = 'completado' THEN 1 ELSE 0 END) as orders_completed,
-        SUM(CASE WHEN o.status = 'cancelado' THEN 1 ELSE 0 END) as orders_cancelled,
+        SUM(CASE WHEN o.status = 'paid' THEN 1 ELSE 0 END) as orders_completed,
+        SUM(CASE WHEN o.status = 'cancelled' THEN 1 ELSE 0 END) as orders_cancelled,
         SUM(o.total) as total_revenue
       FROM staff s
-      LEFT JOIN orders o ON s.id = o.created_by${dateFilter}
-      WHERE s.active = 1
+      LEFT JOIN orders o ON s.id = o.waiter_id${dateFilter}
+      WHERE s.is_active = 1
       GROUP BY s.id
       ORDER BY orders_completed DESC
     `).all(...params);

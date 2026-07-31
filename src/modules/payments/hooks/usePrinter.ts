@@ -49,13 +49,15 @@ const ESCPOS = {
   FONT_B: `${ESC}\x4d\x01`,  // Smaller font
   FONT_A: `${ESC}\x4d\x00`,  // Normal font
   QR_CODE: (data: string) => {
-    // Store QR data
+    // Store QR data: GS ( k pL pH 49 80 48 48 <data>
+    // pL/pH son dinámicos — no se pueden usar escapes \x en template literals
     const dataLen = data.length + 3;
     const pL = dataLen & 0xff;
     const pH = (dataLen >> 8) & 0xff;
-    return `${GS}\x28\x6b\x${pL.toString(16)}\x${pH.toString(16)}\x31\x50\x30${data}` +
-           // Print QR
-           `${GS}\x28\x6b\x03\x00\x31\x51\x4d`;
+    return GS + '\x28\x6b' + String.fromCharCode(pL) + String.fromCharCode(pH) +
+           '\x31\x50\x30' + data +
+           // Print QR: GS ( k 03 00 31 51 4d
+           GS + '\x28\x6b\x03\x00\x31\x51\x4d';
   },
 };
 

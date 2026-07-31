@@ -10,10 +10,14 @@
  *  POST   /api/menu/items             → Crear item (admin)
  *  PUT    /api/menu/items/:id         → Actualizar item (admin)
  *  PATCH  /api/menu/items/:id/toggle  → Activar/desactivar (admin)
+ *
+ *  Alineado al SSOT: server/db/schema.js (menu_categories,
+ *  menu_items, modifier_groups, modifier_options)
  * ═══════════════════════════════════════════════════════════
  */
 
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 
@@ -26,8 +30,11 @@ const router = Router();
 router.get('/categories', (req, res) => {
   try {
     const db = getDb();
+    const { include_inactive } = req.query;
+    const where = include_inactive === 'true' ? '1=1' : 'is_active = 1';
     const categories = db.prepare(
-      'SELECT id, name, description, icon, sort_order FROM menu_categories WHERE active = 1 ORDER BY sort_order ASC'
+      `SELECT id, name, description, emoji, sort_order, is_active
+       FROM menu_categories WHERE ${where} ORDER BY sort_order ASC, name ASC`
     ).all();
     res.json({ success: true, categories });
   } catch (err) {
@@ -43,17 +50,22 @@ router.get('/categories', (req, res) => {
 router.get('/items', (req, res) => {
   try {
     const db = getDb();
-    const { category_id, search, available } = req.query;
+    const { category_id, search, available, include_inactive } = req.query;
 
     let sql = `
-      SELECT mi.id, mi.name, mi.description, mi.price, mi.price_type,
-             mi.image_url, mi.sort_order, mi.available, mc.name as category_name,
-             mc.id as category_id
+      SELECT mi.id, mi.name, mi.subtitle, mi.description, mi.price, mi.currency,
+             mi.iva_percentage, mi.image_url, mi.is_active, mi.is_available,
+             mi.preparation_time, mi.sort_order, mi.area,
+             mc.id as category_id, mc.name as category_name
       FROM menu_items mi
       JOIN menu_categories mc ON mi.category_id = mc.id
-      WHERE mi.active = 1
+      WHERE 1=1
     `;
     const params = [];
+
+    if (include_inactive !== 'true') {
+      sql += ' AND mi.is_active = 1';
+    }
 
     if (category_id) {
       sql += ' AND mi.category_id = ?';
@@ -66,10 +78,10 @@ router.get('/items', (req, res) => {
     }
 
     if (available === 'true') {
-      sql += ' AND mi.available = 1';
+      sql += ' AND mi.is_available = 1';
     }
 
-    sql += ' ORDER BY mc.sort_order ASC, mi.sort_order ASC';
+    sql += ' ORDER BY mc.sort_order ASC, mi.sort_order ASC, mi.name ASC';
 
     const items = db.prepare(sql).all(...params);
     res.json({ success: true, items });
@@ -80,7 +92,7 @@ router.get('/items', (req, res) => {
 });
 
 // ============================================================
-// GET /api/menu/items/:id — Item específico
+// GET /api/menu/items/:id — Item específico + modifiers
 // ============================================================
 
 router.get('/items/:id', (req, res) => {
@@ -90,7 +102,7 @@ router.get('/items/:id', (req, res) => {
       SELECT mi.*, mc.name as category_name
       FROM menu_items mi
       JOIN menu_categories mc ON mi.category_id = mc.id
-      WHERE mi.id = ? AND mi.active = 1
+      WHERE mi.id = ?
     `).get(req.params.id);
 
     if (!item) {
@@ -99,11 +111,12 @@ router.get('/items/:id', (req, res) => {
 
     // Get modifiers for this item
     const modifiers = db.prepare(`
-      SELECT mg.id, mg.name, mg.min_select, mg.max_select,
-             mo.id as option_id, mo.name as option_name, mo.price_adjustment as option_price
+      SELECT mg.id, mg.name, mg.type, mg.required, mg.min_select, mg.max_select,
+             mo.id as option_id, mo.name as option_name,
+             mo.price_adjustment as option_price, mo.is_default as option_default
       FROM modifier_groups mg
       LEFT JOIN modifier_options mo ON mg.id = mo.group_id
-      WHERE mg.item_id = ?
+      WHERE mg.menu_item_id = ?
       ORDER BY mg.sort_order, mo.sort_order
     `).all(item.id);
 
@@ -120,17 +133,18 @@ router.get('/items/:id', (req, res) => {
 
 router.post('/categories', requireAuth, requireRole('admin'), (req, res) => {
   try {
-    const { name, description, icon, sort_order } = req.body;
+    const { name, description, emoji, sort_order } = req.body;
     if (!name) {
       return res.status(400).json({ success: false, error: 'Nombre requerido', code: 'NAME_REQUIRED' });
     }
 
     const db = getDb();
-    const result = db.prepare(
-      'INSERT INTO menu_categories (name, description, icon, sort_order) VALUES (?, ?, ?, ?)'
-    ).run(name, description || '', icon || '', sort_order || 0);
+    const id = randomUUID();
+    db.prepare(
+      'INSERT INTO menu_categories (id, name, description, emoji, sort_order) VALUES (?, ?, ?, ?, ?)'
+    ).run(id, name, description || '', emoji || '🍽', sort_order ?? 0);
 
-    const category = db.prepare('SELECT * FROM menu_categories WHERE id = ?').get(result.lastInsertRowid);
+    const category = db.prepare('SELECT * FROM menu_categories WHERE id = ?').get(id);
     res.status(201).json({ success: true, category });
   } catch (err) {
     console.error('[Menu] Create category error:', err.message);
@@ -144,7 +158,7 @@ router.post('/categories', requireAuth, requireRole('admin'), (req, res) => {
 
 router.put('/categories/:id', requireAuth, requireRole('admin'), (req, res) => {
   try {
-    const { name, description, icon, sort_order, active } = req.body;
+    const { name, description, emoji, sort_order, is_active } = req.body;
     const db = getDb();
 
     const existing = db.prepare('SELECT id FROM menu_categories WHERE id = ?').get(req.params.id);
@@ -156,14 +170,15 @@ router.put('/categories/:id', requireAuth, requireRole('admin'), (req, res) => {
     const params = [];
     if (name) { updates.push('name = ?'); params.push(name); }
     if (description !== undefined) { updates.push('description = ?'); params.push(description); }
-    if (icon !== undefined) { updates.push('icon = ?'); params.push(icon); }
+    if (emoji !== undefined) { updates.push('emoji = ?'); params.push(emoji); }
     if (sort_order !== undefined) { updates.push('sort_order = ?'); params.push(sort_order); }
-    if (active !== undefined) { updates.push('active = ?'); params.push(active ? 1 : 0); }
+    if (is_active !== undefined) { updates.push('is_active = ?'); params.push(is_active ? 1 : 0); }
 
     if (updates.length === 0) {
       return res.status(400).json({ success: false, error: 'Nada que actualizar', code: 'NO_UPDATES' });
     }
 
+    updates.push('updated_at = datetime(\'now\')');
     params.push(req.params.id);
     db.prepare(`UPDATE menu_categories SET ${updates.join(', ')} WHERE id = ?`).run(...params);
 
@@ -181,7 +196,7 @@ router.put('/categories/:id', requireAuth, requireRole('admin'), (req, res) => {
 
 router.post('/items', requireAuth, requireRole('admin'), (req, res) => {
   try {
-    const { name, description, price, price_type, category_id, image_url, sort_order } = req.body;
+    const { name, subtitle, description, price, currency, category_id, image_url, sort_order, is_available, area, preparation_time } = req.body;
 
     if (!name || price === undefined || !category_id) {
       return res.status(400).json({
@@ -199,11 +214,18 @@ router.post('/items', requireAuth, requireRole('admin'), (req, res) => {
       return res.status(404).json({ success: false, error: 'Categoría no encontrada', code: 'CATEGORY_NOT_FOUND' });
     }
 
-    const result = db.prepare(
-      'INSERT INTO menu_items (name, description, price, price_type, category_id, image_url, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(name, description || '', price, price_type || 'unit', category_id, image_url || '', sort_order || 0);
+    const id = randomUUID();
+    db.prepare(`
+      INSERT INTO menu_items (id, category_id, name, subtitle, description, price, currency,
+                              image_url, is_available, sort_order, area, preparation_time)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, category_id, name, subtitle || '', description || '', price,
+      currency || 'BOB', image_url || '', is_available ?? 1, sort_order ?? 0,
+      area || 'cocina', preparation_time ?? 15
+    );
 
-    const item = db.prepare('SELECT * FROM menu_items WHERE id = ?').get(result.lastInsertRowid);
+    const item = db.prepare('SELECT * FROM menu_items WHERE id = ?').get(id);
     res.status(201).json({ success: true, item });
   } catch (err) {
     console.error('[Menu] Create item error:', err.message);
@@ -217,7 +239,8 @@ router.post('/items', requireAuth, requireRole('admin'), (req, res) => {
 
 router.put('/items/:id', requireAuth, requireRole('admin'), (req, res) => {
   try {
-    const { name, description, price, price_type, category_id, image_url, sort_order, available } = req.body;
+    const fields = ['name', 'subtitle', 'description', 'price', 'currency', 'category_id', 'image_url',
+                    'sort_order', 'is_available', 'is_active', 'area', 'preparation_time', 'iva_percentage'];
     const db = getDb();
 
     const existing = db.prepare('SELECT id FROM menu_items WHERE id = ?').get(req.params.id);
@@ -227,19 +250,18 @@ router.put('/items/:id', requireAuth, requireRole('admin'), (req, res) => {
 
     const updates = [];
     const params = [];
-    if (name) { updates.push('name = ?'); params.push(name); }
-    if (description !== undefined) { updates.push('description = ?'); params.push(description); }
-    if (price !== undefined) { updates.push('price = ?'); params.push(price); }
-    if (price_type) { updates.push('price_type = ?'); params.push(price_type); }
-    if (category_id) { updates.push('category_id = ?'); params.push(category_id); }
-    if (image_url !== undefined) { updates.push('image_url = ?'); params.push(image_url); }
-    if (sort_order !== undefined) { updates.push('sort_order = ?'); params.push(sort_order); }
-    if (available !== undefined) { updates.push('available = ?'); params.push(available ? 1 : 0); }
+    for (const field of fields) {
+      if (req.body[field] !== undefined) {
+        updates.push(`${field} = ?`);
+        params.push(typeof req.body[field] === 'boolean' ? (req.body[field] ? 1 : 0) : req.body[field]);
+      }
+    }
 
     if (updates.length === 0) {
       return res.status(400).json({ success: false, error: 'Nada que actualizar', code: 'NO_UPDATES' });
     }
 
+    updates.push('updated_at = datetime(\'now\')');
     params.push(req.params.id);
     db.prepare(`UPDATE menu_items SET ${updates.join(', ')} WHERE id = ?`).run(...params);
 
@@ -258,17 +280,17 @@ router.put('/items/:id', requireAuth, requireRole('admin'), (req, res) => {
 router.patch('/items/:id/toggle', requireAuth, requireRole('admin'), (req, res) => {
   try {
     const db = getDb();
-    const item = db.prepare('SELECT id, active FROM menu_items WHERE id = ?').get(req.params.id);
+    const item = db.prepare('SELECT id, is_active FROM menu_items WHERE id = ?').get(req.params.id);
     if (!item) {
       return res.status(404).json({ success: false, error: 'Item no encontrado', code: 'ITEM_NOT_FOUND' });
     }
 
-    const newActive = item.active ? 0 : 1;
-    db.prepare('UPDATE menu_items SET active = ? WHERE id = ?').run(newActive, req.params.id);
+    const newActive = item.is_active ? 0 : 1;
+    db.prepare('UPDATE menu_items SET is_active = ? WHERE id = ?').run(newActive, req.params.id);
 
     res.json({
       success: true,
-      active: !!newActive,
+      is_active: !!newActive,
       message: `Item ${newActive ? 'activado' : 'desactivado'}`,
     });
   } catch (err) {

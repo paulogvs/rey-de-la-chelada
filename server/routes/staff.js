@@ -1,12 +1,15 @@
 /**
  * ═══════════════════════════════════════════════════════════
- *  Staff Routes — Gestión de Personal
+ *  Staff Routes — Gestión de Personal (v2)
  *
  *  GET    /api/staff          → Listar personal
  *  GET    /api/staff/:id      → Personal específico
- *  POST   /api/staff          → Crear (admin)
- *  PUT    /api/staff/:id      → Actualizar (admin)
+ *  PUT    /api/staff/:id      → Actualizar PIN/display_name (admin)
  *  PATCH  /api/staff/:id/active → Activar/desactivar (admin)
+ *
+ *  v2: No create/delete. 3 fixed roles (admin, mesero, kds).
+ *  Admin can update PIN per role.
+ *  Alineado al SSOT: server/db/schema.js → staff
  * ═══════════════════════════════════════════════════════════
  */
 
@@ -25,7 +28,7 @@ router.get('/', requireAuth, requireRole('admin'), (req, res) => {
   try {
     const db = getDb();
     const staff = db.prepare(`
-      SELECT id, username, role, display_name, active, pin_set, created_at, last_login
+      SELECT id, role, display_name, is_active, current_shift, created_at, last_login_at
       FROM staff ORDER BY role, display_name
     `).all();
 
@@ -44,7 +47,7 @@ router.get('/:id', requireAuth, requireRole('admin'), (req, res) => {
   try {
     const db = getDb();
     const member = db.prepare(`
-      SELECT id, username, role, display_name, active, pin_set, created_at, last_login
+      SELECT id, role, display_name, is_active, current_shift, created_at, last_login_at
       FROM staff WHERE id = ?
     `).get(req.params.id);
 
@@ -60,70 +63,15 @@ router.get('/:id', requireAuth, requireRole('admin'), (req, res) => {
 });
 
 // ============================================================
-// POST /api/staff — Crear personal
-// ============================================================
-
-router.post('/', requireAuth, requireRole('admin'), async (req, res) => {
-  try {
-    const { username, password, role, display_name } = req.body;
-
-    if (!username || !password || !role || !display_name) {
-      return res.status(400).json({
-        success: false,
-        error: 'Usuario, contraseña, rol y nombre son requeridos',
-        code: 'STAFF_DATA_REQUIRED',
-      });
-    }
-
-    const validRoles = ['admin', 'mesero', 'cocina', 'bartender', 'caja'];
-    if (!validRoles.includes(role)) {
-      return res.status(400).json({
-        success: false,
-        error: `Rol inválido. Use: ${validRoles.join(', ')}`,
-        code: 'INVALID_ROLE',
-      });
-    }
-
-    const db = getDb();
-
-    // Check duplicate username
-    const existing = db.prepare('SELECT id FROM staff WHERE username = ?').get(username);
-    if (existing) {
-      return res.status(409).json({ success: false, error: 'Usuario ya existe', code: 'USERNAME_EXISTS' });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const result = db.prepare(
-      'INSERT INTO staff (username, password_hash, role, display_name) VALUES (?, ?, ?, ?)'
-    ).run(username, passwordHash, role, display_name);
-
-    res.status(201).json({
-      success: true,
-      staff: {
-        id: result.lastInsertRowid,
-        username,
-        role,
-        display_name,
-        active: 1,
-        pin_set: 0,
-      },
-    });
-  } catch (err) {
-    console.error('[Staff] Create error:', err.message);
-    res.status(500).json({ success: false, error: 'Error al crear personal', code: 'STAFF_CREATE_ERROR' });
-  }
-});
-
-// ============================================================
-// PUT /api/staff/:id — Actualizar personal
+// PUT /api/staff/:id — Update PIN or display_name (admin)
 // ============================================================
 
 router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   try {
-    const { username, password, role, display_name } = req.body;
+    const { pin, display_name, current_shift } = req.body;
     const db = getDb();
 
-    const existing = db.prepare('SELECT id FROM staff WHERE id = ?').get(req.params.id);
+    const existing = db.prepare('SELECT id, role FROM staff WHERE id = ?').get(req.params.id);
     if (!existing) {
       return res.status(404).json({ success: false, error: 'Personal no encontrado', code: 'STAFF_NOT_FOUND' });
     }
@@ -131,24 +79,24 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
     const updates = [];
     const params = [];
 
-    if (username) { updates.push('username = ?'); params.push(username); }
-    if (password) {
-      const hash = await bcrypt.hash(password, 10);
-      updates.push('password_hash = ?');
+    if (pin) {
+      const hash = await bcrypt.hash(String(pin), 10);
+      updates.push('pin_hash = ?');
       params.push(hash);
     }
-    if (role) { updates.push('role = ?'); params.push(role); }
     if (display_name) { updates.push('display_name = ?'); params.push(display_name); }
+    if (current_shift !== undefined) { updates.push('current_shift = ?'); params.push(current_shift); }
 
     if (updates.length === 0) {
       return res.status(400).json({ success: false, error: 'Nada que actualizar', code: 'NO_UPDATES' });
     }
 
+    updates.push("updated_at = datetime('now')");
     params.push(req.params.id);
     db.prepare(`UPDATE staff SET ${updates.join(', ')} WHERE id = ?`).run(...params);
 
     const updated = db.prepare(
-      'SELECT id, username, role, display_name, active, created_at, last_login FROM staff WHERE id = ?'
+      'SELECT id, role, display_name, is_active, current_shift, created_at, last_login_at FROM staff WHERE id = ?'
     ).get(req.params.id);
 
     res.json({ success: true, staff: updated });
@@ -164,8 +112,8 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
 
 router.patch('/:id/active', requireAuth, requireRole('admin'), (req, res) => {
   try {
-    const { active } = req.body;
-    if (active === undefined || typeof active !== 'boolean') {
+    const { is_active } = req.body;
+    if (is_active === undefined || typeof is_active !== 'boolean') {
       return res.status(400).json({ success: false, error: 'Estado activo requerido (boolean)', code: 'ACTIVE_REQUIRED' });
     }
 
@@ -175,13 +123,12 @@ router.patch('/:id/active', requireAuth, requireRole('admin'), (req, res) => {
       return res.status(404).json({ success: false, error: 'Personal no encontrado', code: 'STAFF_NOT_FOUND' });
     }
 
-    // Prevent self-deactivation
-    if (req.user.sub == req.params.id) {
+    if (req.user.sub == req.params.id && !is_active) {
       return res.status(409).json({ success: false, error: 'No puede desactivarse a sí mismo', code: 'SELF_DEACTIVATE' });
     }
 
-    db.prepare('UPDATE staff SET active = ? WHERE id = ?').run(active ? 1 : 0, req.params.id);
-    res.json({ success: true, active, message: active ? 'Usuario activado' : 'Usuario desactivado' });
+    db.prepare('UPDATE staff SET is_active = ? WHERE id = ?').run(is_active ? 1 : 0, req.params.id);
+    res.json({ success: true, is_active, message: is_active ? 'Usuario activado' : 'Usuario desactivado' });
   } catch (err) {
     console.error('[Staff] Toggle active error:', err.message);
     res.status(500).json({ success: false, error: 'Error al cambiar estado', code: 'STAFF_TOGGLE_ERROR' });

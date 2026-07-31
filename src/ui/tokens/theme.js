@@ -10,6 +10,11 @@
 
 import tokens from './tokens.json';
 
+/** Acceso seguro a document (typeof guard — compatible no-undef/SSR) */
+function safeDocument() {
+  return typeof document !== 'undefined' ? document : null;
+}
+
 class ThemeManager {
   constructor() {
     this._tokens = tokens;
@@ -90,7 +95,9 @@ class ThemeManager {
     const palette = this._tokens.palettes[paletteName];
     if (!palette) return;
 
-    const root = document.documentElement;
+    // Guard SSR/Node: sin document no hay CSS custom properties
+    const root = safeDocument();
+    if (!root) return;
 
     // 1. Brand colors
     this._setProp(root, '--dorado-rey', palette.brand['dorado-rey']);

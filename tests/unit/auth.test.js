@@ -155,11 +155,11 @@ describe('Auth Middleware', () => {
     });
 
     it('should allow multiple roles', () => {
-      const req = { user: { role: 'cocina' } };
+      const req = { user: { role: 'kds' } };
       const res = {};
       const next = vi.fn();
 
-      requireRole('admin', 'cocina')(req, res, next);
+      requireRole('admin', 'kds')(req, res, next);
 
       expect(next).toHaveBeenCalled();
     });
@@ -170,16 +170,22 @@ describe('Auth Middleware', () => {
       expect(canAccessModule('anyone', 'clientes')).toBe(true);
     });
 
-    it('should allow only cocina and admin to cocina module', () => {
-      expect(canAccessModule('cocina', 'cocina')).toBe(true);
+    it('should allow kds and admin to cocina module', () => {
+      expect(canAccessModule('kds', 'cocina')).toBe(true);
       expect(canAccessModule('admin', 'cocina')).toBe(true);
       expect(canAccessModule('mesero', 'cocina')).toBe(false);
-      expect(canAccessModule('bartender', 'cocina')).toBe(false);
+    });
+
+    it('should allow kds and admin to bar module', () => {
+      expect(canAccessModule('kds', 'bar')).toBe(true);
+      expect(canAccessModule('admin', 'bar')).toBe(true);
+      expect(canAccessModule('mesero', 'bar')).toBe(false);
     });
 
     it('should allow only admin to admin module', () => {
       expect(canAccessModule('admin', 'admin')).toBe(true);
       expect(canAccessModule('mesero', 'admin')).toBe(false);
+      expect(canAccessModule('kds', 'admin')).toBe(false);
     });
 
     it('should return false for unknown modules', () => {

@@ -15,6 +15,7 @@
 
 import { appConfig, type PwaModuleId } from '@/core/config';
 import { PWA_REGISTRY } from '@/core/config/pwa-registry';
+import { MODULE_CAPABILITIES } from '@/core/config/capabilities';
 import themeManager from '@/ui/tokens/theme';
 
 export interface PwaEnv {
@@ -38,7 +39,7 @@ export function bootstrapPwa(moduleId: PwaModuleId): PwaEnv {
   themeManager.setTheme(config.theme.defaultTheme);
 
   // 2. Determine env info
-  const capabilities = Object.values(require('@/core/config/capabilities').MODULE_CAPABILITIES[moduleId] || []);
+  const capabilities = Object.values(MODULE_CAPABILITIES[moduleId] || []);
 
   const env: PwaEnv = {
     moduleId,
@@ -53,7 +54,17 @@ export function bootstrapPwa(moduleId: PwaModuleId): PwaEnv {
   document.documentElement.dataset.pwa = moduleId;
   document.documentElement.dataset.themeVariant = reg.themeVariant;
 
-  // 4. Log environment (Artículo VI: Observabilidad)
+  // 4. Service Worker — registro por módulo (FASE 3)
+  //    Solo en producción: sw.js vive en /[pwa]/sw.js con scope /[pwa]/
+  if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker
+        .register(`/${moduleId}/sw.js`, { scope: `/${moduleId}/` })
+        .catch(err => console.error(`[PWA] SW registration failed (${moduleId}):`, err));
+    });
+  }
+
+  // 5. Log environment (Artículo VI: Observabilidad)
   console.log(`[PWA] Bootstrapped: ${moduleId}`, {
     basePath: env.basePath,
     capabilities: env.capabilities,

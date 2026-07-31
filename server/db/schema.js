@@ -11,15 +11,14 @@
  * ═══════════════════════════════════════════════════════════
  */
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const CREATE_TABLES = [
-  // ── Staff / Users ─────────────────────────────────────
+  // ── Staff / Users (v2: 3 roles only, no username) ─────
   `CREATE TABLE IF NOT EXISTS staff (
     id          TEXT PRIMARY KEY,
-    username    TEXT NOT NULL UNIQUE,
     pin_hash    TEXT NOT NULL,
-    role        TEXT NOT NULL CHECK(role IN ('admin','mesero','cocina','caja','bartender')),
+    role        TEXT NOT NULL CHECK(role IN ('admin','mesero','kds')),
     display_name TEXT NOT NULL,
     is_active   INTEGER NOT NULL DEFAULT 1,
     current_shift TEXT,
@@ -113,7 +112,7 @@ const CREATE_TABLES = [
     table_number    INTEGER NOT NULL,
     waiter_id       TEXT NOT NULL,
     waiter_name     TEXT NOT NULL,
-    status          TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','confirmed','preparing','ready','served','paid','cancelled')),
+    status          TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','called','confirmed','preparing','ready','served','paid','cancelled')),
     subtotal        REAL NOT NULL DEFAULT 0,
     iva_amount      REAL NOT NULL DEFAULT 0,
     discount        REAL NOT NULL DEFAULT 0,
@@ -188,6 +187,20 @@ const CREATE_TABLES = [
     FOREIGN KEY (closed_by) REFERENCES staff(id)
   )`,
 
+  // ── Waiter Calls (mesero llamar) ──────────────────────
+  `CREATE TABLE IF NOT EXISTS waiter_calls (
+    id            TEXT PRIMARY KEY,
+    table_id      TEXT NOT NULL,
+    table_number  INTEGER NOT NULL,
+    session_id    TEXT NOT NULL,
+    call_type     TEXT NOT NULL CHECK(call_type IN ('call_waiter','request_bill')),
+    status        TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','accepted','done','cancelled')),
+    accepted_by   TEXT,
+    accepted_at   TEXT,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (table_id) REFERENCES tables(id)
+  )`,
+
   // ── Sync Log ──────────────────────────────────────────
   `CREATE TABLE IF NOT EXISTS sync_log (
     id          TEXT PRIMARY KEY,
@@ -216,10 +229,15 @@ function applySchema(db) {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
 
-  // Check current schema version
-  const currentVersion = db.prepare(
-    `SELECT version FROM schema_version ORDER BY version DESC LIMIT 1`
-  ).get();
+  // Check current schema version (fresh DB: tabla aún no existe)
+  let currentVersion = null;
+  try {
+    currentVersion = db.prepare(
+      `SELECT version FROM schema_version ORDER BY version DESC LIMIT 1`
+    ).get();
+  } catch {
+    // Primera ejecución — schema_version aún no existe
+  }
 
   if (currentVersion && currentVersion.version >= SCHEMA_VERSION) {
     console.log(`[DB] Schema at version ${currentVersion.version}, no migration needed`);
@@ -239,4 +257,4 @@ function applySchema(db) {
   console.log(`[DB] Schema v${SCHEMA_VERSION} applied successfully`);
 }
 
-module.exports = { applySchema, SCHEMA_VERSION, CREATE_TABLES };
+export { applySchema, SCHEMA_VERSION, CREATE_TABLES };

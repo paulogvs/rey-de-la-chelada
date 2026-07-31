@@ -11,7 +11,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { Badge } from '../Badge/Badge';
-import type { Order, OrderLineItem, KDSStatus } from '@/core/types';
+import type { Order, KDSStatus } from '@/core/types';
 import './KDSOrderCard.css';
 
 export interface KDSOrderCardProps {
@@ -27,8 +27,8 @@ export interface KDSOrderCardProps {
   /** Callback to acknowledge/reject the order */
   onAcknowledge?: (orderId: string) => void;
   onReject?: (orderId: string) => void;
-  /** Force KDS module variant (cocina or bar) */
-  variant?: 'cocina' | 'bar';
+  /** Force KDS module variant (cocina, bar, or kds for unified) */
+  variant?: 'cocina' | 'bar' | 'kds';
 }
 
 export function KDSOrderCard({

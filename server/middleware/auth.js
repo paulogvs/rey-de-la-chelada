@@ -7,12 +7,10 @@
  *  Artículo VII: Secrets Boundary — JWT_SECRET desde .env.
  * ═══════════════════════════════════════════════════════════
  *
- *  Roles del sistema:
- *    admin     → Acceso total
- *    mesero    → Mesas, pedidos, pagos
- *    cocina    → KDS, marcar estado
- *    bartender → KDS barra
- *    caja      → Corte de caja, facturación
+ *  Roles del sistema (v2: 3 roles):
+ *    admin  → Acceso total
+ *    mesero → Mesas, pedidos, pagos, waiter calls
+ *    kds    → KDS cocina+barra unificado
  */
 
 import jwt from 'jsonwebtoken';
@@ -202,10 +200,10 @@ export function optionalAuth(req, res, next) {
  */
 const MODULE_ROLES = {
   clientes:  [],       // Public — no auth needed
-  cocina:    ['cocina', 'admin'],
-  bar:       ['bartender', 'admin'],
+  cocina:    ['kds', 'admin'],
+  bar:       ['kds', 'admin'],
   meseros:   ['mesero', 'admin'],
-  caja:      ['caja', 'admin'],
+  caja:      ['admin'],
   admin:     ['admin'],
 };
 

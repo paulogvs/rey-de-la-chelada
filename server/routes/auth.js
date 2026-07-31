@@ -1,17 +1,18 @@
 /**
  * ═══════════════════════════════════════════════════════════
- *  Auth Routes — Login, Refresh, PIN Verify, Profile
+ *  Auth Routes — Login, PIN, Refresh, Profile
  *
- *  Artículo I:  SSOT — Toda autenticación pasa por aquí.
- *  Artículo VII: Secrets Boundary — JWT_SECRET desde .env.
- *  Artículo VIII: Error Recovery — Mensajes claros en español.
- * ═══════════════════════════════════════════════════════════
+ *  v2: PIN login matches ANY staff row with that PIN.
+ *  Returns JWT with role. No username needed.
  *
- *  POST /api/auth/login     → Login con username + password
- *  POST /api/auth/pin       → Login con PIN (meseros)
+ *  POST /api/auth/login     → Login con PIN (matches any staff)
+ *  POST /api/auth/pin       → Alias for /login
  *  POST /api/auth/refresh   → Refresh token
  *  GET  /api/auth/me        → Perfil del usuario autenticado
- *  POST /api/auth/logout    → Logout (invalidate token)
+ *  POST /api/auth/logout    → Logout
+ *
+ *  Alineado al SSOT: server/db/schema.js → staff (pin_hash, is_active)
+ * ═══════════════════════════════════════════════════════════
  */
 
 import { Router } from 'express';
@@ -22,86 +23,10 @@ import { generateToken, generateRefreshToken, verifyToken, requireAuth } from '.
 const router = Router();
 
 // ============================================================
-// POST /api/auth/login
+// POST /api/auth/login — PIN login (matches any staff row)
 // ============================================================
 
-router.post('/login', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-
-    if (!username || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Usuario y contraseña son requeridos',
-        code: 'CREDENTIALS_REQUIRED',
-      });
-    }
-
-    const db = getDb();
-    const user = db.prepare('SELECT id, username, password_hash, role, display_name, active FROM staff WHERE username = ?').get(username);
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Credenciales inválidas',
-        code: 'INVALID_CREDENTIALS',
-      });
-    }
-
-    if (!user.active) {
-      return res.status(403).json({
-        success: false,
-        error: 'Cuenta desactivada. Contacte al administrador.',
-        code: 'ACCOUNT_DISABLED',
-      });
-    }
-
-    const valid = await bcrypt.compare(password, user.password_hash);
-    if (!valid) {
-      return res.status(401).json({
-        success: false,
-        error: 'Credenciales inválidas',
-        code: 'INVALID_CREDENTIALS',
-      });
-    }
-
-    // Generate tokens
-    const tokenUser = {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      displayName: user.display_name,
-    };
-
-    const token = generateToken(tokenUser);
-    const refreshToken = generateRefreshToken(tokenUser);
-
-    res.json({
-      success: true,
-      token,
-      refreshToken,
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        displayName: user.display_name,
-      },
-    });
-  } catch (err) {
-    console.error('[Auth] Login error:', err.message);
-    res.status(500).json({
-      success: false,
-      error: 'Error al iniciar sesión',
-      code: 'LOGIN_ERROR',
-    });
-  }
-});
-
-// ============================================================
-// POST /api/auth/pin — PIN login for meseros
-// ============================================================
-
-router.post('/pin', (req, res) => {
+router.post('/login', (req, res) => {
   try {
     const { pin } = req.body;
 
@@ -114,14 +39,11 @@ router.post('/pin', (req, res) => {
     }
 
     const db = getDb();
+    const users = db.prepare(
+      'SELECT id, pin_hash, role, display_name, is_active FROM staff WHERE is_active = 1'
+    ).all();
 
-    // Buscar mesero por PIN
-    const user = db.prepare(
-      'SELECT id, username, password_hash, role, display_name, pin_hash, active FROM staff WHERE role = ? AND active = 1'
-    ).all('mesero');
-
-    // Find matching PIN
-    const matched = user.find(u => u.pin_hash && bcrypt.compareSync(pin, u.pin_hash));
+    const matched = users.find(u => u.pin_hash && bcrypt.compareSync(String(pin), u.pin_hash));
 
     if (!matched) {
       return res.status(401).json({
@@ -131,9 +53,10 @@ router.post('/pin', (req, res) => {
       });
     }
 
+    db.prepare("UPDATE staff SET last_login_at = datetime('now') WHERE id = ?").run(matched.id);
+
     const tokenUser = {
       id: matched.id,
-      username: matched.username,
       role: matched.role,
       displayName: matched.display_name,
     };
@@ -147,19 +70,28 @@ router.post('/pin', (req, res) => {
       refreshToken,
       user: {
         id: matched.id,
-        username: matched.username,
         role: matched.role,
         displayName: matched.display_name,
       },
     });
   } catch (err) {
-    console.error('[Auth] PIN login error:', err.message);
+    console.error('[Auth] Login error:', err.message);
     res.status(500).json({
       success: false,
-      error: 'Error al verificar PIN',
-      code: 'PIN_ERROR',
+      error: 'Error al iniciar sesión',
+      code: 'LOGIN_ERROR',
     });
   }
+});
+
+// ============================================================
+// POST /api/auth/pin — Alias for /login
+// ============================================================
+
+router.post('/pin', (req, res) => {
+  // Redirect to login handler
+  req.url = '/login';
+  router.handle(req, res);
 });
 
 // ============================================================
@@ -187,9 +119,10 @@ router.post('/refresh', (req, res) => {
       });
     }
 
-    // Get fresh user data
     const db = getDb();
-    const user = db.prepare('SELECT id, username, role, display_name FROM staff WHERE id = ? AND active = 1').get(decoded.sub);
+    const user = db.prepare(
+      'SELECT id, role, display_name FROM staff WHERE id = ? AND is_active = 1'
+    ).get(decoded.sub);
 
     if (!user) {
       return res.status(401).json({
@@ -201,7 +134,6 @@ router.post('/refresh', (req, res) => {
 
     const tokenUser = {
       id: user.id,
-      username: user.username,
       role: user.role,
       displayName: user.display_name,
     };
@@ -232,7 +164,7 @@ router.get('/me', requireAuth, (req, res) => {
   try {
     const db = getDb();
     const user = db.prepare(
-      'SELECT id, username, role, display_name, created_at, last_login FROM staff WHERE id = ?'
+      'SELECT id, role, display_name, is_active, current_shift, last_login_at, created_at FROM staff WHERE id = ?'
     ).get(req.user.sub);
 
     if (!user) {
@@ -247,11 +179,12 @@ router.get('/me', requireAuth, (req, res) => {
       success: true,
       user: {
         id: user.id,
-        username: user.username,
         role: user.role,
         displayName: user.display_name,
+        isActive: !!user.is_active,
+        currentShift: user.current_shift,
+        lastLogin: user.last_login_at,
         createdAt: user.created_at,
-        lastLogin: user.last_login,
       },
     });
   } catch (err) {
@@ -269,8 +202,6 @@ router.get('/me', requireAuth, (req, res) => {
 // ============================================================
 
 router.post('/logout', (req, res) => {
-  // JWT es stateless — el cliente debe descartar el token.
-  // En el futuro, podemos agregar una blocklist.
   res.json({
     success: true,
     message: 'Sesión cerrada exitosamente. Descarte su token.',

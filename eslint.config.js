@@ -29,6 +29,20 @@ export default [
     },
   },
   {
+    // Browser globals para .js de src (theme.js usa document/console)
+    files: ['src/**/*.js'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        document: 'readonly',
+        window: 'readonly',
+        navigator: 'readonly',
+        localStorage: 'readonly',
+        fetch: 'readonly',
+      },
+    },
+  },
+  {
     files: ['server/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,

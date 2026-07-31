@@ -11,8 +11,8 @@ import { appConfig } from '@/core/config';
 import './PriceDisplay.css';
 
 export interface PriceDisplayProps {
-  /** Total price with IVA included */
-  priceWithIVA: number;
+  /** Total price with IVA included (null = show "—" placeholder) */
+  priceWithIVA: number | null;
   /** Optional: IVA percentage (defaults to app config) */
   ivaPercentage?: number;
   /** Show IVA breakdown toggle */
@@ -40,6 +40,17 @@ export function PriceDisplay({
   const rate = (ivaPercentage ?? config.taxes.iva.percentage) / 100;
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [selectedTip, setSelectedTip] = useState<number>(0);
+
+  // Null price: show placeholder
+  if (priceWithIVA == null) {
+    return (
+      <div className={classes}>
+        <div className="price-display__main">
+          <span className="price-display__amount price-display__amount--null">—</span>
+        </div>
+      </div>
+    );
+  }
 
   const base = Math.round((priceWithIVA / (1 + rate)) * 100) / 100;
   const ivaAmount = Math.round((priceWithIVA - base) * 100) / 100;
