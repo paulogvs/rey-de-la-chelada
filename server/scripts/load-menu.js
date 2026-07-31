@@ -1,66 +1,117 @@
 /**
  * ═══════════════════════════════════════════════════════════
- *  load-menu.js — Import menu data from JSON into SQLite
+ *  load-menu.js — Import menu data from menu-seed.json to SQLite
  *
- *  Usage: node server/scripts/load-menu.js menu-data.json
+ *  Usage: node server/scripts/load-menu.js
  *
- *  Idempotent: uses INSERT OR REPLACE for categories and items.
- *  Creates categories if they don't exist, updates if they do.
- *  Same for menu items (matched by name + category).
+ *  Reads src/core/data/menu-seed.json (SSOT) and upserts
+ *  categories + items into SQLite.
  *
- *  JSON format:
- *  {
- *    "categories": [
- *      { "name": "Cervezas", "emoji": "🍺", "sort_order": 1 }
- *    ],
- *    "items": [
- *      {
- *        "category": "Cervezas",
- *        "name": "Cerveza Pacena",
- *        "description": "",
- *        "price": 15,
- *        "area": "bar",
- *        "sort_order": 1,
- *        "preparation_time": 15,
- *        "size_variants": { "media": 15, "litro": 25 }
- *      }
- *    ]
- *  }
+ *  Idempotent: safe to run multiple times.
+ *
+ *  Image path convention:
+ *    BAR items → /menu-photos/micheladas/{id}.png
+ *    COC items → /menu-photos/categorias/cat-{category}.jpg (fallback)
  *
  * ═══════════════════════════════════════════════════════════
  */
 
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve, join } from 'node:path';
 import { getDb, closeDb } from '../db/index.js';
 
-const filePath = process.argv[2];
+// ── Paths ──────────────────────────────────────────────────
+const ROOT = resolve(import.meta.dirname, '..', '..');
+const SEED_PATH = join(ROOT, 'src', 'core', 'data', 'menu-seed.json');
+const PHOTO_BASE = '/menu-photos';
 
-if (!filePath) {
-  console.error('Usage: node server/scripts/load-menu.js <menu-data.json>');
+// ── Read seed data ─────────────────────────────────────────
+if (!existsSync(SEED_PATH)) {
+  console.error(`[load-menu] Seed file not found: ${SEED_PATH}`);
   process.exit(1);
 }
 
-let data;
+let seedData;
 try {
-  const raw = readFileSync(resolve(filePath), 'utf-8');
-  data = JSON.parse(raw);
+  const raw = readFileSync(SEED_PATH, 'utf-8');
+  seedData = JSON.parse(raw);
 } catch (err) {
-  console.error(`[load-menu] Error reading file: ${err.message}`);
+  console.error(`[load-menu] Error reading seed: ${err.message}`);
   process.exit(1);
 }
 
-if (!data.categories || !Array.isArray(data.categories)) {
-  console.error('[load-menu] Invalid JSON: missing "categories" array');
+// ── Parse seed into categories + items ─────────────────────
+const categories = [];
+const items = [];
+
+const menu = seedData.restobar?.menu;
+if (!menu) {
+  console.error('[load-menu] Invalid seed: missing restobar.menu');
   process.exit(1);
 }
 
-if (!data.items || !Array.isArray(data.items)) {
-  console.error('[load-menu] Invalid JSON: missing "items" array');
-  process.exit(1);
+let categorySort = 0;
+let itemSort = 0;
+
+for (const [areaKey, area] of Object.entries(menu)) {
+  const areaLower = areaKey.toLowerCase(); // 'bar' or 'cocina'
+
+  for (const cat of area.categorias || []) {
+    const catName = cat.nombre_categoria;
+    const catEmoji = areaKey === 'BAR' ? '🍺' : '🍽️';
+
+    categories.push({
+      name: catName,
+      emoji: catEmoji,
+      sort_order: categorySort++,
+    });
+
+    for (const seedItem of cat.items || []) {
+      // Build image path
+      let imageUrl = null;
+      if (seedItem.imagen) {
+        // Item has explicit image reference
+        if (areaLower === 'bar') {
+          imageUrl = `${PHOTO_BASE}/micheladas/${seedItem.imagen}`;
+        } else {
+          imageUrl = `${PHOTO_BASE}/categorias/${seedItem.imagen}`;
+        }
+      }
+
+      // Build description from ingredients
+      const description = seedItem.descripcion || '';
+      const ingredientes = seedItem.ingredientes?.join(', ') || '';
+
+      // Build size variants for pizzas
+      let sizeVariants = null;
+      if (cat.variantes_tamanos && seedItem.precios) {
+        sizeVariants = seedItem.precios;
+      }
+
+      items.push({
+        category: catName,
+        name: seedItem.nombre,
+        subtitle: seedItem.subtitulo || '',
+        description: description || ingredientes,
+        price: seedItem.precio ?? null,
+        area: areaLower,
+        sort_order: itemSort++,
+        preparation_time: areaLower === 'bar' ? 5 : 15,
+        image_url: imageUrl,
+        size_variants: sizeVariants,
+        has_ice: seedItem.tiene_ice || false,
+        ingredient_list: seedItem.ingredientes || [],
+        garnish_list: seedItem.decoracion_garnish || [],
+        recipe_json: seedItem.receta_tecnica || null,
+      });
+    }
+  }
 }
 
+console.log(`[load-menu] Parsed ${categories.length} categories, ${items.length} items from seed`);
+
+// ── Import into SQLite ─────────────────────────────────────
 const db = getDb();
 
 let categoriesCreated = 0;
@@ -70,45 +121,32 @@ let itemsUpdated = 0;
 
 const transaction = db.transaction(() => {
   // Process categories
-  for (const cat of data.categories) {
-    if (!cat.name) {
-      console.warn('[load-menu] Skipping category without name:', cat);
-      continue;
-    }
-
+  for (const cat of categories) {
     const existing = db.prepare('SELECT id FROM menu_categories WHERE name = ?').get(cat.name);
 
     if (existing) {
-      // Update existing category
       db.prepare(`
         UPDATE menu_categories
         SET emoji = COALESCE(?, emoji),
             sort_order = COALESCE(?, sort_order),
             updated_at = datetime('now')
         WHERE id = ?
-      `).run(cat.emoji || null, cat.sort_order ?? null, existing.id);
+      `).run(cat.emoji, cat.sort_order, existing.id);
       categoriesUpdated++;
     } else {
-      // Create new category
       db.prepare(`
         INSERT INTO menu_categories (id, name, emoji, sort_order)
         VALUES (?, ?, ?, ?)
-      `).run(randomUUID(), cat.name, cat.emoji || '🍽', cat.sort_order || 0);
+      `).run(randomUUID(), cat.name, cat.emoji, cat.sort_order);
       categoriesCreated++;
     }
   }
 
   // Process items
-  for (const item of data.items) {
-    if (!item.name || !item.category) {
-      console.warn('[load-menu] Skipping item without name or category:', item);
-      continue;
-    }
-
-    // Find category
+  for (const item of items) {
     const category = db.prepare('SELECT id FROM menu_categories WHERE name = ?').get(item.category);
     if (!category) {
-      console.warn(`[load-menu] Category "${item.category}" not found for item "${item.name}" — skipping`);
+      console.warn(`[load-menu] Category "${item.category}" not found for "${item.name}" — skipping`);
       continue;
     }
 
@@ -117,51 +155,65 @@ const transaction = db.transaction(() => {
     ).get(item.name, category.id);
 
     const sizeVariants = item.size_variants ? JSON.stringify(item.size_variants) : null;
+    const ingredientList = item.ingredient_list?.length ? JSON.stringify(item.ingredient_list) : null;
+    const garnishList = item.garnish_list?.length ? JSON.stringify(item.garnish_list) : null;
+    const recipeJson = item.recipe_json ? JSON.stringify(item.recipe_json) : null;
 
     if (existing) {
-      // Update existing item
       db.prepare(`
         UPDATE menu_items
-        SET description = COALESCE(?, description),
+        SET subtitle = COALESCE(?, subtitle),
+            description = COALESCE(?, description),
             price = COALESCE(?, price),
             area = COALESCE(?, area),
             sort_order = COALESCE(?, sort_order),
             preparation_time = COALESCE(?, preparation_time),
             size_variants = COALESCE(?, size_variants),
             image_url = COALESCE(?, image_url),
-            is_available = COALESCE(?, is_available),
+            has_ice = COALESCE(?, has_ice),
+            ingredient_list = COALESCE(?, ingredient_list),
+            garnish_list = COALESCE(?, garnish_list),
+            recipe_json = COALESCE(?, recipe_json),
             updated_at = datetime('now')
         WHERE id = ?
       `).run(
-        item.description ?? null,
-        item.price ?? null,
-        item.area ?? null,
-        item.sort_order ?? null,
-        item.preparation_time ?? null,
+        item.subtitle || null,
+        item.description || null,
+        item.price,
+        item.area,
+        item.sort_order,
+        item.preparation_time,
         sizeVariants,
-        item.image_url ?? null,
-        item.is_available ?? null,
+        item.image_url,
+        item.has_ice ? 1 : 0,
+        ingredientList,
+        garnishList,
+        recipeJson,
         existing.id
       );
       itemsUpdated++;
     } else {
-      // Create new item
       db.prepare(`
-        INSERT INTO menu_items (id, category_id, name, description, price, currency,
-                                is_active, is_available, preparation_time, sort_order, area, size_variants, image_url)
-        VALUES (?, ?, ?, ?, ?, 'BOB', 1, ?, ?, ?, ?, ?, ?)
+        INSERT INTO menu_items (id, category_id, name, subtitle, description, price, currency,
+                                is_active, is_available, preparation_time, sort_order, area,
+                                has_ice, ingredient_list, garnish_list, recipe_json, size_variants, image_url)
+        VALUES (?, ?, ?, ?, ?, ?, 'BOB', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         randomUUID(),
         category.id,
         item.name,
+        item.subtitle || null,
         item.description || '',
-        item.price ?? null,
-        item.is_available !== false ? 1 : 0,
-        item.preparation_time || 15,
-        item.sort_order || 0,
-        item.area || 'cocina',
+        item.price,
+        item.preparation_time,
+        item.sort_order,
+        item.area,
+        item.has_ice ? 1 : 0,
+        ingredientList,
+        garnishList,
+        recipeJson,
         sizeVariants,
-        item.image_url || null
+        item.image_url
       );
       itemsCreated++;
     }

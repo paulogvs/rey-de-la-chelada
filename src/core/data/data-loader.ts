@@ -31,6 +31,7 @@ interface SeedItem {
   precios?: Record<string, number | null>;
   area?: string;
   tiene_ice?: boolean;
+  imagen?: string;
 }
 
 interface SeedCategory {
@@ -95,7 +96,11 @@ export function loadSeedData(): { categories: MenuCategory[]; items: MenuItem[] 
           price: seedItem.precio ?? null,
           currency: CURRENCY,
           ivaPercentage: IVA_PERCENTAGE,
-          imageUrl: null,
+          imageUrl: seedItem.imagen
+            ? (areaKey === 'BAR'
+                ? `/menu-photos/micheladas/${seedItem.imagen}`
+                : `/menu-photos/categorias/${seedItem.imagen}`)
+            : null,
           isActive: true,
           isAvailable: true,
           modifierGroups: [],

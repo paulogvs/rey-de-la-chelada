@@ -98,6 +98,9 @@ app.use('/badges', express.static(path.join(__dirname, '..', 'public', 'badges')
 // Icons compartidos
 app.use('/icons', express.static(path.join(DIST_DIR, 'icons'), { maxAge: '7d' }));
 
+// Menu photos (micheladas, categorías)
+app.use('/menu-photos', express.static(path.join(__dirname, '..', 'public', 'menu'), { maxAge: '30d' }));
+
 // ============================================================
 // PWA Routes — Cada una sirve su propio directorio
 // ============================================================
