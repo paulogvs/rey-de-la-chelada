@@ -268,11 +268,29 @@ export interface Recipe {
 
 /** KDS Event (WebSocket message) */
 export interface KDSEvent {
-  type: 'new_order' | 'status_change' | 'urgent' | 'cancelled';
+  type: 'new_order' | 'status_change' | 'item_ready' | 'order_complete' | 'urgent' | 'cancelled';
   orderId: string;
   tableNumber: number;
   items: OrderLineItem[];
   timestamp: string;
+}
+
+/**
+ * KDS event as received from the WebSocket broadcaster (server → client).
+ * Items are already normalized to client shape by the parsing layer.
+ */
+export interface KDSIncomingEvent {
+  type: 'new_order' | 'status_change' | 'item_ready' | 'order_complete';
+  orderId: string;
+  tableNumber?: number;
+  tableId?: string;
+  waiterId?: string;
+  waiterName?: string;
+  items?: OrderLineItem[];
+  itemId?: string;
+  status?: OrderStatus | KDSStatus;
+  previousStatus?: string;
+  timestamp?: string;
 }
 
 /** Sync event for offline/online bridge */

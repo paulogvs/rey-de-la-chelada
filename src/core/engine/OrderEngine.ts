@@ -15,6 +15,7 @@ import type {
   Payment,
   PaymentMethod,
   KDSEvent,
+  KDSIncomingEvent,
   SyncEvent,
 } from '../types';
 
@@ -283,6 +284,117 @@ class OrderEngine {
   importOrder(order: Order): void {
     this.orders.set(order.id, order);
     this._notify();
+  }
+
+  /**
+   * Apply an incoming KDS event received from the WebSocket broadcaster
+   * (server → client). The server is the source of truth for order state:
+   *  - new_order        → import the full order (replace if exists)
+   *  - status_change    → update the order status
+   *  - item_ready       → mark a single item as ready
+   *  - order_complete   → mark the whole order as ready
+   *
+   * Fires the KDS event to listeners so UI alerts (sound, flash) still work.
+   * Returns true when the event was applied, false when it was a no-op
+   * (unknown type, missing orderId, or order not present).
+   */
+  applyKDSEvent(event: KDSIncomingEvent): boolean {
+    if (!event || !event.orderId) return false;
+
+    switch (event.type) {
+      case 'new_order': {
+        if (!event.items) return false;
+        const order: Order = {
+          id: event.orderId,
+          tableId: event.tableId || `table-${event.tableNumber ?? 0}`,
+          tableNumber: event.tableNumber ?? 0,
+          waiterId: event.waiterId || '',
+          waiterName: event.waiterName || '',
+          items: event.items,
+          status: (event.status as OrderStatus) || 'confirmed',
+          subtotal: 0,
+          ivaAmount: 0,
+          discount: 0,
+          discountReason: '',
+          total: 0,
+          paymentMethod: null,
+          paymentReference: null,
+          isPaid: false,
+          paidAt: null,
+          notes: '',
+          guestCount: 1,
+          createdAt: event.timestamp || new Date().toISOString(),
+          updatedAt: event.timestamp || new Date().toISOString(),
+          syncedAt: null,
+          localId: event.orderId,
+        };
+        this._recalculateOrder(order);
+        this.importOrder(order);
+        this._fireKDSEvent({
+          type: 'new_order',
+          orderId: order.id,
+          tableNumber: order.tableNumber,
+          items: order.items,
+          timestamp: order.createdAt,
+        });
+        return true;
+      }
+
+      case 'status_change': {
+        const existing = this.orders.get(event.orderId);
+        if (!existing) return false;
+        if (event.status) {
+          existing.status = event.status as OrderStatus;
+        }
+        existing.updatedAt = event.timestamp || new Date().toISOString();
+        this._notify();
+        this._fireKDSEvent({
+          type: 'status_change',
+          orderId: existing.id,
+          tableNumber: existing.tableNumber,
+          items: existing.items,
+          timestamp: existing.updatedAt,
+        });
+        return true;
+      }
+
+      case 'item_ready': {
+        const existing = this.orders.get(event.orderId);
+        if (!existing) return false;
+        const item = existing.items.find(i => i.id === event.itemId);
+        if (!item) return false;
+        item.status = 'ready';
+        existing.updatedAt = event.timestamp || new Date().toISOString();
+        this._notify();
+        this._fireKDSEvent({
+          type: 'item_ready',
+          orderId: existing.id,
+          tableNumber: existing.tableNumber,
+          items: [item],
+          timestamp: existing.updatedAt,
+        });
+        return true;
+      }
+
+      case 'order_complete': {
+        const existing = this.orders.get(event.orderId);
+        if (!existing) return false;
+        existing.status = 'ready';
+        existing.updatedAt = event.timestamp || new Date().toISOString();
+        this._notify();
+        this._fireKDSEvent({
+          type: 'order_complete',
+          orderId: existing.id,
+          tableNumber: existing.tableNumber,
+          items: existing.items,
+          timestamp: existing.updatedAt,
+        });
+        return true;
+      }
+
+      default:
+        return false;
+    }
   }
 
   /** Export all orders for sync */

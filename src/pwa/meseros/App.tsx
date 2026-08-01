@@ -13,6 +13,7 @@
 import React, { useState, useCallback } from 'react';
 import { bootstrapPwa } from '../_shared/bootstrap';
 import { setCurrentPwaModule } from '../_shared/hooks/useCapability';
+import { useKDSWebSocket } from '../_shared/hooks/useKDSWebSocket';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { TableGrid } from '@/modules/salon/components/TableGrid';
 import { ForchiBadge } from '@/ui/components/ForchiBadge';
@@ -29,6 +30,20 @@ function MeserosApp() {
   const [view, setView] = useState<ViewState>('tables');
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
+
+  // Real-time: KDS marks an order complete → notify the waiter.
+  useKDSWebSocket({
+    module: 'meseros',
+    onEvent: event => {
+      if (event.type === 'order_complete') {
+        addToast({
+          type: 'success',
+          message: `Mesa ${event.tableNumber ?? ''} — Pedido listo 🍽️`,
+          duration: 4000,
+        });
+      }
+    },
+  });
 
   // Handle table selection from grid
   const handleTableSelect = useCallback((table: Table) => {

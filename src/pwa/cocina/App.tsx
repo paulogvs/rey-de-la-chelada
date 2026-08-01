@@ -16,6 +16,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { bootstrapPwa } from '../_shared/bootstrap';
 import { setCurrentPwaModule } from '../_shared/hooks/useCapability';
+import { useKDSWebSocket } from '../_shared/hooks/useKDSWebSocket';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { orderEngine } from '@/core/engine';
 import { KDSOrderCard, KDSOrderCardSkeleton } from '@/ui/components/KDSOrderCard';
@@ -97,6 +98,14 @@ export default function App() {
   });
   const [loading, setLoading] = useState(true);
   const prevOrderIdsRef = useRef<Set<string>>(new Set());
+  const loadOrdersRef = useRef<() => void>(() => {});
+
+  // WebSocket — real-time order dispatch + polling fallback.
+  const ws = useKDSWebSocket({
+    module: 'cocina',
+    orderEngine,
+    onFallback: () => loadOrdersRef.current(),
+  });
 
   // Load orders from engine
   const loadOrders = useCallback(() => {
@@ -142,16 +151,31 @@ export default function App() {
     setLoading(false);
   }, [state.audioEnabled, state.urgentOrderIds]);
 
+  // Subscribe to engine — keep ref in sync for WebSocket fallback
+  loadOrdersRef.current = loadOrders;
+
+  // Keep connection badge in sync with WebSocket state
+  useEffect(() => {
+    setState(prev =>
+      prev.isConnected !== ws.isConnected ? { ...prev, isConnected: ws.isConnected } : prev
+    );
+  }, [ws.isConnected]);
+
   // Subscribe to engine
   useEffect(() => {
     loadOrders();
     const unsubscribe = orderEngine.onChange(loadOrders);
-    const interval = setInterval(loadOrders, 30000);
+
+    // Polling fallback: only when WebSocket is unavailable/starved.
+    let interval: ReturnType<typeof setInterval> | null = null;
+    if (ws.shouldFallback) {
+      interval = setInterval(loadOrders, 30000);
+    }
     return () => {
       unsubscribe();
-      clearInterval(interval);
+      if (interval) clearInterval(interval);
     };
-  }, [loadOrders]);
+  }, [loadOrders, ws.shouldFallback]);
 
   // Subscribe to KDS events
   useEffect(() => {
