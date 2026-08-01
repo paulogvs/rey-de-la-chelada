@@ -20,6 +20,10 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import {
+  validateBulkPricesRequest,
+  applyBulkPriceUpdates,
+} from '../services/menu-bulk-updates.js';
 
 const router = Router();
 
@@ -296,6 +300,71 @@ router.patch('/items/:id/toggle', requireAuth, requireRole('admin'), (req, res) 
   } catch (err) {
     console.error('[Menu] Toggle error:', err.message);
     res.status(500).json({ success: false, error: 'Error al cambiar estado', code: 'ITEM_TOGGLE_ERROR' });
+  }
+});
+
+// ============================================================
+// Admin: PATCH /api/menu/items/:id/price — Quick price update
+// ============================================================
+
+router.patch('/items/:id/price', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const { price } = req.body;
+    if (typeof price !== 'number' || Number.isNaN(price)) {
+      return res.status(400).json({
+        success: false, error: 'price numérico requerido', code: 'PRICE_REQUIRED',
+      });
+    }
+    if (price < 0) {
+      return res.status(400).json({
+        success: false, error: 'price no puede ser negativo', code: 'PRICE_NEGATIVE',
+      });
+    }
+
+    const db = getDb();
+    const existing = db.prepare('SELECT id FROM menu_items WHERE id = ?').get(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Item no encontrado', code: 'ITEM_NOT_FOUND' });
+    }
+
+    db.prepare(`
+      UPDATE menu_items SET price = ?, updated_at = datetime('now') WHERE id = ?
+    `).run(price, req.params.id);
+
+    const updated = db.prepare('SELECT id, name, price FROM menu_items WHERE id = ?').get(req.params.id);
+    res.json({ success: true, item: updated, message: 'Precio actualizado' });
+  } catch (err) {
+    console.error('[Menu] Price update error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al actualizar precio', code: 'PRICE_UPDATE_ERROR' });
+  }
+});
+
+// ============================================================
+// Admin: POST /api/menu/items/bulk-prices — Bulk price update
+// ============================================================
+
+router.post('/items/bulk-prices', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const validation = validateBulkPricesRequest(req.body);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false, error: validation.error, code: 'INVALID_BULK_REQUEST',
+      });
+    }
+
+    const db = getDb();
+    const result = applyBulkPriceUpdates(db, req.body.updates);
+
+    res.json({
+      success: true,
+      updated: result.updated,
+      failed: result.failed,
+      errors: result.errors,
+      message: `${result.updated} precio(s) actualizado(s)`,
+    });
+  } catch (err) {
+    console.error('[Menu] Bulk price update error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al actualizar precios', code: 'BULK_PRICE_ERROR' });
   }
 });
 

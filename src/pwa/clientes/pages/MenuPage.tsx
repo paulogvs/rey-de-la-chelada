@@ -10,10 +10,10 @@
  * - Tap item → detail view (modifiers, description, photo)
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { menuEngine } from '@/core/engine';
-import type { MenuCategory, MenuItem } from '@/core/types';
+import React, { useState, useCallback } from 'react';
+import type { MenuItem } from '@/core/types';
 import { useTableSession } from '../hooks/useTableSession';
+import { useMenu } from '../hooks/useMenu';
 import { MenuItemCard, MenuItemCardSkeleton, MenuItemCardEmpty } from '@/ui/components/MenuItemCard';
 import { Badge } from '@/ui/components/Badge';
 import { ToastInline } from '@/ui/components/Toast';
@@ -55,13 +55,25 @@ function ItemDetailModal({
   onClose: () => void;
   onAdd: (item: MenuItem) => void;
 }) {
+  // Photo fallback: hide image and show a colored placeholder if it 404s
+  const [imgError, setImgError] = React.useState(false);
+  const showImage = item.imageUrl && !imgError;
   return (
     <div className="clientes-detail-overlay" onClick={onClose}>
       <div className="clientes-detail" onClick={e => e.stopPropagation()}>
         <button className="clientes-detail__close" onClick={onClose}>✕</button>
 
-        {item.imageUrl && (
-          <img src={item.imageUrl} alt={item.name} className="clientes-detail__image" />
+        {showImage ? (
+          <img
+            src={item.imageUrl ?? ''}
+            alt={item.name}
+            className="clientes-detail__image"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div className="clientes-detail__image clientes-detail__image--placeholder" aria-hidden="true">
+            {item.name.charAt(0)}
+          </div>
         )}
 
         <h2 className="clientes-detail__name">{item.name}</h2>
@@ -124,11 +136,8 @@ interface DraftItem {
 
 export function MenuPage() {
   const session = useTableSession();
-  const [categories, setCategories] = useState<MenuCategory[]>([]);
-  const [items, setItems] = useState<MenuItem[]>([]);
+  const { categories, items, loading, error: apiError, refresh: loadMenu } = useMenu();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [detailItem, setDetailItem] = useState<MenuItem | null>(null);
   const [callFeedback, setCallFeedback] = useState<string | null>(null);
   const [billFeedback, setBillFeedback] = useState<string | null>(null);
@@ -138,39 +147,26 @@ export function MenuPage() {
   const [showSummary, setShowSummary] = useState(false);
   const [sending, setSending] = useState(false);
 
-  // Cargar menú
-  const loadMenu = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    try {
-      const cats = menuEngine.getCategories();
-      const its = menuEngine.getItems();
-      setCategories(cats);
-      setItems(its);
-      if (cats.length === 0 && its.length === 0) {
-        setError('Menú no disponible');
-      }
-    } catch (err) {
-      console.error('[MenuPage] Error loading menu:', err);
-      setError('Error al cargar el menú');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadMenu();
-    return menuEngine.onChange(loadMenu);
-  }, [loadMenu]);
-
-  // Categorías y items filtrados
-  const cats = selectedCategory
+  // Map API shape (snake_case) → UI shape (camelCase)
+  const cats = (selectedCategory
     ? categories.filter(c => c.id === selectedCategory)
-    : categories;
+    : categories
+  ).map(c => ({ ...c, isActive: c.is_active ?? c.isActive ?? true }));
 
-  const filteredItems = selectedCategory
-    ? items.filter(i => i.categoryId === selectedCategory && i.isActive && i.isAvailable)
-    : items.filter(i => i.isActive && i.isAvailable);
+  const filteredItems = items
+    .map(i => ({
+      ...i,
+      categoryId: i.category_id ?? i.categoryId,
+      isActive: i.is_active ?? i.isActive ?? true,
+      isAvailable: i.is_available ?? i.isAvailable ?? true,
+      modifierGroups: i.modifierGroups ?? [],
+      tags: i.tags ?? [],
+      imageUrl: i.image_url ?? i.imageUrl,
+      ivaPercentage: i.iva_percentage ?? i.ivaPercentage ?? 13,
+      preparationTime: i.preparation_time ?? i.preparationTime ?? 15,
+    }))
+    .filter(i => (selectedCategory ? i.categoryId === selectedCategory : true))
+    .filter(i => i.isActive && i.isAvailable);
 
   // Add item to draft
   const handleAddToDraft = useCallback((item: MenuItem) => {
@@ -305,14 +301,14 @@ export function MenuPage() {
       )}
 
       {/* Error state */}
-      {!loading && error && (
+      {!loading && apiError && (
         <section className="clientes-items">
           <MenuItemCardEmpty onRetry={loadMenu} />
         </section>
       )}
 
       {/* Categories + Items */}
-      {!loading && !error && (
+      {!loading && !apiError && (
         <>
           {/* Category filter */}
           <nav className="clientes-categories" role="tablist">
@@ -321,7 +317,7 @@ export function MenuPage() {
               active={!selectedCategory}
               onClick={() => setSelectedCategory(null)}
             />
-            {categories.filter(c => c.isActive).map(cat => (
+            {cats.map(cat => (
               <CategoryButton
                 key={cat.id}
                 label={cat.name}

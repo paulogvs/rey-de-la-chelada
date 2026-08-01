@@ -8,9 +8,13 @@
  * Zero hardcoded colors — all from CSS variables
  * Touch-friendly tap target for selection
  * Includes loading/empty/error states
+ *
+ * Photo fallback: if the image fails to load (404, network), we hide
+ * the <img> and show a colored placeholder with the item's first
+ * letter. This works for both `text` and `photo` variants.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { MenuItem } from '@/core/types';
 import { Badge } from '../Badge/Badge';
 import './MenuItemCard.css';
@@ -35,6 +39,11 @@ export function MenuItemCard({
   variant = 'text',
   className = '',
 }: MenuItemCardProps) {
+  // Image load state — if it errors (404 / network), fall back to placeholder.
+  // `loaded` starts false so we don't briefly show a broken image icon.
+  const [imgError, setImgError] = useState(false);
+  const showImage = item.imageUrl && !imgError;
+
   const classes = [
     'menu-item-card',
     `menu-item-card--${variant}`,
@@ -44,6 +53,7 @@ export function MenuItemCard({
   ].filter(Boolean).join(' ');
 
   const priceLabel = item.price != null ? `Bs. ${item.price.toFixed(2)}` : '—';
+  const handleImgError = () => setImgError(true);
 
   if (variant === 'photo') {
     return (
@@ -54,8 +64,13 @@ export function MenuItemCard({
         aria-label={`${item.name} — ${priceLabel}`}
       >
         <div className="menu-item-card__photo-image">
-          {item.imageUrl ? (
-            <img src={item.imageUrl} alt={item.name} loading="lazy" />
+          {showImage ? (
+            <img
+              src={item.imageUrl ?? ''}
+              alt={item.name}
+              loading="lazy"
+              onError={handleImgError}
+            />
           ) : (
             <span className="menu-item-card__image-placeholder" aria-hidden="true">
               {item.name.charAt(0)}
@@ -86,10 +101,15 @@ export function MenuItemCard({
       disabled={!item.isAvailable}
       aria-label={`${item.name} — ${priceLabel}`}
     >
-      {/* Image placeholder */}
+      {/* Image (or placeholder on error) */}
       <div className="menu-item-card__image">
-        {item.imageUrl ? (
-          <img src={item.imageUrl} alt={item.name} loading="lazy" />
+        {showImage ? (
+          <img
+            src={item.imageUrl ?? ''}
+            alt={item.name}
+            loading="lazy"
+            onError={handleImgError}
+          />
         ) : (
           <span className="menu-item-card__image-placeholder" aria-hidden="true">
             {item.name.charAt(0)}

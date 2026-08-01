@@ -23,6 +23,7 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { broadcastOrderConfirmed, broadcastOrderStatusChange } from '../services/order-broadcaster.js';
 
 const router = Router();
 
@@ -426,7 +427,7 @@ router.patch('/:id/submit', requireAuth, (req, res) => {
 router.patch('/:id/confirm', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
   try {
     const db = getDb();
-    const existing = db.prepare('SELECT id, status, table_id FROM orders WHERE id = ?').get(req.params.id);
+    const existing = db.prepare('SELECT id, status, table_id, table_number FROM orders WHERE id = ?').get(req.params.id);
     if (!existing) {
       return res.status(404).json({ success: false, error: 'Pedido no encontrado', code: 'ORDER_NOT_FOUND' });
     }
@@ -445,6 +446,10 @@ router.patch('/:id/confirm', requireAuth, requireRole('admin', 'mesero'), (req, 
 
     // Mark table as ordered
     db.prepare("UPDATE tables SET status = 'ordered' WHERE id = ?").run(existing.table_id);
+
+    // Broadcast new_order to KDS (cocina + bar)
+    const order = buildOrder(db, req.params.id);
+    broadcastOrderConfirmed(order);
 
     res.json({ success: true, status: 'confirmed', message: 'Pedido confirmado' });
   } catch (err) {
@@ -512,6 +517,11 @@ router.patch('/:id/status', requireAuth, (req, res) => {
           .run(existing.table_id);
       }
     }
+
+    // Broadcast status_change to KDS so cocina + bar re-render.
+    // If the new state is "ready" and all items are ready, also notify meseros.
+    const orderForWs = buildOrder(db, req.params.id);
+    broadcastOrderStatusChange(orderForWs, existing.status);
 
     res.json({ success: true, status: canonical, message: `Pedido ${canonical}` });
   } catch (err) {

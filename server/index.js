@@ -38,6 +38,11 @@ import { requireAuth, optionalAuth } from './middleware/auth.js';
 // ── Database ──────────────────────────────────────────────
 import { getDb } from './db/index.js';
 
+// ── WebSocket Broadcaster (SSOT) ──────────────────────────
+import { broadcaster, buildKDSEvent, KDSEventType } from './services/websocket-broadcaster.js';
+// Re-export so route handlers can import from a single place
+export { broadcaster, buildKDSEvent, KDSEventType };
+
 // ============================================================
 // Setup
 // ============================================================
@@ -183,45 +188,39 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/waiter-calls', waiterCallsRoutes);
 
 // ============================================================
-// WebSocket — KDS Real-Time
+// WebSocket — KDS Real-Time (delegated to broadcaster SSOT)
 // ============================================================
 
-wss.on('connection', (ws, req) => {
-  const url = req.url || '';
-  const pwaId = url.startsWith('/cocina') ? 'cocina'
-    : url.startsWith('/bar') ? 'bar'
-    : 'unknown';
+broadcaster.attach(wss);
 
-  console.log(`[KDS] ${pwaId} connected`);
+// Per-client lifecycle: confirm connection + cleanup on close
+wss.on('connection', (ws, req) => {
+  const url = (req && req.url) || '';
+  const module = broadcaster._moduleFromUrl(url);
+
+  console.log(`[KDS] ${module} connected (clients: ${broadcaster.getClientCount()})`);
 
   // Send initial connection confirmation
-  ws.send(JSON.stringify({
-    type: 'connected',
-    module: pwaId,
-    timestamp: new Date().toISOString(),
-  }));
-
-  ws.on('message', (message) => {
-    try {
-      const parsed = JSON.parse(message.toString());
-
-      // Broadcast a todos los KDS clients
-      wss.clients.forEach((client) => {
-        if (client !== ws && client.readyState === 1) {
-          client.send(JSON.stringify(parsed));
-        }
-      });
-    } catch (err) {
-      console.error('[KDS] Invalid message:', err.message);
+  try {
+    if (ws.readyState === 1) {
+      ws.send(JSON.stringify({
+        type: 'connected',
+        module,
+        timestamp: new Date().toISOString(),
+      }));
     }
-  });
+  } catch (err) {
+    console.warn(`[KDS] Initial send failed: ${err.message}`);
+  }
 
   ws.on('close', () => {
-    console.log(`[KDS] ${pwaId} disconnected`);
+    broadcaster.unregisterClient(ws);
+    console.log(`[KDS] ${module} disconnected (clients: ${broadcaster.getClientCount()})`);
   });
 
   ws.on('error', (err) => {
-    console.error(`[KDS] ${pwaId} error:`, err.message);
+    console.error(`[KDS] ${module} error:`, err.message);
+    broadcaster.unregisterClient(ws);
   });
 });
 

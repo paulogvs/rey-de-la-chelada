@@ -5,7 +5,8 @@
  *  Usage: node server/scripts/load-menu.js
  *
  *  Reads src/core/data/menu-seed.json (SSOT) and upserts
- *  categories + items into SQLite.
+ *  categories + items into SQLite. Also creates modifier groups
+ *  for items with size_variants (pizzas, etc).
  *
  *  Idempotent: safe to run multiple times.
  *
@@ -20,6 +21,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { getDb, closeDb } from '../db/index.js';
+import { createModifierGroupsForItem } from './menu-modifier-helpers.js';
 
 // ── Paths ──────────────────────────────────────────────────
 const ROOT = resolve(import.meta.dirname, '..', '..');
@@ -111,6 +113,11 @@ for (const [areaKey, area] of Object.entries(menu)) {
 
 console.log(`[load-menu] Parsed ${categories.length} categories, ${items.length} items from seed`);
 
+// ============================================================
+// Modifier Groups — helper imported from menu-modifier-helpers.js
+// (so it can be unit-tested independently of this script)
+// ============================================================
+
 // ── Import into SQLite ─────────────────────────────────────
 const db = getDb();
 
@@ -159,7 +166,7 @@ const transaction = db.transaction(() => {
     const garnishList = item.garnish_list?.length ? JSON.stringify(item.garnish_list) : null;
     const recipeJson = item.recipe_json ? JSON.stringify(item.recipe_json) : null;
 
-    if (existing) {
+      if (existing) {
       db.prepare(`
         UPDATE menu_items
         SET subtitle = COALESCE(?, subtitle),
@@ -191,15 +198,21 @@ const transaction = db.transaction(() => {
         recipeJson,
         existing.id
       );
+
+      // Sync modifier groups for items with size_variants
+      if (item.size_variants) {
+        createModifierGroupsForItem(db, existing.id, item.size_variants);
+      }
       itemsUpdated++;
     } else {
+      const newId = randomUUID();
       db.prepare(`
         INSERT INTO menu_items (id, category_id, name, subtitle, description, price, currency,
                                 is_active, is_available, preparation_time, sort_order, area,
                                 has_ice, ingredient_list, garnish_list, recipe_json, size_variants, image_url)
         VALUES (?, ?, ?, ?, ?, ?, 'BOB', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        randomUUID(),
+        newId,
         category.id,
         item.name,
         item.subtitle || null,
@@ -215,6 +228,11 @@ const transaction = db.transaction(() => {
         sizeVariants,
         item.image_url
       );
+
+      // Create modifier groups for items with size_variants
+      if (item.size_variants) {
+        createModifierGroupsForItem(db, newId, item.size_variants);
+      }
       itemsCreated++;
     }
   }
