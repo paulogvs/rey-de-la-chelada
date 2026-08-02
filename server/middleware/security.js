@@ -77,11 +77,14 @@ export const corsOptions = {
     const allowedOrigins = [
       // Local development
       'http://localhost:3001',
+      'http://localhost:3002',
       'http://localhost:5173',
       'http://127.0.0.1:3001',
+      'http://127.0.0.1:3002',
       'http://127.0.0.1:5173',
       // Tailscale IPs
       'http://100.100.100.100:3001',
+      'http://100.100.100.100:3002',
       // Production (to be configured)
       ...(process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : []),
     ];
