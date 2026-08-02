@@ -45,6 +45,24 @@ function CategoryButton({
   );
 }
 
+/**
+ * Full-width hero banner above the header.
+ * Hides itself if the image is missing (404 / network error).
+ * The path is data served by the Express /menu-photos mount.
+ */
+function MenuBanner() {
+  const [imgError, setImgError] = useState(false);
+  if (imgError) return null;
+  return (
+    <img
+      src="/menu-photos/micheladas/header-micheladas.png"
+      alt="Rey de la Chelada"
+      className="clientes-banner"
+      onError={() => setImgError(true)}
+    />
+  );
+}
+
 /** Item detail modal */
 function ItemDetailModal({
   item,
@@ -141,6 +159,8 @@ export function MenuPage() {
   const [detailItem, setDetailItem] = useState<MenuItem | null>(null);
   const [callFeedback, setCallFeedback] = useState<string | null>(null);
   const [billFeedback, setBillFeedback] = useState<string | null>(null);
+  // Logo fallback: keep text-only brand if the image is missing
+  const [logoError, setLogoError] = useState(false);
 
   // Draft order state
   const [draftItems, setDraftItems] = useState<DraftItem[]>([]);
@@ -266,9 +286,20 @@ export function MenuPage() {
 
   return (
     <div className="clientes-page">
+      {/* Hero banner (full-width, hidden if missing) */}
+      <MenuBanner />
+
       {/* Header */}
       <header className="clientes-header">
         <div className="clientes-header__brand">
+          {!logoError && (
+            <img
+              src="/logo/rey_de_la_chelada_logo.png"
+              alt=""
+              className="clientes-header__logo"
+              onError={() => setLogoError(true)}
+            />
+          )}
           <h1>Rey de la Chelada</h1>
           {session.tableNumber > 0 && (
             <Badge variant="info">Mesa {session.tableNumber}</Badge>

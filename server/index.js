@@ -106,6 +106,9 @@ app.use('/icons', express.static(path.join(DIST_DIR, 'icons'), { maxAge: '7d' })
 // Menu photos (micheladas, categorías)
 app.use('/menu-photos', express.static(path.join(__dirname, '..', 'public', 'menu'), { maxAge: '30d' }));
 
+// App logo (brand identity)
+app.use('/logo', express.static(path.join(__dirname, '..', 'public', 'logo'), { maxAge: '30d' }));
+
 // ============================================================
 // PWA Routes — Cada una sirve su propio directorio
 // ============================================================
