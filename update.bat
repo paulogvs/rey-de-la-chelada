@@ -91,14 +91,10 @@ echo.
 :SKIP_PULL
 
 REM ==========================================================
-REM Phase 2: Install
+REM Phase 2: Install (siempre npm ? ver setup.bat)
 REM ==========================================================
 echo [2/4] Instalando dependencias...
-if "!PM!"=="pnpm" (
-    call pnpm install
-) else (
-    call npm install
-)
+call npm install --legacy-peer-deps
 if not exist "node_modules\package.json" (
     echo   [ERROR] Install failed.
     exit /b 1
@@ -112,11 +108,7 @@ REM ==========================================================
 echo [3/4] Compilando...
 findstr /c:"build" package.json >nul 2>&1
 if !errorlevel! equ 0 (
-    if "!PM!"=="pnpm" (
-        call pnpm run build
-    ) else (
-        call npm run build
-    )
+    call npm run build
     echo   Build completado
 ) else (
     echo   Sin build script

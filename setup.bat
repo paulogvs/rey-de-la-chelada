@@ -188,20 +188,17 @@ REM Phase 4: Install Dependencies
 REM ==========================================================
 echo [4/9] Instalando dependencias...
 
+REM --- Gestor de paquetes: SIEMPRE npm (el repo versiona
+REM      package-lock.json; pnpm NO esta soportado por este proyecto).
+REM      --legacy-peer-deps resuelve el conflicto de eslint. ---
 set "PM=npm"
-where pnpm >nul 2>&1
-if !errorlevel! equ 0 set "PM=pnpm"
 
 if not "!DRY_RUN!"=="1" (
     echo !PM! > "!APP_DIR!\.pm-config"
 )
 
 if not exist "node_modules\package.json" (
-    if "!PM!"=="pnpm" (
-        %EXEC%call pnpm install
-    ) else (
-        %EXEC%call npm install
-    )
+    call npm install --legacy-peer-deps
     if not exist "node_modules\package.json" (
         echo   [ERROR] Fallo la instalacion de dependencias.
         exit /b 1
@@ -220,11 +217,7 @@ echo [5/9] Compilando aplicacion...
 
 findstr /c:"build" package.json >nul 2>&1
 if !errorlevel! equ 0 (
-    if "!PM!"=="pnpm" (
-        %EXEC%call pnpm run build
-    ) else (
-        %EXEC%call npm run build
-    )
+    %EXEC%call npm run build
     if exist "dist\clientes\index.html" (
         echo   Build completado, 6 PWAs
     ) else (
