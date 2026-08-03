@@ -109,6 +109,17 @@ app.use('/menu-photos', express.static(path.join(__dirname, '..', 'public', 'men
 // App logo (brand identity)
 app.use('/logo', express.static(path.join(__dirname, '..', 'public', 'logo'), { maxAge: '30d' }));
 
+// Shared Vite chunks (multi-PWA build emits shared code to dist/assets root)
+app.use('/assets', express.static(path.join(DIST_DIR, 'assets'), { maxAge: '30d' }));
+
+// ============================================================
+// Root redirect — UX: '/' apunta al menú público (clientes)
+// (Solo matchea la ruta exacta '/', no interfiere con /api/*)
+// ============================================================
+app.get('/', (req, res) => {
+  res.redirect(302, '/clientes/');
+});
+
 // ============================================================
 // PWA Routes — Cada una sirve su propio directorio
 // ============================================================
