@@ -113,6 +113,12 @@ export const corsOptions = {
  * Restricts scripts, styles, and connections to trusted sources
  */
 export const helmetCspConfig = {
+  // Disable Cross-Origin-Resource-Policy: same-origin.
+  // The multi-PWA build references shared chunks with `crossorigin`
+  // (Vite modulepreload). CORP same-origin + crossorigin blocks them
+  // silently in the browser → blank page. Static assets must allow
+  // cross-origin reads (CORS middleware handles the Access-Control-*).
+  crossOriginResourcePolicy: false,
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
