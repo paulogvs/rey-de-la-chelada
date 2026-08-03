@@ -6,7 +6,7 @@ REM Creates a timestamped copy. Keeps last 7 days.
 
 set "APP_DIR=%~dp0"
 
-set "DB_PATH=!APP_DIR!data\app.db"
+set "DB_PATH=!APP_DIR!data\rey-de-la-chelada.db"
 set "BACKUP_DIR=!APP_DIR!backups"
 
 if exist "!APP_DIR!.env" (
@@ -16,7 +16,7 @@ if exist "!APP_DIR!.env" (
             for /f "tokens=1,* delims==" %%b in ("!LINE!") do (
                 if "%%b"=="DATABASE_PATH" (
                     set "RAW_PATH=%%c"
-                    if "!RAW_PATH:~0,1!"=="." set "DB_PATH=!APP_DIR!data\app.db"
+                    if "!RAW_PATH:~0,1!"=="." set "DB_PATH=!APP_DIR!data\rey-de-la-chelada.db"
                 )
                 if "%%b"=="BACKUP_DIR" (
                     set "RAW_DIR=%%c"

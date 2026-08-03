@@ -3,7 +3,7 @@
  * Windows Self-Hosted (RESTAURANT profile)
  *
  * Usage:
- *   pm2 start ecosystem.config.js --env production
+ *   pm2 start ecosystem.config.cjs --env production
  *   pm2 save
  *   pm2 startup
  *   pm2 monit
@@ -14,17 +14,20 @@ module.exports = {
     script: './server/index.js',
 
     // Clustering
-    instances: process.env.NODE_ENV === 'production' ? 'max' : 1,
-    exec_mode: 'cluster',
+    // IMPORTANT: WebSockets (KDS real-time) require a SINGLE process —
+    // cluster mode would split WS clients across processes and break
+    // the broadcaster. Use fork mode with 1 instance.
+    instances: 1,
+    exec_mode: 'fork',
 
     // Environment
     env: {
       NODE_ENV: 'development',
-      PORT: 3001,
+      PORT: 3002,
     },
     env_production: {
       NODE_ENV: 'production',
-      PORT: process.env.PORT || 3001,
+      PORT: process.env.PORT || 3002,
     },
 
     // Health & Restart

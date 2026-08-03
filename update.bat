@@ -1,23 +1,30 @@
 @echo off
 setlocal enabledelayedexpansion
 
-REM ── Rey de la Chelada — Update from GitHub ────────────────
+REM ── Rey de la Chelada — Update.bat ────────────────────────
+REM Auto-update from GitHub (runs hourly via Scheduled Task
+REM or manually by double-click).
+REM Pattern: pull → install → build → restart (EcoJet-proven).
 
 set "APP_DIR=%~dp0"
+set "APP_DIR=%APP_DIR:~0,-1%"
 cd /d "!APP_DIR!"
 
-echo ═══════════════════════════════════════════════════════════
-echo  Rey de la Chelada — Auto-Update
-echo  %DATE% %TIME%
-echo ═══════════════════════════════════════════════════════════
+title Rey de la Chelada — Auto-Update
 
-if not exist ".env" (
+echo ╔══════════════════════════════════════════════════════╗
+echo ║  Rey de la Chelada — Auto-Update                     ║
+echo ║  %DATE% %TIME%                                       ║
+echo ╚══════════════════════════════════════════════════════╝
+echo.
+
+if not exist "!APP_DIR!\.env" (
     echo [SKIP] No .env found.
     exit /b 0
 )
 
-REM Read config
-for /f "usebackq delims=" %%a in (".env") do (
+REM ─── Read config from .env ───────────────────────────────
+for /f "usebackq delims=" %%a in ("!APP_DIR!\.env") do (
     set "LINE=%%a"
     if not "!LINE!"=="" if not "!LINE:~0,1!"=="#" (
         for /f "tokens=1,* delims==" %%b in ("!LINE!") do (
@@ -35,27 +42,49 @@ if "!GITHUB_TOKEN!"=="" (
 )
 
 if "!APP_NAME!"=="" set "APP_NAME=rey-de-la-chelada"
+if "!PORT!"=="" set "PORT=3002"
+if "!GITHUB_REPO!"=="" set "GITHUB_REPO=paulogvs/rey-de-la-chelada"
 
 set "PM=npm"
-if exist ".pm-config" set /p PM=<".pm-config"
+if exist "!APP_DIR!\.pm-config" set /p PM=<"!APP_DIR!\.pm-config"
 echo   Package manager: !PM!
+echo.
 
-REM Phase 1: Pull
+REM ─── Phase 1: Pull ───────────────────────────────────────
 echo [1/4] Pulling from GitHub...
+
+git remote set-url origin "https://oauth2:!GITHUB_TOKEN!@github.com/!GITHUB_REPO!.git" >nul 2>&1
+git fetch origin >nul 2>&1
+
+for /f "tokens=*" %%i in ('git rev-parse HEAD') do set "LOCAL=%%i"
+for /f "tokens=*" %%i in ('git rev-parse @{u} 2^>nul') do set "REMOTE=%%i"
+
+if "!REMOTE!"=="" (
+    echo   [WARNING] No upstream branch configured. Saltando pull...
+    goto :SKIP_PULL
+) else if "!LOCAL!"=="!REMOTE!" (
+    echo   Ya esta actualizado — nada que hacer.
+    goto :DONE
+)
+
 if "%1"=="--force" (
-    git fetch "https://!GITHUB_TOKEN!@github.com/!GITHUB_REPO!.git"
     git reset --hard origin/main
 ) else (
-    git pull "https://!GITHUB_TOKEN!@github.com/!GITHUB_REPO!.git" --ff-only
+    git pull --ff-only origin main
     if !errorlevel! neq 0 (
-        echo   [WARNING] git pull failed.
+        echo   [ERROR] git pull fallo — posibles conflictos locales.
+        echo   Solucion: ejecuta update.bat --force
         exit /b 1
     )
 )
-echo   ✅ Code updated
+for /f "tokens=*" %%i in ('git log -1 --oneline') do set "LATEST=%%i"
+echo   Actualizado a: !LATEST!
+echo.
 
-REM Phase 2: Install
-echo [2/4] Installing dependencies...
+:SKIP_PULL
+
+REM ─── Phase 2: Install ────────────────────────────────────
+echo [2/4] Instalando dependencias...
 if "!PM!"=="pnpm" (
     call pnpm install
 ) else (
@@ -65,35 +94,45 @@ if not exist "node_modules\package.json" (
     echo   [ERROR] Install failed.
     exit /b 1
 )
-echo   ✅ Dependencies installed
+echo   Dependencias instaladas
+echo.
 
-REM Phase 3: Build
-echo [3/4] Building...
-findstr /c:""build"" package.json >nul 2>&1
+REM ─── Phase 3: Build ──────────────────────────────────────
+echo [3/4] Compilando...
+findstr /c:"build" package.json >nul 2>&1
 if !errorlevel! equ 0 (
     if "!PM!"=="pnpm" (
         call pnpm run build
     ) else (
         call npm run build
     )
-    echo   ✅ Build complete
+    echo   Build completado
+) else (
+    echo   Sin build script
 )
+echo.
 
-REM Phase 4: Restart
-echo [4/4] Restarting service...
+REM ─── Phase 4: Restart ────────────────────────────────────
+echo [4/4] Reiniciando servicio...
 where pm2 >nul 2>&1
 if !errorlevel! equ 0 (
     pm2 restart !APP_NAME! >nul 2>&1
     if !errorlevel! equ 0 (
-        echo   ✅ App restarted: !APP_NAME!
+        echo   App reiniciada: !APP_NAME!
     ) else (
-        pm2 start ecosystem.config.js --env production >nul 2>&1
-        echo   ✅ App started
+        pm2 start ecosystem.config.cjs --env production >nul 2>&1
+        echo   App iniciada
     )
+) else (
+    echo   [WARNING] PM2 no encontrado. Inicia manualmente: node server/index.js
 )
 
-echo ═══════════════════════════════════════════════════════════
-echo  Update complete at %DATE% %TIME%
-echo ═══════════════════════════════════════════════════════════
+:DONE
+echo.
+echo ╔══════════════════════════════════════════════════════╗
+echo ║  Update completo — %DATE% %TIME%                  ║
+echo ║  App: http://localhost:!PORT!                       ║
+echo ╚══════════════════════════════════════════════════════╝
+echo.
 
 endlocal
