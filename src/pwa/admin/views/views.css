@@ -1,0 +1,304 @@
+/* ============================================================
+   PWA ADMIN — View styles (Dashboard, Prices, Bulk, Modifiers,
+   Staff, Tables, Closings)
+   ZERO hardcoded colors — all variables from tokens.json
+   ============================================================ */
+
+/* ---- Shell ---- */
+
+.admin-loading {
+  padding: var(--space-8);
+  color: var(--text-muted);
+}
+
+.admin-restricted {
+  padding: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  color: var(--text);
+}
+
+.admin-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-5);
+}
+
+.admin-topbar h1 {
+  margin: 0;
+}
+
+.admin-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.admin-muted {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.admin-sidebar__footer {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.admin-sidebar__logout {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  min-height: var(--touch-min-target);
+  width: 100%;
+}
+
+.admin-sidebar__logout:hover {
+  color: var(--text);
+  border-color: var(--dorado-rey);
+}
+
+/* ---- Toolbar (search + filters) ---- */
+
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+
+.admin-toolbar__search {
+  flex: 1;
+  min-width: 200px;
+  max-width: 320px;
+}
+
+.admin-stat__sub {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* ---- Price editor list ---- */
+
+.admin-price-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.admin-price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-soft);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.admin-price-row__info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.admin-price-row__name {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.admin-price-row__cat {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.admin-price-row__edit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.admin-price-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.admin-price-input__prefix {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* ---- Bulk grid ---- */
+
+.admin-bulk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.admin-bulk-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-soft);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.admin-bulk-item__name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-bulk-item__ok {
+  color: var(--status-paid);
+  font-weight: 700;
+}
+
+.admin-bulk-item__err {
+  color: var(--status-cancelled);
+  font-weight: 700;
+}
+
+/* ---- Staff rows ---- */
+
+.admin-staff-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.admin-staff-row__info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.admin-staff-row__name {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.admin-staff-row__actions {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.admin-staff-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.admin-staff-field label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.admin-staff-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ---- Closings history ---- */
+
+.admin-closings-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.admin-closing-row {
+  padding: var(--space-3);
+  background: var(--surface-soft);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.admin-closing-row__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.admin-closing-row__date {
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.admin-closing-row__nums {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+}
+
+.admin-closing-row__nums strong {
+  font-family: var(--font-mono);
+}
+
+.admin-closing-row__pos {
+  color: var(--status-paid);
+  font-family: var(--font-mono);
+}
+
+.admin-closing-row__neg {
+  color: var(--status-cancelled);
+  font-family: var(--font-mono);
+}
+
+.admin-closing-row__meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.admin-closing-row__notes {
+  font-style: italic;
+}
+
+/* ---- Responsive ---- */
+
+@media (max-width: 768px) {
+  .admin-price-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-price-row__edit {
+    justify-content: space-between;
+  }
+}

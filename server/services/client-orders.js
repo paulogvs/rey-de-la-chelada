@@ -65,8 +65,37 @@ export function createPublicOrder(db, input) {
     }
 
     const quantity = item.quantity || 1;
-    // price null = item with size variants → unit price comes from modifiers
-    const unitPrice = menuItem.price ?? 0;
+
+    // Resolve unit price: base price (null = size-variant item) + modifier adjustments.
+    // Modifiers arrive as [{ option_id, quantity? }] from the clientes PWA.
+    let modifierAdjustment = 0;
+    let modifierSummary = [];
+    const rawModifiers = Array.isArray(item.modifiers) ? item.modifiers : [];
+    if (rawModifiers.length > 0) {
+      const optionIds = rawModifiers.map(m => m.option_id || m.modifier_option_id).filter(Boolean);
+      let options = [];
+      if (optionIds.length > 0) {
+        const placeholders = optionIds.map(() => '?').join(',');
+        options = db.prepare(
+          `SELECT id, name, price_adjustment FROM modifier_options WHERE id IN (${placeholders})`
+        ).all(...optionIds);
+      }
+      for (const m of rawModifiers) {
+        const opt = options.find(o => o.id === (m.option_id || m.modifier_option_id));
+        if (!opt) {
+          return {
+            success: false,
+            code: 'INVALID_MODIFIER_OPTION',
+            error: `Opción inválida: ${m.option_id || m.modifier_option_id}`,
+          };
+        }
+        modifierAdjustment += Number(opt.price_adjustment || 0);
+        modifierSummary.push({ option_id: opt.id, name: opt.name, price_adjustment: opt.price_adjustment });
+      }
+    }
+
+    const basePrice = menuItem.price ?? 0;
+    const unitPrice = round2(basePrice + modifierAdjustment);
     const itemSubtotal = round2(unitPrice * quantity);
     subtotal += itemSubtotal;
 
@@ -77,7 +106,7 @@ export function createPublicOrder(db, input) {
       quantity,
       unit_price: unitPrice,
       subtotal: itemSubtotal,
-      modifiers_json: item.modifiers ? JSON.stringify(item.modifiers) : null,
+      modifiers_json: modifierSummary.length > 0 ? JSON.stringify(modifierSummary) : null,
       preparation_notes: item.notes || item.preparation_notes || '',
       status: 'pending',
     });
@@ -120,6 +149,18 @@ export function createPublicOrder(db, input) {
   // Mark table as occupied
   db.prepare("UPDATE tables SET status = 'occupied', current_order_id = ? WHERE id = ?")
     .run(orderId, table.id);
+
+  // Notify mesero: the client order arrives as a call_waiter call so the
+  // mesero PWA shows the table immediately ("El pedido activo es el permiso").
+  const existingCall = db.prepare(
+    "SELECT id FROM waiter_calls WHERE table_id = ? AND call_type = 'call_waiter' AND status = 'pending'"
+  ).get(table.id);
+  if (!existingCall) {
+    db.prepare(`
+      INSERT INTO waiter_calls (id, table_id, table_number, session_id, call_type, status)
+      VALUES (?, ?, ?, ?, 'call_waiter', 'pending')
+    `).run(randomUUID(), table.id, table.number, session_id);
+  }
 
   const order = buildOrder(db, orderId);
   return { success: true, order };

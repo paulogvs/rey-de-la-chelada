@@ -15,133 +15,13 @@ import type { MenuItem } from '@/core/types';
 import { useTableSession } from '../hooks/useTableSession';
 import { useMenu } from '../hooks/useMenu';
 import { MenuItemCard, MenuItemCardSkeleton, MenuItemCardEmpty } from '@/ui/components/MenuItemCard';
-import { Badge } from '@/ui/components/Badge';
 import { ToastInline } from '@/ui/components/Toast';
 import { ForchiBadge } from '@/ui/components/ForchiBadge';
 import { OrderBar } from '@/ui/components/OrderBar';
 import { OrderSummary } from '@/ui/components/OrderSummary';
+import { ItemDetailModal } from '../components/ItemDetailModal';
+import { CategoryButton, MenuBanner, PageHeader, CustomerActions } from '../components/MenuChrome';
 import './MenuPage.css';
-
-/** Category filter bar item */
-function CategoryButton({
-  label,
-  emoji,
-  active,
-  onClick,
-}: {
-  label: string;
-  emoji?: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      className={`clientes-categories__btn ${active ? 'active' : ''}`}
-      onClick={onClick}
-    >
-      {emoji && <span className="clientes-categories__emoji">{emoji}</span>}
-      {label}
-    </button>
-  );
-}
-
-/**
- * Full-width hero banner above the header.
- * Hides itself if the image is missing (404 / network error).
- * The path is data served by the Express /menu-photos mount.
- */
-function MenuBanner() {
-  const [imgError, setImgError] = useState(false);
-  if (imgError) return null;
-  return (
-    <img
-      src="/menu-photos/micheladas/header-micheladas.png"
-      alt="Rey de la Chelada"
-      className="clientes-banner"
-      onError={() => setImgError(true)}
-    />
-  );
-}
-
-/** Item detail modal */
-function ItemDetailModal({
-  item,
-  onClose,
-  onAdd,
-}: {
-  item: MenuItem;
-  onClose: () => void;
-  onAdd: (item: MenuItem) => void;
-}) {
-  // Photo fallback: hide image and show a colored placeholder if it 404s
-  const [imgError, setImgError] = React.useState(false);
-  const showImage = item.imageUrl && !imgError;
-  return (
-    <div className="clientes-detail-overlay" onClick={onClose}>
-      <div className="clientes-detail" onClick={e => e.stopPropagation()}>
-        <button className="clientes-detail__close" onClick={onClose}>✕</button>
-
-        {showImage ? (
-          <img
-            src={item.imageUrl ?? ''}
-            alt={item.name}
-            className="clientes-detail__image"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <div className="clientes-detail__image clientes-detail__image--placeholder" aria-hidden="true">
-            {item.name.charAt(0)}
-          </div>
-        )}
-
-        <h2 className="clientes-detail__name">{item.name}</h2>
-        <p className="clientes-detail__desc">{item.description}</p>
-
-        <div className="clientes-detail__price">
-          {item.price != null ? `Bs. ${item.price.toFixed(2)}` : '—'}
-        </div>
-
-        {item.tags.length > 0 && (
-          <div className="clientes-detail__tags">
-            {item.tags.map(tag => (
-              <Badge key={tag} variant="info">{tag}</Badge>
-            ))}
-          </div>
-        )}
-
-        {item.modifierGroups.length > 0 && (
-          <div className="clientes-detail__modifiers">
-            <h4>Variantes disponibles:</h4>
-            {item.modifierGroups.map(g => (
-              <div key={g.id} className="clientes-detail__mod-group">
-                <strong>{g.name}</strong>
-                <div className="clientes-detail__mod-options">
-                  {g.options.map(o => (
-                    <span key={o.id} className="clientes-detail__mod-option">
-                      {o.name}
-                      {o.priceAdjustment !== 0 && (
-                        <span className="clientes-detail__mod-price">
-                          {o.priceAdjustment > 0 ? '+' : ''}Bs. {o.priceAdjustment.toFixed(2)}
-                        </span>
-                      )}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <button
-          className="clientes-detail__add-btn"
-          onClick={() => { onAdd(item); onClose(); }}
-        >
-          Agregar al pedido
-        </button>
-      </div>
-    </div>
-  );
-}
 
 /** Draft item type for local state */
 interface DraftItem {
@@ -150,17 +30,51 @@ interface DraftItem {
   name: string;
   quantity: number;
   unitPrice: number;
+  /** Selected modifier option ids (pizza sizes, extras) */
+  modifierOptionIds: string[];
 }
 
-export function MenuPage() {
+/** Add (or bump) a draft line, optionally with selected modifier options. */
+function buildDraftItem(
+  item: MenuItem,
+  modifierOptionIds: string[] = []
+): DraftItem {
+  // Unit price = base price + modifier adjustments (size variants)
+  const adjustment = item.modifierGroups
+    .flatMap(g => g.options)
+    .filter(o => modifierOptionIds.includes(o.id))
+    .reduce((sum, o) => sum + (o.priceAdjustment ?? 0), 0);
+  return {
+    id: `draft-${Date.now()}-${item.id}`,
+    menuItemId: item.id,
+    name: item.name,
+    quantity: 1,
+    unitPrice: (item.price ?? 0) + adjustment,
+    modifierOptionIds,
+  };
+}
+
+export function MenuPage({
+  onSubmitOrder,
+}: {
+  /** Called with the draft payload to create the public order (parent handles API + tracking). */
+  onSubmitOrder: (input: {
+    table_number: number;
+    session_id: string;
+    items: Array<{
+      menu_item_id: string;
+      quantity: number;
+      modifiers?: Array<{ option_id: string }>;
+    }>;
+    guest_count?: number;
+  }) => void;
+}) {
   const session = useTableSession();
   const { categories, items, loading, error: apiError, refresh: loadMenu } = useMenu();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [detailItem, setDetailItem] = useState<MenuItem | null>(null);
   const [callFeedback, setCallFeedback] = useState<string | null>(null);
   const [billFeedback, setBillFeedback] = useState<string | null>(null);
-  // Logo fallback: keep text-only brand if the image is missing
-  const [logoError, setLogoError] = useState(false);
 
   // Draft order state
   const [draftItems, setDraftItems] = useState<DraftItem[]>([]);
@@ -188,9 +102,8 @@ export function MenuPage() {
     .filter(i => (selectedCategory ? i.categoryId === selectedCategory : true))
     .filter(i => i.isActive && i.isAvailable);
 
-  // Add item to draft
-  const handleAddToDraft = useCallback((item: MenuItem) => {
-    const price = item.price ?? 0;
+  // Add item to draft (with optional modifier selections)
+  const handleAddToDraft = useCallback((item: MenuItem, modifierOptionIds: string[] = []) => {
     setDraftItems(prev => {
       const existing = prev.find(d => d.menuItemId === item.id);
       if (existing) {
@@ -200,13 +113,7 @@ export function MenuPage() {
             : d
         );
       }
-      return [...prev, {
-        id: `draft-${Date.now()}-${item.id}`,
-        menuItemId: item.id,
-        name: item.name,
-        quantity: 1,
-        unitPrice: price,
-      }];
+      return [...prev, buildDraftItem(item, modifierOptionIds)];
     });
   }, []);
 
@@ -216,47 +123,34 @@ export function MenuPage() {
   const draftTotalWithIva = Math.round((draftTotal + draftIva) * 100) / 100;
   const draftItemCount = draftItems.reduce((sum, d) => sum + d.quantity, 0);
 
-  // Send draft to waiter
+  // Send draft to waiter via the PUBLIC client-orders endpoint
+  // (no JWT — table_number + session_id is the permission)
   const handleSendDraft = useCallback(async () => {
     if (draftItems.length === 0 || !session.tableId) return;
     setSending(true);
+    setCallFeedback(null);
     try {
-      // Create order via API
-      const response = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          table_id: session.tableId,
-          items: draftItems.map(d => ({
-            menu_item_id: d.menuItemId,
-            quantity: d.quantity,
-          })),
-          guest_count: 1,
-        }),
+      onSubmitOrder({
+        table_number: session.tableNumber,
+        session_id: session.sessionId,
+        items: draftItems.map(d => ({
+          menu_item_id: d.menuItemId,
+          quantity: d.quantity,
+          modifiers: d.modifierOptionIds.length > 0
+            ? d.modifierOptionIds.map(option_id => ({ option_id }))
+            : undefined,
+        })),
+        guest_count: 1,
       });
-
-      if (!response.ok) throw new Error('Error al crear pedido');
-
-      const data = await response.json();
-      if (data.success && data.order) {
-        // Submit the order (draft → called)
-        await fetch(`/api/orders/${data.order.id}/submit`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-
       setDraftItems([]);
       setShowSummary(false);
-      setCallFeedback('✅ Pedido enviado al mesero');
-      setTimeout(() => setCallFeedback(null), 3000);
     } catch {
       setCallFeedback('❌ Error al enviar pedido');
-      setTimeout(() => setCallFeedback(null), 3000);
+      setTimeout(() => setCallFeedback(null), 4000);
     } finally {
       setSending(false);
     }
-  }, [draftItems, session.tableId]);
+  }, [draftItems, session.tableId, session.tableNumber, session.sessionId, onSubmitOrder]);
 
   // Call waiter con feedback
   const handleCallWaiter = useCallback(async () => {
@@ -290,27 +184,11 @@ export function MenuPage() {
       <MenuBanner />
 
       {/* Header */}
-      <header className="clientes-header">
-        <div className="clientes-header__brand">
-          {!logoError && (
-            <img
-              src="/logo/rey_de_la_chelada_logo.png"
-              alt=""
-              className="clientes-header__logo"
-              onError={() => setLogoError(true)}
-            />
-          )}
-          <h1>Rey de la Chelada</h1>
-          {session.tableNumber > 0 && (
-            <Badge variant="info">Mesa {session.tableNumber}</Badge>
-          )}
-        </div>
-        {!session.isValid && session.error && (
-          <div className="clientes-alert clientes-alert--error">
-            {session.error}
-          </div>
-        )}
-      </header>
+      <PageHeader
+        tableNumber={session.tableNumber}
+        sessionValid={session.isValid}
+        sessionError={session.error}
+      />
 
       {/* Feedback toasts */}
       {(callFeedback || billFeedback) && (
@@ -393,29 +271,13 @@ export function MenuPage() {
       )}
 
       {/* Customer actions */}
-      {session.canCallWaiter && (
-        <footer className="clientes-actions">
-          <button
-            className="clientes-actions__btn clientes-actions__btn--call animate-fade-in-up"
-            onClick={handleCallWaiter}
-          >
-            Llamar Mesero
-          </button>
-          <button
-            className="clientes-actions__btn clientes-actions__btn--bill animate-fade-in-up"
-            onClick={handleRequestBill}
-          >
-            Pedir Cuenta
-          </button>
-        </footer>
-      )}
-
-      {/* Read-only mode */}
-      {session.isReadOnly && !session.canCallWaiter && session.isValid && (
-        <footer className="clientes-actions clientes-actions--readonly">
-          <p>Escanea el QR cuando tengas un pedido activo para llamar al mesero.</p>
-        </footer>
-      )}
+      <CustomerActions
+        canCallWaiter={session.canCallWaiter}
+        isReadOnly={session.isReadOnly}
+        isValid={session.isValid}
+        onCallWaiter={handleCallWaiter}
+        onRequestBill={handleRequestBill}
+      />
 
       {/* Order Bar (draft) */}
       <OrderBar

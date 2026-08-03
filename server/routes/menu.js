@@ -23,6 +23,9 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import {
   validateBulkPricesRequest,
   applyBulkPriceUpdates,
+  validateModifierOptionUpdate,
+  validateBulkModifierPricesRequest,
+  applyBulkModifierPriceUpdates,
 } from '../services/menu-bulk-updates.js';
 
 const router = Router();
@@ -88,6 +91,55 @@ router.get('/items', (req, res) => {
     sql += ' ORDER BY mc.sort_order ASC, mi.sort_order ASC, mi.name ASC';
 
     const items = db.prepare(sql).all(...params);
+
+    // Optional: attach modifierGroups (pizza sizes, extras) so the
+    // clientes PWA can render size selection without N detail calls.
+    if (req.query.include_modifiers === 'true' && items.length > 0) {
+      const itemIds = items.map(i => i.id);
+      const placeholders = itemIds.map(() => '?').join(',');
+      const groups = db.prepare(`
+        SELECT mg.id, mg.menu_item_id, mg.name, mg.type, mg.required,
+               mg.min_select, mg.max_select, mg.sort_order
+        FROM modifier_groups mg
+        WHERE mg.menu_item_id IN (${placeholders})
+        ORDER BY mg.menu_item_id ASC, mg.sort_order ASC
+      `).all(...itemIds);
+      const groupIds = groups.map(g => g.id);
+      let options = [];
+      if (groupIds.length > 0) {
+        const gPlaceholders = groupIds.map(() => '?').join(',');
+        options = db.prepare(`
+          SELECT id, group_id, name, price_adjustment, is_default, sort_order
+          FROM modifier_options
+          WHERE group_id IN (${gPlaceholders})
+          ORDER BY group_id ASC, sort_order ASC
+        `).all(...groupIds);
+      }
+      const optionsByGroup = new Map();
+      for (const o of options) {
+        const list = optionsByGroup.get(o.group_id) ?? [];
+        list.push({ id: o.id, name: o.name, priceAdjustment: o.price_adjustment, isDefault: o.is_default === 1 });
+        optionsByGroup.set(o.group_id, list);
+      }
+      const groupsByItem = new Map();
+      for (const g of groups) {
+        const list = groupsByItem.get(g.menu_item_id) ?? [];
+        list.push({
+          id: g.id,
+          name: g.name,
+          type: g.type,
+          required: g.required === 1,
+          minSelect: g.min_select,
+          maxSelect: g.max_select,
+          options: optionsByGroup.get(g.id) ?? [],
+        });
+        groupsByItem.set(g.menu_item_id, list);
+      }
+      for (const item of items) {
+        item.modifierGroups = groupsByItem.get(item.id) ?? [];
+      }
+    }
+
     res.json({ success: true, items });
   } catch (err) {
     console.error('[Menu] Items error:', err.message);
@@ -365,6 +417,86 @@ router.post('/items/bulk-prices', requireAuth, requireRole('admin'), (req, res) 
   } catch (err) {
     console.error('[Menu] Bulk price update error:', err.message);
     res.status(500).json({ success: false, error: 'Error al actualizar precios', code: 'BULK_PRICE_ERROR' });
+  }
+});
+
+// ============================================================
+// GET /api/menu/modifier-options — Todas las opciones de mods
+// (pizza sizes, etc) con su item y grupo — para el panel admin
+// ============================================================
+
+router.get('/modifier-options', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const db = getDb();
+    const options = db.prepare(`
+      SELECT mo.id, mo.name, mo.price_adjustment, mo.is_default, mo.sort_order,
+             mg.id as group_id, mg.name as group_name,
+             mi.id as menu_item_id, mi.name as menu_item_name
+      FROM modifier_options mo
+      JOIN modifier_groups mg ON mo.group_id = mg.id
+      JOIN menu_items mi ON mg.menu_item_id = mi.id
+      ORDER BY mi.name ASC, mo.sort_order ASC
+    `).all();
+    res.json({ success: true, options, count: options.length });
+  } catch (err) {
+    console.error('[Menu] Modifier options error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al obtener opciones', code: 'MODIFIER_OPTIONS_ERROR' });
+  }
+});
+
+// ============================================================
+// Admin: PATCH /api/menu/modifier-options/:id/price
+// ============================================================
+
+router.patch('/modifier-options/:id/price', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const { priceAdjustment } = req.body;
+    const validation = validateModifierOptionUpdate({ id: req.params.id, priceAdjustment });
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, error: validation.error, code: 'INVALID_MODIFIER_PRICE' });
+    }
+
+    const db = getDb();
+    const existing = db.prepare('SELECT id, name FROM modifier_options WHERE id = ?').get(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Opción no encontrada', code: 'MODIFIER_OPTION_NOT_FOUND' });
+    }
+
+    db.prepare('UPDATE modifier_options SET price_adjustment = ? WHERE id = ?')
+      .run(priceAdjustment, req.params.id);
+
+    const updated = db.prepare('SELECT id, name, price_adjustment FROM modifier_options WHERE id = ?').get(req.params.id);
+    res.json({ success: true, option: updated, message: 'Precio de opción actualizado' });
+  } catch (err) {
+    console.error('[Menu] Modifier option price error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al actualizar opción', code: 'MODIFIER_PRICE_ERROR' });
+  }
+});
+
+// ============================================================
+// Admin: POST /api/menu/modifier-options/bulk-prices
+// ============================================================
+
+router.post('/modifier-options/bulk-prices', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const validation = validateBulkModifierPricesRequest(req.body);
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, error: validation.error, code: 'INVALID_BULK_REQUEST' });
+    }
+
+    const db = getDb();
+    const result = applyBulkModifierPriceUpdates(db, req.body.updates);
+
+    res.json({
+      success: true,
+      updated: result.updated,
+      failed: result.failed,
+      errors: result.errors,
+      message: `${result.updated} opción(es) actualizada(s)`,
+    });
+  } catch (err) {
+    console.error('[Menu] Bulk modifier price error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al actualizar opciones', code: 'BULK_MODIFIER_PRICE_ERROR' });
   }
 });
 

@@ -144,6 +144,31 @@ router.get('/', requireAuth, (req, res) => {
 });
 
 // ============================================================
+// GET /api/payments/closings — Historial de cortes de caja
+// (solo cerrados; el actual se obtiene con /closing/current)
+// NOTA: debe ir ANTES de GET /:id (patrón de un segmento)
+// ============================================================
+
+router.get('/closings', requireAuth, requireRole('admin', 'caja'), (req, res) => {
+  try {
+    const db = getDb();
+    const closings = db.prepare(`
+      SELECT cc.*, s.display_name as closed_by_name, o.display_name as opened_by_name
+      FROM cash_closings cc
+      LEFT JOIN staff s ON cc.closed_by = s.id
+      LEFT JOIN staff o ON cc.opened_by = o.id
+      WHERE cc.closed_at IS NOT NULL
+      ORDER BY cc.closed_at DESC
+      LIMIT 50
+    `).all();
+    res.json({ success: true, closings, count: closings.length });
+  } catch (err) {
+    console.error('[Payments] Closings history error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al obtener historial de cortes', code: 'CLOSINGS_HISTORY_ERROR' });
+  }
+});
+
+// ============================================================
 // GET /api/payments/:id
 // ============================================================
 

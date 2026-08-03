@@ -186,6 +186,29 @@ export function validateModifierOptionUpdate(entry) {
 }
 
 /**
+ * Validate a bulk modifier options request shape.
+ * @returns {{ valid: boolean, error: string|null }}
+ */
+export function validateBulkModifierPricesRequest(body) {
+  if (!body || typeof body !== 'object') {
+    return { valid: false, error: 'Cuerpo requerido' };
+  }
+  if (!Array.isArray(body.updates)) {
+    return { valid: false, error: '`updates` debe ser un array' };
+  }
+  if (body.updates.length === 0) {
+    return { valid: false, error: 'Al menos una actualización requerida' };
+  }
+  for (let i = 0; i < body.updates.length; i++) {
+    const v = validateModifierOptionUpdate(body.updates[i]);
+    if (!v.valid) {
+      return { valid: false, error: `Opción #${i + 1}: ${v.error}` };
+    }
+  }
+  return { valid: true, error: null };
+}
+
+/**
  * Apply price adjustments to modifier options (pizza sizes, etc).
  * Returns { updated, failed, errors }. Skips unknown ids (no throw).
  *

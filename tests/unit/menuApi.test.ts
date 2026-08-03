@@ -41,7 +41,7 @@ describe('fetchMenuFromApi', () => {
     expect(mock).toHaveBeenCalledWith('/api/menu/categories', expect.objectContaining({
       headers: expect.objectContaining({ Accept: 'application/json' }),
     }));
-    expect(mock).toHaveBeenCalledWith('/api/menu/items', expect.any(Object));
+    expect(mock).toHaveBeenCalledWith('/api/menu/items?include_modifiers=true&available=true', expect.any(Object));
     expect(result.categories).toEqual([{ id: 'c1' }]);
     expect(result.items).toEqual([{ id: 'i1' }]);
     expect(result.error).toBeNull();

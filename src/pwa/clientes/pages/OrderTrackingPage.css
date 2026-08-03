@@ -1,0 +1,251 @@
+/**
+ * PWA CLIENTES — OrderTrackingPage styles
+ * Token-based only (design tokens SSOT) — no hardcoded hex colors.
+ */
+
+.tracking-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 2.5rem;
+  min-height: 100%;
+}
+
+/* Header: table badge + live indicator */
+.tracking-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.tracking-header__table {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.tracking-header__label {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+.tracking-header__number {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.tracking-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.8;
+}
+
+.tracking-live__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: tracking-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes tracking-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+
+/* Status hero */
+.tracking-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1.5rem 0 0.5rem;
+}
+
+.tracking-status__icon {
+  font-size: 3.25rem;
+  line-height: 1;
+  margin-bottom: 0.75rem;
+}
+
+.tracking-status__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.tracking-status__hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.95rem;
+  opacity: 0.75;
+}
+
+/* Progress stepper */
+.tracking-stepper {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  justify-content: space-between;
+  margin-top: 0.75rem;
+}
+
+.tracking-stepper__dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: all 0.25s ease;
+}
+
+.tracking-stepper__dot.done {
+  color: var(--on-accent, #fff);
+}
+
+.tracking-stepper__line {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  margin: 0 0.35rem;
+  transition: all 0.25s ease;
+}
+
+.tracking-stepper__line.done {
+  opacity: 1;
+}
+
+.tracking-stepper__labels {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin: 0.4rem 0 0;
+  font-size: 0.68rem;
+  text-align: center;
+  gap: 0.25rem;
+}
+
+.tracking-stepper__label {
+  flex: 1;
+  opacity: 0.45;
+  line-height: 1.2;
+  transition: opacity 0.25s ease;
+}
+
+.tracking-stepper__label.active {
+  opacity: 0.95;
+  font-weight: 600;
+}
+
+/* Total summary */
+.tracking-summary {
+  width: 100%;
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+}
+
+.tracking-summary__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tracking-summary__row strong {
+  font-size: 1.15rem;
+}
+
+/* Actions */
+.tracking-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.tracking-btn {
+  min-height: 48px; /* touch target */
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.7rem 1.25rem;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.tracking-btn:active {
+  transform: scale(0.98);
+}
+
+.tracking-btn--primary {
+  width: 100%;
+  color: var(--on-accent, #fff);
+}
+
+.tracking-btn--ghost {
+  width: 100%;
+  background: transparent;
+  opacity: 0.75;
+}
+
+/* Thanks / cancelled hero */
+.tracking-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 3rem 0 1.5rem;
+}
+
+.tracking-hero__icon {
+  font-size: 4rem;
+  line-height: 1;
+  margin-bottom: 1rem;
+}
+
+.tracking-hero__title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin: 0 0 0.5rem;
+}
+
+.tracking-hero__subtitle {
+  margin: 0 0 1.5rem;
+  font-size: 1rem;
+  opacity: 0.8;
+  max-width: 34ch;
+}
+
+.tracking-receipt {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.4rem 1.5rem;
+  border-radius: 14px;
+  padding: 1rem 1.4rem;
+  margin-bottom: 1.5rem;
+  text-align: left;
+}
+
+.tracking-receipt__label {
+  opacity: 0.7;
+  font-size: 0.85rem;
+}
+
+.tracking-receipt__value {
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-align: right;
+}

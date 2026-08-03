@@ -112,4 +112,38 @@ export async function updateTableStatus(
   return { ...result, data: { table }, table };
 }
 
-export default { fetchTables, fetchTableById, updateTableStatus };
+/** POST /api/tables — create a table (admin) */
+export async function createTable(
+  token: string,
+  payload: { number: number; capacity: number; section?: string },
+  fetchImpl: typeof fetch = fetch
+): Promise<TableResult> {
+  const result = await apiFetch<{ success: boolean; table?: ServerTable }>('/api/tables', {
+    method: 'POST',
+    token,
+    body: payload,
+    fetchImpl,
+  });
+
+  if (!result.ok || !result.data?.table) {
+    return { ...result, data: null, table: null } as TableResult;
+  }
+
+  const table = normalizeTable(result.data.table);
+  return { ...result, data: { table }, table };
+}
+
+/** DELETE /api/tables/:id — remove a table (admin, no active orders) */
+export async function deleteTable(
+  token: string,
+  tableId: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<ApiResult<{ message?: string }>> {
+  return apiFetch<{ success: boolean; message?: string }>(`/api/tables/${tableId}`, {
+    method: 'DELETE',
+    token,
+    fetchImpl,
+  });
+}
+
+export default { fetchTables, fetchTableById, updateTableStatus, createTable, deleteTable };

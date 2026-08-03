@@ -10,6 +10,9 @@ import {
   validatePriceUpdate,
   validateBulkPricesRequest,
   applyBulkPriceUpdates,
+  validateModifierOptionUpdate,
+  validateBulkModifierPricesRequest,
+  applyBulkModifierPriceUpdates,
 } from '../../server/services/menu-bulk-updates.js';
 
 // In-memory DB mock that tracks menu_items
@@ -182,5 +185,150 @@ describe('applyBulkPriceUpdates', () => {
 
     expect(db.items.get('i1').price).toBe(15);
     expect(db.items.get('i2').price).toBe(20); // unchanged
+  });
+});
+
+// In-memory DB mock for modifier_options
+function makeModifierDb() {
+  const options = new Map();
+  return {
+    options,
+    prepare(sql) {
+      return {
+        get(...args) {
+          if (sql.includes('FROM modifier_options WHERE id =')) {
+            const [id] = args;
+            return options.has(id) ? { id } : undefined;
+          }
+          return undefined;
+        },
+        run(...args) {
+          if (sql.includes('UPDATE modifier_options SET price_adjustment')) {
+            const [price, id] = args;
+            const opt = options.get(id);
+            if (opt) {
+              opt.priceAdjustment = price;
+              return { changes: 1 };
+            }
+            return { changes: 0 };
+          }
+          return { changes: 0 };
+        },
+      };
+    },
+    transaction(fn) {
+      return (entries) => fn(entries);
+    },
+  };
+}
+
+describe('validateModifierOptionUpdate', () => {
+  it('accepts a valid entry', () => {
+    expect(validateModifierOptionUpdate({ id: 'mo1', priceAdjustment: 25 })).toEqual({ valid: true, error: null });
+  });
+
+  it('accepts priceAdjustment 0 (included in base price)', () => {
+    expect(validateModifierOptionUpdate({ id: 'mo1', priceAdjustment: 0 })).toEqual({ valid: true, error: null });
+  });
+
+  it('rejects missing id', () => {
+    expect(validateModifierOptionUpdate({ priceAdjustment: 25 }).valid).toBe(false);
+  });
+
+  it('rejects non-string id', () => {
+    expect(validateModifierOptionUpdate({ id: 123, priceAdjustment: 25 }).valid).toBe(false);
+  });
+
+  it('rejects missing priceAdjustment', () => {
+    expect(validateModifierOptionUpdate({ id: 'mo1' }).valid).toBe(false);
+  });
+
+  it('rejects string priceAdjustment', () => {
+    expect(validateModifierOptionUpdate({ id: 'mo1', priceAdjustment: '25' }).valid).toBe(false);
+  });
+
+  it('rejects NaN priceAdjustment', () => {
+    expect(validateModifierOptionUpdate({ id: 'mo1', priceAdjustment: NaN }).valid).toBe(false);
+  });
+
+  it('rejects negative priceAdjustment', () => {
+    expect(validateModifierOptionUpdate({ id: 'mo1', priceAdjustment: -1 }).valid).toBe(false);
+  });
+
+  it('rejects null entry', () => {
+    expect(validateModifierOptionUpdate(null).valid).toBe(false);
+  });
+});
+
+describe('validateBulkModifierPricesRequest', () => {
+  it('accepts a valid array of updates', () => {
+    const v = validateBulkModifierPricesRequest({ updates: [{ id: 'mo1', priceAdjustment: 25 }] });
+    expect(v.valid).toBe(true);
+  });
+
+  it('rejects missing body', () => {
+    expect(validateBulkModifierPricesRequest().valid).toBe(false);
+  });
+
+  it('rejects missing updates field', () => {
+    expect(validateBulkModifierPricesRequest({}).valid).toBe(false);
+  });
+
+  it('rejects non-array updates', () => {
+    expect(validateBulkModifierPricesRequest({ updates: 'nope' }).valid).toBe(false);
+  });
+
+  it('rejects empty array', () => {
+    expect(validateBulkModifierPricesRequest({ updates: [] }).valid).toBe(false);
+  });
+
+  it('reports the index of the first invalid entry', () => {
+    const v = validateBulkModifierPricesRequest({
+      updates: [
+        { id: 'mo1', priceAdjustment: 25 },
+        { id: 'mo2' }, // missing priceAdjustment
+      ],
+    });
+    expect(v.valid).toBe(false);
+    expect(v.error).toMatch(/Opción #2/);
+  });
+});
+
+describe('applyBulkModifierPriceUpdates', () => {
+  it('updates multiple options in a single transaction', () => {
+    const db = makeModifierDb();
+    db.options.set('mo1', { id: 'mo1', priceAdjustment: 0 });
+    db.options.set('mo2', { id: 'mo2', priceAdjustment: 0 });
+
+    const result = applyBulkModifierPriceUpdates(db, [
+      { id: 'mo1', priceAdjustment: 25 },
+      { id: 'mo2', priceAdjustment: 35 },
+    ]);
+
+    expect(result.updated).toBe(2);
+    expect(result.failed).toBe(0);
+    expect(db.options.get('mo1').priceAdjustment).toBe(25);
+    expect(db.options.get('mo2').priceAdjustment).toBe(35);
+  });
+
+  it('skips non-existent IDs and reports them in errors', () => {
+    const db = makeModifierDb();
+    db.options.set('mo1', { id: 'mo1', priceAdjustment: 0 });
+
+    const result = applyBulkModifierPriceUpdates(db, [
+      { id: 'mo1', priceAdjustment: 25 },
+      { id: 'does-not-exist', priceAdjustment: 99 },
+    ]);
+
+    expect(result.updated).toBe(1);
+    expect(result.failed).toBe(1);
+    expect(result.errors).toEqual([{ id: 'does-not-exist', reason: 'not_found' }]);
+  });
+
+  it('returns zero updates for an empty list (defensive)', () => {
+    const db = makeModifierDb();
+    const result = applyBulkModifierPriceUpdates(db, []);
+    expect(result.updated).toBe(0);
+    expect(result.failed).toBe(0);
   });
 });

@@ -22,6 +22,11 @@ function createMockDb() {
     { id: 'm2', name: 'Pique Macho', price: 85, area: 'cocina', category_id: 'c2', is_active: 1 },
     { id: 'm3', name: 'Pizza La Rey', price: null, area: 'cocina', category_id: 'c3', is_active: 1 },
   ];
+  const modifierOptions = [
+    { id: 'o1', group_id: 'g1', name: 'Mediana', price_adjustment: 0, is_default: 1 },
+    { id: 'o2', group_id: 'g1', name: 'Familiar', price_adjustment: 15, is_default: 0 },
+    { id: 'o3', group_id: 'g1', name: 'Familiar XL', price_adjustment: 30, is_default: 0 },
+  ];
   const orders = [];
   const orderItems = [];
   const calls = [];
@@ -46,6 +51,9 @@ function createMockDb() {
       if (sql.includes('FROM menu_items WHERE id')) {
         return menuItems.find(m => m.id === params[0]) || undefined;
       }
+      if (sql.includes('FROM modifier_options WHERE id')) {
+        return modifierOptions.find(o => o.id === params[0]) || undefined;
+      }
       if (sql.includes('FROM orders WHERE id')) {
         return orders.find(o => o.id === params[0]) || undefined;
       }
@@ -57,9 +65,12 @@ function createMockDb() {
       }
       return undefined;
     },
-    all: (orderId) => {
+    all: (...params) => {
       if (sql.includes('FROM order_items')) {
-        return orderItems.filter(oi => oi.order_id === orderId);
+        return orderItems.filter(oi => oi.order_id === params[0]);
+      }
+      if (sql.includes('FROM modifier_options') && sql.includes('IN')) {
+        return modifierOptions.filter(o => params.includes(o.id));
       }
       return [];
     },
@@ -86,7 +97,10 @@ function createMockDb() {
         return { changes: 1, lastInsertRowid: 0 };
       }
       if (sql.includes('INSERT INTO waiter_calls')) {
-        calls.push({ id: params[0], table_id: params[1], table_number: params[2], status: 'pending' });
+        calls.push({
+          id: params[0], table_id: params[1], table_number: params[2],
+          session_id: params[3], call_type: params[4] || 'call_waiter', status: 'pending', created_at: now(),
+        });
         return { changes: 1, lastInsertRowid: 0 };
       }
       if (sql.includes('UPDATE tables SET status')) {
@@ -104,7 +118,7 @@ function createMockDb() {
   });
 
   return {
-    _state: { tables, menuItems, orders, orderItems, calls, staff },
+    _state: { tables, menuItems, modifierOptions, orders, orderItems, calls, staff },
     prepare: (sql) => stmt(sql),
     transaction: (fn) => fn,
   };
@@ -181,6 +195,71 @@ describe('createPublicOrder service', () => {
     });
     const table = mockDb._state.tables.find(t => t.number === 2);
     expect(table.status).toBe('occupied');
+  });
+
+  it('creates a pending call_waiter call so the mesero is notified', async () => {
+    const { createPublicOrder } = await import('../../server/services/client-orders.js');
+    createPublicOrder(mockDb, {
+      table_number: 1,
+      session_id: 'abc-123',
+      items: [{ menu_item_id: 'm1', quantity: 1 }],
+    });
+    const call = mockDb._state.calls[0];
+    expect(call).toBeDefined();
+    expect(call.call_type).toBe('call_waiter');
+    expect(call.status).toBe('pending');
+    expect(call.table_id).toBe('t1');
+    expect(call.session_id).toBe('abc-123');
+  });
+
+  it('applies modifier price adjustments to size-variant items', async () => {
+    const { createPublicOrder } = await import('../../server/services/client-orders.js');
+    const result = createPublicOrder(mockDb, {
+      table_number: 1,
+      session_id: 'abc-123',
+      items: [{
+        menu_item_id: 'm3', // pizza, price null
+        quantity: 1,
+        modifiers: [{ option_id: 'o2' }], // Familiar +15
+      }],
+    });
+    expect(result.success).toBe(true);
+    const order = mockDb._state.orders[0];
+    // subtotal 15, iva 1.95, total 16.95
+    expect(order.subtotal).toBe(15);
+    expect(order.total).toBe(16.95);
+  });
+
+  it('sums multiple modifier adjustments and multiplies by quantity', async () => {
+    const { createPublicOrder } = await import('../../server/services/client-orders.js');
+    createPublicOrder(mockDb, {
+      table_number: 1,
+      session_id: 'abc-123',
+      items: [{
+        menu_item_id: 'm3',
+        quantity: 2,
+        modifiers: [{ option_id: 'o2' }, { option_id: 'o3' }], // +15 +30 = +45
+      }],
+    });
+    const order = mockDb._state.orders[0];
+    // unit 45 * 2 = 90, iva 11.70, total 101.70
+    expect(order.subtotal).toBe(90);
+    expect(order.total).toBe(101.7);
+  });
+
+  it('rejects invalid modifier options with a clear code', async () => {
+    const { createPublicOrder } = await import('../../server/services/client-orders.js');
+    const result = createPublicOrder(mockDb, {
+      table_number: 1,
+      session_id: 'abc-123',
+      items: [{
+        menu_item_id: 'm3',
+        quantity: 1,
+        modifiers: [{ option_id: 'o99' }], // does not exist
+      }],
+    });
+    expect(result.success).toBe(false);
+    expect(result.code).toBe('INVALID_MODIFIER_OPTION');
   });
 });
 

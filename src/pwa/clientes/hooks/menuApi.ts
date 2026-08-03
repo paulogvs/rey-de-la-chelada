@@ -22,7 +22,7 @@ export async function fetchMenuFromApi(fetchImpl = fetch) {
   try {
     const [catRes, itemsRes] = await Promise.all([
       fetchImpl(CATEGORIES_URL, { headers: { Accept: 'application/json' } }),
-      fetchImpl(ITEMS_URL, { headers: { Accept: 'application/json' } }),
+      fetchImpl(`${ITEMS_URL}?include_modifiers=true&available=true`, { headers: { Accept: 'application/json' } }),
     ]);
 
     if (!catRes.ok) throw new Error(`Categorías: HTTP ${catRes.status}`);
