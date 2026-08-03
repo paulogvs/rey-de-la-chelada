@@ -10,9 +10,13 @@
 
 import tokens from './tokens.json';
 
-/** Acceso seguro a document (typeof guard — compatible no-undef/SSR) */
+/** Acceso seguro a document.documentElement (typeof guard — compatible no-undef/SSR).
+ *  Devuelve el elemento :root, que es el que posee `.style.setProperty`.
+ *  (Antes devolvía `document` — que no tiene `.style` — y rompía todo el
+ *  arranque con "Cannot read properties of undefined (reading 'setProperty')".) */
 function safeDocument() {
-  return typeof document !== 'undefined' ? document : null;
+  if (typeof document === 'undefined') return null;
+  return document.documentElement || null;
 }
 
 class ThemeManager {

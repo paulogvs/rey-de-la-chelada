@@ -123,7 +123,7 @@ export const helmetCspConfig = {
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],  // Needed for React dev
-      styleSrc: ["'self'", "'unsafe-inline'"],                      // Needed for CSS-in-JS
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],  // CSS-in-JS + Google Fonts
       imgSrc: ["'self'", "data:", "blob:"],
       connectSrc: ["'self'", "ws:", "wss:"],                        // WebSocket for KDS
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
