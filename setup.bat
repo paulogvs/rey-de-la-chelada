@@ -1,18 +1,20 @@
 @echo off
 setlocal enabledelayedexpansion
 
-REM ── Rey de la Chelada — Setup.bat ─────────────────────────
-REM One-command installer for Windows Self-Hosted.
-REM Based on the proven EcoJet setup pattern.
+REM ==========================================================
+REM  Rey de la Chelada - Setup.bat
+REM  One-command installer for Windows Self-Hosted.
+REM  Based on the proven EcoJet setup pattern.
 REM
-REM Usage:
-REM   1. Copy this file + .env to the target PC (e.g. D:\OTRO DISCO\REY DE LA CHELADA)
-REM   2. Edit .env with your GITHUB_TOKEN (read-only, contents: read)
-REM   3. Run: setup.bat   (auto-elevates to Administrator)
+REM  Usage:
+REM    1. Copy this file + .env to the target PC
+REM    2. Edit .env with your GITHUB_TOKEN (read-only)
+REM    3. Run: setup.bat  (auto-elevates to Administrator)
 REM
-REM Flags:
-REM   setup.bat --dry-run    → Preview without executing
-REM   setup.bat --force      → Force reinstall service
+REM  Flags:
+REM    setup.bat --dry-run   Preview without executing
+REM    setup.bat --force     Force reinstall service
+REM ==========================================================
 
 set "DRY_RUN=0"
 if /i "%1"=="--dry-run" set "DRY_RUN=1"
@@ -25,26 +27,25 @@ if /i "%2"=="--force" set "FORCE=1"
 set "SCRIPT_DIR=%~dp0"
 set "APP_DIR=%SCRIPT_DIR:~0,-1%"
 
-title Rey de la Chelada — Setup
+title Rey de la Chelada - Setup
 
-REM ─── Auto-elevation to Administrator (VBScript) ───────────
-REM Works with paths containing spaces (unlike Start-Process from batch).
+REM ==========================================================
+REM Auto-elevation to Administrator (VBScript)
+REM ==========================================================
 net session >nul 2>&1
 if !errorlevel! neq 0 (
     echo.
     echo   [INFO] Este instalador necesita permisos de Administrador.
-    echo   Solicitando elevacion (acepta el UAC)...
-    echo Set UAC = CreateObject^("Shell.Application"^) > "%temp%\rdlc-elevate.vbs"
-    echo UAC.ShellExecute "%~f0", "", "%~dp0", "runas", 1 >> "%temp%\rdlc-elevate.vbs"
-    cscript "%temp%\rdlc-elevate.vbs" //nologo
-    del "%temp%\rdlc-elevate.vbs" >nul 2>&1
+    echo   Solicitando elevacion UAC, acepta el prompt...
+    cscript //nologo "!APP_DIR!\elevate.vbs"
     exit /b 0
 )
 
-echo. ╔══════════════════════════════════════════════════════╗
-echo. ║       Rey de la Chelada — Setup Automatizado        ║
-echo. ║       Restaurante/Bar Management System             ║
-echo. ╚══════════════════════════════════════════════════════╝
+echo.
+echo   ==========================================
+echo     Rey de la Chelada - Setup Automatizado
+echo     Restaurante/Bar Management System
+echo   ==========================================
 echo.
 echo   Ruta instalacion: !APP_DIR!
 echo.
@@ -57,7 +58,9 @@ if "!DRY_RUN!"=="1" (
 set "EXEC="
 if "!DRY_RUN!"=="0" set "EXEC=call "
 
-REM ─── Phase 1: Prerequisites ───────────────────────────────
+REM ==========================================================
+REM Phase 1: Prerequisites
+REM ==========================================================
 echo [1/9] Verificando prerequisitos...
 
 where node >nul 2>&1
@@ -97,7 +100,9 @@ if !errorlevel! neq 0 (
 
 echo.
 
-REM ─── Phase 2: Load .env ───────────────────────────────────
+REM ==========================================================
+REM Phase 2: Load .env
+REM ==========================================================
 echo [2/9] Cargando configuracion...
 
 if not exist "!APP_DIR!\.env" (
@@ -142,7 +147,9 @@ echo     Puerto:   !PORT!
 echo     Mesas:    !DEFAULT_TABLES!
 echo.
 
-REM ─── Phase 3: Clone / Pull ────────────────────────────────
+REM ==========================================================
+REM Phase 3: Clone / Pull
+REM ==========================================================
 echo [3/9] Obteniendo codigo fuente...
 
 cd /d "!APP_DIR!"
@@ -176,7 +183,9 @@ if not exist "package.json" (
 
 echo.
 
-REM ─── Phase 4: Install Dependencies ────────────────────────
+REM ==========================================================
+REM Phase 4: Install Dependencies
+REM ==========================================================
 echo [4/9] Instalando dependencias...
 
 set "PM=npm"
@@ -204,7 +213,9 @@ if not exist "node_modules\package.json" (
 
 echo.
 
-REM ─── Phase 5: Build ───────────────────────────────────────
+REM ==========================================================
+REM Phase 5: Build
+REM ==========================================================
 echo [5/9] Compilando aplicacion...
 
 findstr /c:"build" package.json >nul 2>&1
@@ -215,7 +226,7 @@ if !errorlevel! equ 0 (
         %EXEC%call npm run build
     )
     if exist "dist\clientes\index.html" (
-        echo   Build completado (6 PWAs)
+        echo   Build completado, 6 PWAs
     ) else (
         echo   No se detecto output de build
     )
@@ -225,7 +236,9 @@ if !errorlevel! equ 0 (
 
 echo.
 
-REM ─── Phase 6: Install PM2 + Service ───────────────────────
+REM ==========================================================
+REM Phase 6: Install PM2 + Service
+REM ==========================================================
 echo [6/9] Configurando servicio...
 
 where pm2 >nul 2>&1
@@ -270,7 +283,9 @@ if "!IS_ADMIN!"=="0" (
 
 echo.
 
-REM ─── Phase 7: Firewall + Tailscale ────────────────────────
+REM ==========================================================
+REM Phase 7: Firewall + Tailscale
+REM ==========================================================
 echo [7/9] Configurando Firewall y Tailscale...
 
 if not "!DRY_RUN!"=="1" (
@@ -291,7 +306,9 @@ if !errorlevel! equ 0 (
 
 echo.
 
-REM ─── Phase 8: Auto-Update + Backup ────────────────────────
+REM ==========================================================
+REM Phase 8: Auto-Update + Backup
+REM ==========================================================
 echo [8/9] Configurando actualizacion...
 
 if not exist "!APP_DIR!\logs" if "!DRY_RUN!"=="0" mkdir "!APP_DIR!\logs"
@@ -302,7 +319,7 @@ if not "!GITHUB_REPO!"=="" (
         if not "!DRY_RUN!"=="1" (
             schtasks /create /tn "!APP_NAME!-update" /tr "cmd /c \"!APP_DIR!\update.bat\"" /sc hourly /f >nul 2>&1
         )
-        echo   Auto-update configurado (cada hora)
+        echo   Auto-update configurado cada hora
     ) else (
         echo   Auto-update ya configurado
     )
@@ -313,33 +330,35 @@ if !errorlevel! neq 0 (
     if not "!DRY_RUN!"=="1" (
         schtasks /create /tn "!APP_NAME!-backup" /tr "cmd /c \"!APP_DIR!\backup.bat\"" /sc daily /st 0300 /f >nul 2>&1
     )
-    echo   Backup diario configurado (3:00 AM)
+        echo   Backup diario configurado a las 3 AM
 ) else (
     echo   Backup ya configurado
 )
 
 echo.
 
-REM ─── Phase 9: Health Check ────────────────────────────────
+REM ==========================================================
+REM Phase 9: Health Check
+REM ==========================================================
 echo [9/9] Verificando funcionamiento...
 
 if not "!DRY_RUN!"=="1" (
     timeout /t 3 /nobreak >nul
-    powershell -Command "try { $r = Invoke-WebRequest -Uri 'http://localhost:!PORT!/health' -TimeoutSec 2 -UseBasicParsing; if ($r.StatusCode -eq 200) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
+    powershell -Command "try { `$r = Invoke-WebRequest -Uri 'http://localhost:!PORT!/health' -TimeoutSec 2 -UseBasicParsing; if (`$r.StatusCode -eq 200) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
     if !errorlevel! equ 0 (
-        echo   App responde correctamente (localhost:!PORT!)
+        echo   App responde correctamente en localhost:!PORT!
     ) else (
-        echo   Health check: la app puede estar iniciando...
+        echo   Health check: la app puede estar iniciando
         echo   Verifica manualmente: http://localhost:!PORT!
     )
 )
 
 echo.
-echo ╔══════════════════════════════════════════════════════╗
-echo ║       SETUP COMPLETADO                              ║
-echo ║       Rey de la Chelada                             ║
-echo ║       Cochabamba, Bolivia                           ║
-echo ╚══════════════════════════════════════════════════════╝
+echo   ==========================================
+echo     SETUP COMPLETADO
+echo     Rey de la Chelada
+echo     Cochabamba, Bolivia
+echo   ==========================================
 echo.
 echo   Local:     http://localhost:!PORT!
 echo   Clientes:  http://localhost:!PORT!/clientes/

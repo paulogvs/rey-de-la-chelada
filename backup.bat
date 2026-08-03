@@ -1,16 +1,19 @@
 @echo off
 setlocal enabledelayedexpansion
 
-REM ── Rey de la Chelada — Daily Database Backup ─────────────
-REM Creates a timestamped copy. Keeps last 7 days.
+REM ==========================================================
+REM  Rey de la Chelada - Daily Database Backup
+REM  Creates a timestamped copy. Keeps last 7 days.
+REM ==========================================================
 
 set "APP_DIR=%~dp0"
+set "APP_DIR=%APP_DIR:~0,-1%"
 
 set "DB_PATH=!APP_DIR!data\rey-de-la-chelada.db"
 set "BACKUP_DIR=!APP_DIR!backups"
 
-if exist "!APP_DIR!.env" (
-    for /f "usebackq delims=" %%a in ("!APP_DIR!.env") do (
+if exist "!APP_DIR!\.env" (
+    for /f "usebackq delims=" %%a in ("!APP_DIR!\.env") do (
         set "LINE=%%a"
         if not "!LINE!"=="" if not "!LINE:~0,1!"=="#" (
             for /f "tokens=1,* delims==" %%b in ("!LINE!") do (

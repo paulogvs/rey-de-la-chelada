@@ -1,12 +1,12 @@
 @echo off
-:: sync.bat — Sincroniza Rey de la Chelada con el ecosistema FORCH.iA
+:: sync.bat ? Sincroniza Rey de la Chelada con el ecosistema FORCH.iA
 :: ============================================================
 
 setlocal enabledelayedexpansion
 
 echo.
 echo ==========================================
-echo FORCH.iA — Sync: Rey de la Chelada
+echo FORCH.iA ? Sync: Rey de la Chelada
 echo ==========================================
 echo.
 

@@ -1,21 +1,24 @@
 @echo off
 setlocal enabledelayedexpansion
 
-REM ── Rey de la Chelada — Update.bat ────────────────────────
-REM Auto-update from GitHub (runs hourly via Scheduled Task
-REM or manually by double-click).
-REM Pattern: pull → install → build → restart (EcoJet-proven).
+REM ==========================================================
+REM  Rey de la Chelada - Update.bat
+REM  Auto-update from GitHub (runs hourly via Scheduled Task
+REM  or manually by double-click).
+REM  Pattern: pull -> install -> build -> restart (EcoJet-proven)
+REM ==========================================================
 
 set "APP_DIR=%~dp0"
 set "APP_DIR=%APP_DIR:~0,-1%"
 cd /d "!APP_DIR!"
 
-title Rey de la Chelada — Auto-Update
+title Rey de la Chelada - Auto-Update
 
-echo ╔══════════════════════════════════════════════════════╗
-echo ║  Rey de la Chelada — Auto-Update                     ║
-echo ║  %DATE% %TIME%                                       ║
-echo ╚══════════════════════════════════════════════════════╝
+echo.
+echo   ==========================================
+echo     Rey de la Chelada - Auto-Update
+echo     %DATE% %TIME%
+echo   ==========================================
 echo.
 
 if not exist "!APP_DIR!\.env" (
@@ -23,7 +26,9 @@ if not exist "!APP_DIR!\.env" (
     exit /b 0
 )
 
-REM ─── Read config from .env ───────────────────────────────
+REM ==========================================================
+REM Read config from .env
+REM ==========================================================
 for /f "usebackq delims=" %%a in ("!APP_DIR!\.env") do (
     set "LINE=%%a"
     if not "!LINE!"=="" if not "!LINE:~0,1!"=="#" (
@@ -50,7 +55,9 @@ if exist "!APP_DIR!\.pm-config" set /p PM=<"!APP_DIR!\.pm-config"
 echo   Package manager: !PM!
 echo.
 
-REM ─── Phase 1: Pull ───────────────────────────────────────
+REM ==========================================================
+REM Phase 1: Pull
+REM ==========================================================
 echo [1/4] Pulling from GitHub...
 
 git remote set-url origin "https://oauth2:!GITHUB_TOKEN!@github.com/!GITHUB_REPO!.git" >nul 2>&1
@@ -60,10 +67,10 @@ for /f "tokens=*" %%i in ('git rev-parse HEAD') do set "LOCAL=%%i"
 for /f "tokens=*" %%i in ('git rev-parse @{u} 2^>nul') do set "REMOTE=%%i"
 
 if "!REMOTE!"=="" (
-    echo   [WARNING] No upstream branch configured. Saltando pull...
+    echo   [WARNING] No upstream branch configured. Saltando pull
     goto :SKIP_PULL
 ) else if "!LOCAL!"=="!REMOTE!" (
-    echo   Ya esta actualizado — nada que hacer.
+    echo   Ya esta actualizado - nada que hacer.
     goto :DONE
 )
 
@@ -72,7 +79,7 @@ if "%1"=="--force" (
 ) else (
     git pull --ff-only origin main
     if !errorlevel! neq 0 (
-        echo   [ERROR] git pull fallo — posibles conflictos locales.
+        echo   [ERROR] git pull fallo - posibles conflictos locales.
         echo   Solucion: ejecuta update.bat --force
         exit /b 1
     )
@@ -83,7 +90,9 @@ echo.
 
 :SKIP_PULL
 
-REM ─── Phase 2: Install ────────────────────────────────────
+REM ==========================================================
+REM Phase 2: Install
+REM ==========================================================
 echo [2/4] Instalando dependencias...
 if "!PM!"=="pnpm" (
     call pnpm install
@@ -97,7 +106,9 @@ if not exist "node_modules\package.json" (
 echo   Dependencias instaladas
 echo.
 
-REM ─── Phase 3: Build ──────────────────────────────────────
+REM ==========================================================
+REM Phase 3: Build
+REM ==========================================================
 echo [3/4] Compilando...
 findstr /c:"build" package.json >nul 2>&1
 if !errorlevel! equ 0 (
@@ -112,7 +123,9 @@ if !errorlevel! equ 0 (
 )
 echo.
 
-REM ─── Phase 4: Restart ────────────────────────────────────
+REM ==========================================================
+REM Phase 4: Restart
+REM ==========================================================
 echo [4/4] Reiniciando servicio...
 where pm2 >nul 2>&1
 if !errorlevel! equ 0 (
@@ -129,10 +142,10 @@ if !errorlevel! equ 0 (
 
 :DONE
 echo.
-echo ╔══════════════════════════════════════════════════════╗
-echo ║  Update completo — %DATE% %TIME%                  ║
-echo ║  App: http://localhost:!PORT!                       ║
-echo ╚══════════════════════════════════════════════════════╝
+echo   ==========================================
+echo     Update completo - %DATE% %TIME%
+echo     App: http://localhost:!PORT!
+echo   ==========================================
 echo.
 
 endlocal
