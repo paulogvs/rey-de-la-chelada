@@ -17,8 +17,11 @@
   width: 100%;
   height: 200px;
   max-height: 240px;
-  object-fit: cover;
+  /* contain: muestra la imagen COMPLETA sin recortar (el asset es
+     1536x180, muy alargado — cover recortaba los lados y se veía mal) */
+  object-fit: contain;
   object-position: center;
+  background: var(--surface-soft);
 }
 
 /* ---- Header ---- */

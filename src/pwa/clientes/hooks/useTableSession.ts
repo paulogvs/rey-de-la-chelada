@@ -121,14 +121,14 @@ export function useTableSession(): TableSession {
           tableNumber: persisted.tableNumber,
           sessionId: persisted.sessionId,
           isValid: false,
-          error: 'Sesión expirada. Escanea el QR de la mesa.',
+          error: 'Sesión expirada. Escanea de nuevo el QR de la mesa.',
         }));
         return;
       }
       setSession(prev => ({
         ...prev,
         isValid: false,
-        error: 'QR inválido. Escanea el código de la mesa.',
+        error: 'QR no válido o expirado. Pide el código QR de tu mesa al mesero.',
       }));
       return;
     }

@@ -11,6 +11,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
+import { QRDisplay } from '@/ui/components/QRDisplay';
+import { securityEngine } from '@/core/config';
 import { fetchTables, createTable, deleteTable, type Table } from '../../_shared/api/tablesApi';
 
 interface TablesViewProps {
@@ -44,6 +46,12 @@ export function TablesView({ token, onToast }: TablesViewProps) {
   const [newCapacity, setNewCapacity] = useState('4');
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [qrTable, setQrTable] = useState<Table | null>(null);
+
+  /** Genera el QR URL para una mesa (sesión de 3h, se renueva con pedido) */
+  const getQrUrl = useCallback((tableNumber: number): string => {
+    return securityEngine.generateQrUrl(tableNumber);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -153,6 +161,14 @@ export function TablesView({ token, onToast }: TablesViewProps) {
                 </Badge>
                 <span className="admin-tables__capacity">{t.capacity} pers. · {t.section}</span>
                 <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setQrTable(t)}
+                  title="Ver/imprimir QR del menú de esta mesa"
+                >
+                  QR
+                </Button>
+                <Button
                   variant="ghost"
                   size="sm"
                   loading={deletingId === t.id}
@@ -167,6 +183,35 @@ export function TablesView({ token, onToast }: TablesViewProps) {
           </div>
         )}
       </Card>
+
+      {qrTable && (
+        <div className="admin-modal-overlay" onClick={() => setQrTable(null)}>
+          <Card className="admin-qr-modal" onClick={e => e.stopPropagation()}>
+            <div className="admin-qr-modal__head">
+              <h3>QR — Mesa {qrTable.number}</h3>
+              <Button variant="ghost" size="sm" onClick={() => setQrTable(null)}>✕</Button>
+            </div>
+            <p className="admin-muted">
+              El cliente escanea este código para abrir el menú digital de la mesa.
+              <br />
+              Sesión válida por 3 horas (se renueva con pedido activo).
+            </p>
+            <div className="admin-qr-modal__qr">
+              <QRDisplay
+                data={getQrUrl(qrTable.number)}
+                size={220}
+                label={`Mesa ${qrTable.number} — Rey de la Chelada`}
+              />
+            </div>
+            <div className="admin-qr-modal__url admin-muted">
+              {getQrUrl(qrTable.number)}
+            </div>
+            <Button variant="primary" onClick={() => window.print()}>
+              🖨 Imprimir QR
+            </Button>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

@@ -302,3 +302,61 @@
     justify-content: space-between;
   }
 }
+
+/* ---- Modal QR de mesa ---- */
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: var(--space-4);
+}
+
+.admin-qr-modal {
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+}
+
+.admin-qr-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.admin-qr-modal__head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  color: var(--dorado-rey);
+}
+
+.admin-qr-modal__qr {
+  display: flex;
+  justify-content: center;
+  margin: var(--space-4) 0;
+}
+
+.admin-qr-modal__url {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  word-break: break-all;
+  margin-bottom: var(--space-4);
+  padding: var(--space-2);
+  background: var(--surface-soft);
+  border-radius: var(--radius-sm);
+}
+
+/* Al imprimir, solo el QR */
+@media print {
+  body * { visibility: hidden; }
+  .admin-qr-modal, .admin-qr-modal * { visibility: visible; }
+  .admin-qr-modal {
+    position: absolute;
+    inset: 0;
+    max-width: 100%;
+  }
+}
