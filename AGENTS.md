@@ -1,7 +1,8 @@
 # AGENTS.md — Rey de la Chelada
 
 > **SSOT — Este archivo GANA sobre cualquier otro.**
-> Creado: 2026-07-29 | Versión: 1.1.0 | Stack: React 19 + Express 5 + SQLite + Multi-PWA
+> Creado: 2026-07-29 | Versión: 1.2.0 | Stack: React 19 + Express 5 + SQLite + Multi-PWA
+> Actualizado: 2026-08-03 — App completa FASE 8-13 (Admin PWA, flujo cliente, impresión, E2E)
 
 ---
 
