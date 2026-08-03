@@ -73,6 +73,13 @@
 
 /* ---- Summary View ---- */
 
+.caja-summary__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
 .caja-summary__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

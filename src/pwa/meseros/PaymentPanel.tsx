@@ -24,6 +24,8 @@ import { apiFetch } from '../_shared/api/apiFetch';
 import { processPayment, type ServerPayment } from '../_shared/api/paymentsApi';
 import { updateTableStatus } from '../_shared/api/tablesApi';
 import type { Order } from '../_shared/api/ordersApi';
+import { PrintReceipt } from '../_shared/components/PrintReceipt';
+import { buildReceiptData } from '../_shared/utils/receipt';
 
 interface PaymentPanelProps {
   orderId: string;
@@ -48,6 +50,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
   const [splitPayments, setSplitPayments] = useState<SplitPayment[]>([]);
   const [selectedTip, setSelectedTip] = useState(0);
   const [processing, setProcessing] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
 
   // Fetch fresh order from the server
   useEffect(() => {
@@ -332,6 +335,9 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
         <Button variant="secondary" onClick={onBack} disabled={processing}>
           Volver
         </Button>
+        <Button variant="secondary" onClick={() => setPrintOpen(true)} disabled={processing}>
+          🖨️ Imprimir
+        </Button>
         <Button
           variant="primary"
           onClick={processPaymentNow}
@@ -342,6 +348,15 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
           {processing ? 'Procesando...' : `Cobrar Bs. ${totalWithTip.toFixed(2)}`}
         </Button>
       </div>
+
+      {/* Print receipt overlay */}
+      <PrintReceipt
+        open={printOpen}
+        onClose={() => setPrintOpen(false)}
+        kind="order"
+        receipt={buildReceiptData(order)}
+        label={`Mesa ${table.number} — Pedido ${order.id.slice(0, 8)}`}
+      />
     </div>
   );
 }

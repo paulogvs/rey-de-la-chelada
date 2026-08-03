@@ -20,6 +20,8 @@ import { QuantityStepper } from '@/ui/components/QuantityStepper';
 import { Modal } from '@/ui/components/Modal';
 import { fetchMenuCategories, fetchMenuItems, fetchMenuItemDetail, type MenuItem } from '../_shared/api/menuApi';
 import { createOrder, submitOrder, confirmOrder } from '../_shared/api/ordersApi';
+import { PrintReceipt } from '../_shared/components/PrintReceipt';
+import { buildReceiptData } from '../_shared/utils/receipt';
 
 interface OrderPanelProps {
   table: Table;
@@ -64,6 +66,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel, onBack }: Or
   const [itemNotes, setItemNotes] = useState('');
   const [loadingMenu, setLoadingMenu] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
 
   // Load menu (public endpoints)
   useEffect(() => {
@@ -317,6 +320,13 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel, onBack }: Or
               Cancelar
             </Button>
             <Button
+              variant="secondary"
+              onClick={() => setPrintOpen(true)}
+              disabled={cart.length === 0}
+            >
+              🖨️ Imprimir
+            </Button>
+            <Button
               variant="primary"
               onClick={placeOrder}
               disabled={cart.length === 0 || submitting}
@@ -422,6 +432,33 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel, onBack }: Or
           </div>
         )}
       </Modal>
+
+      {/* Print comanda (cart preview) */}
+      <PrintReceipt
+        open={printOpen}
+        onClose={() => setPrintOpen(false)}
+        kind="order"
+        receipt={buildReceiptData({
+          id: `comanda-${Date.now()}`,
+          tableNumber: table.number,
+          createdAt: new Date().toISOString(),
+          subtotal: Math.round((cartTotal / 1.13) * 100) / 100,
+          ivaAmount: Math.round((cartTotal - cartTotal / 1.13) * 100) / 100,
+          total: cartTotal,
+          paymentMethod: undefined,
+          items: cart.map(ci => ({
+            menuItemName: ci.menuItem.name,
+            quantity: ci.quantity,
+            unitPrice: (ci.menuItem.price ?? 0) + ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0),
+            subtotal: (((ci.menuItem.price ?? 0) + ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0)) * ci.quantity),
+            modifiers: ci.selectedModifiers.map(m => ({
+              optionName: m.name,
+              priceAdjustment: m.priceAdjustment ?? 0,
+            })),
+          })),
+        })}
+        label={`Mesa ${table.number} — Comanda`}
+      />
     </div>
   );
 }

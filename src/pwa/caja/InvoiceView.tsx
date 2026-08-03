@@ -10,6 +10,7 @@ import { appConfig } from '@/core/config';
 import { Card } from '@/ui/components/Card';
 import { Button } from '@/ui/components/Button';
 import { useToast } from '@/ui/components/Toast';
+import { PrintReceipt } from '../_shared/components/PrintReceipt';
 
 export function InvoiceView() {
   const { addToast } = useToast();
@@ -19,6 +20,8 @@ export function InvoiceView() {
   const [invoiceName, setInvoiceName] = useState('');
   const [invoiceOrderId, setInvoiceOrderId] = useState('');
   const [invoiceAmount, setInvoiceAmount] = useState(0);
+  const [printOpen, setPrintOpen] = useState(false);
+  const [printData, setPrintData] = useState<{ nit: string; name: string; orderId: string; amount: number } | null>(null);
 
   const handleGenerateInvoice = useCallback(() => {
     if (!invoiceNit || !invoiceName || invoiceAmount <= 0) {
@@ -32,6 +35,15 @@ export function InvoiceView() {
       duration: 4000,
     });
   }, [invoiceNit, invoiceName, invoiceAmount, addToast]);
+
+  const handlePrintInvoice = useCallback(() => {
+    if (!invoiceNit || !invoiceName || invoiceAmount <= 0) {
+      addToast({ type: 'warning', message: 'Completa NIT, Razón Social y monto', duration: 3000 });
+      return;
+    }
+    setPrintData({ nit: invoiceNit, name: invoiceName, orderId: invoiceOrderId, amount: invoiceAmount });
+    setPrintOpen(true);
+  }, [invoiceNit, invoiceName, invoiceOrderId, invoiceAmount, addToast]);
 
   return (
     <div className="caja-invoice">
@@ -91,6 +103,9 @@ export function InvoiceView() {
         </div>
 
         <div className="caja-invoice__actions">
+          <Button variant="secondary" onClick={handlePrintInvoice} fullWidth>
+            🖨️ Imprimir factura
+          </Button>
           <Button variant="primary" onClick={handleGenerateInvoice} fullWidth>
             Generar Factura
           </Button>
@@ -122,6 +137,23 @@ export function InvoiceView() {
           </div>
         )}
       </Card>
+
+      {/* Print invoice */}
+      <PrintReceipt
+        open={printOpen}
+        onClose={() => setPrintOpen(false)}
+        kind="invoice"
+        receipt={{
+          businessName: 'El Rey de la Chelada',
+          nit: printData?.nit ?? '',
+          customerName: printData?.name ?? '',
+          orderId: printData?.orderId || '—',
+          amount: printData?.amount ?? 0,
+          ivaAmount: Math.round((printData?.amount ?? 0) * 0.13 * 100) / 100,
+          date: new Date().toISOString(),
+        }}
+        label="Factura"
+      />
     </div>
   );
 }

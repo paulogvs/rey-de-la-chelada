@@ -35,7 +35,7 @@ export const apiLimiter = rateLimit({
  */
 export const authLimiter = rateLimit({
   windowMs: 60 * 1000,  // 1 minute
-  max: 5,
+  max: Number(process.env.AUTH_RATE_LIMIT_MAX) || 5,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

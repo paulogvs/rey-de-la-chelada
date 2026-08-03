@@ -19,6 +19,7 @@ import {
 import { Card } from '@/ui/components/Card';
 import { Button } from '@/ui/components/Button';
 import { useToast } from '@/ui/components/Toast';
+import { PrintReceipt } from '../_shared/components/PrintReceipt';
 
 interface ClosingViewProps {
   token: string;
@@ -39,6 +40,7 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
   const [actualCash, setActualCash] = useState<number>(0);
   const [notes, setNotes] = useState('');
   const [reconciled, setReconciled] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -170,6 +172,9 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
               <Button variant="secondary" onClick={() => setReconciled(r => !r)}>
                 {reconciled ? 'Diferencia conciliada ✓' : 'Marcar diferencia conciliada'}
               </Button>
+              <Button variant="secondary" onClick={() => setPrintOpen(true)} disabled={busy}>
+                🖨️ Imprimir cierre
+              </Button>
               <Button variant="primary" onClick={handleClose} disabled={busy} fullWidth>
                 {busy ? 'Cerrando…' : 'Cerrar Día'}
               </Button>
@@ -215,6 +220,27 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
           </div>
         </div>
       </Card>
+
+      {/* Print closing report */}
+      <PrintReceipt
+        open={printOpen}
+        onClose={() => setPrintOpen(false)}
+        kind="closing"
+        receipt={{
+          businessName: 'El Rey de la Chelada',
+          date: new Date().toISOString(),
+          totalSales: daily?.totalSales ?? 0,
+          totalIva: daily?.totalIva ?? 0,
+          totalOrders: daily?.totalOrders ?? 0,
+          byMethod: { ...byMethod },
+          expectedCash: expectedCash,
+          actualCash: actualCash,
+          difference: difference,
+          reconciled: reconciled,
+          notes: notes || undefined,
+        }}
+        label="Cierre de caja"
+      />
     </div>
   );
 }

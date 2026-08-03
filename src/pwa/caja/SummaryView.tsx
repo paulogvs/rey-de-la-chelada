@@ -9,6 +9,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { fetchDailySales, type DailySales } from '../_shared/api/reportsApi';
 import { Card, CardSkeleton } from '@/ui/components/Card';
+import { Button } from '@/ui/components/Button';
+import { useToast } from '@/ui/components/Toast';
+import { buildDailySalesCsv, downloadCsv, dailyCsvFilename } from '../_shared/utils/csvExport';
 
 interface SummaryViewProps {
   token: string;
@@ -34,9 +37,11 @@ const METHOD_ICONS: Record<string, string> = {
 };
 
 export function SummaryView({ token, today, ivaRate, refreshTick }: SummaryViewProps) {
+  const { addToast } = useToast();
   const [summary, setSummary] = useState<DailySales | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,6 +61,22 @@ export function SummaryView({ token, today, ivaRate, refreshTick }: SummaryViewP
     const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
   }, [load, refreshTick]);
+
+  // Client-side CSV export (no dependencies) — BOM for Excel
+  const handleExportCsv = useCallback(() => {
+    if (!summary) return;
+    setExporting(true);
+    try {
+      const csv = buildDailySalesCsv(summary, ivaRate);
+      downloadCsv(dailyCsvFilename(summary.date), csv);
+      addToast({ type: 'success', message: 'Reporte CSV exportado', duration: 3000 });
+    } catch (err) {
+      console.error('[SummaryView] CSV export error:', err);
+      addToast({ type: 'error', message: 'Error al exportar CSV', duration: 4000 });
+    } finally {
+      setExporting(false);
+    }
+  }, [summary, ivaRate, addToast]);
 
   if (loading && !summary) {
     return (
@@ -82,6 +103,11 @@ export function SummaryView({ token, today, ivaRate, refreshTick }: SummaryViewP
 
   return (
     <div className="caja-summary">
+      <div className="caja-summary__toolbar">
+        <Button variant="secondary" size="sm" onClick={handleExportCsv} loading={exporting} disabled={!summary}>
+          📄 Exportar CSV
+        </Button>
+      </div>
       <div className="caja-summary__grid">
         <Card status="paid" className="caja-metric">
           <div className="caja-metric__label">Ventas del día</div>

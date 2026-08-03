@@ -54,6 +54,45 @@ function round2(n) {
   return Math.round(n * 100) / 100;
 }
 
+/**
+ * Resolve modifier adjustments for an order item from the DB.
+ *
+ * The mesero/clientes PWAs send modifiers as optionName (+priceAdjustment).
+ * To keep server totals authoritative (SSOT), we look the options up by
+ * name within the item's modifier groups and re-derive the adjustment.
+ *
+ * @param {object} db — better-sqlite3 instance
+ * @param {string} menuItemId
+ * @param {Array} modifiers — [{ groupName?, optionName, priceAdjustment? }]
+ * @returns {{ adjustment: number, summary: Array }}
+ */
+function resolveModifierAdjustment(db, menuItemId, modifiers) {
+  const raw = Array.isArray(modifiers) ? modifiers : [];
+  if (raw.length === 0) return { adjustment: 0, summary: [] };
+
+  const groups = db.prepare(
+    'SELECT id FROM modifier_groups WHERE menu_item_id = ?'
+  ).all(menuItemId);
+  if (groups.length === 0) return { adjustment: 0, summary: [] };
+
+  const placeholders = groups.map(() => '?').join(',');
+  const options = db.prepare(
+    `SELECT id, name, price_adjustment FROM modifier_options
+     WHERE group_id IN (${placeholders})`
+  ).all(...groups.map(g => g.id));
+
+  let adjustment = 0;
+  const summary = [];
+  for (const m of raw) {
+    const opt = options.find(o => o.name === m.optionName);
+    if (!opt) continue;
+    const adj = Number(opt.price_adjustment || 0);
+    adjustment += adj;
+    summary.push({ groupName: m.groupName || '', optionName: opt.name, priceAdjustment: adj });
+  }
+  return { adjustment: Math.round(adjustment * 100) / 100, summary };
+}
+
 /** Recalcula subtotal/iva/total de un pedido */
 function recalcOrder(db, orderId) {
   const items = db.prepare('SELECT COALESCE(SUM(subtotal), 0) as subtotal FROM order_items WHERE order_id = ?').get(orderId);
@@ -276,7 +315,9 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
       }
 
       const quantity = item.quantity || 1;
-      const unitPrice = menuItem.price || 0;
+      // Resolve size/modifier adjustments from the DB (SSOT — server computes totals)
+      const { adjustment, summary } = resolveModifierAdjustment(db, menuItem.id, item.modifiers);
+      const unitPrice = round2((menuItem.price || 0) + adjustment);
       const itemSubtotal = round2(unitPrice * quantity);
 
       subtotal += itemSubtotal;
@@ -288,7 +329,7 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
         quantity,
         unit_price: unitPrice,
         subtotal: itemSubtotal,
-        modifiers_json: item.modifiers ? JSON.stringify(item.modifiers) : null,
+        modifiers_json: summary.length > 0 ? JSON.stringify(summary) : null,
         preparation_notes: item.notes || item.preparation_notes || '',
         status: 'pending',
         kds_module: item.kds_module || menuItem.area || 'cocina',
@@ -370,7 +411,8 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
         if (!menuItem) continue;
 
         const quantity = item.quantity || 1;
-        const unitPrice = menuItem.price || 0;
+        const { adjustment } = resolveModifierAdjustment(db, menuItem.id, item.modifiers);
+        const unitPrice = round2((menuItem.price || 0) + adjustment);
         const itemSubtotal = round2(unitPrice * quantity);
 
         insertItem.run(randomUUID(), req.params.id, menuItem.id, menuItem.name, quantity,
@@ -562,7 +604,8 @@ router.post('/:id/items', requireAuth, requireRole('admin', 'mesero'), (req, res
     }
 
     const qty = quantity || 1;
-    const unitPrice = menuItem.price || 0;
+    const { adjustment } = resolveModifierAdjustment(db, menuItem.id, modifiers);
+    const unitPrice = round2((menuItem.price || 0) + adjustment);
     const itemSubtotal = round2(unitPrice * qty);
 
     db.prepare(`
