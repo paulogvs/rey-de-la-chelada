@@ -1,26 +1,30 @@
 /**
- * OrderPanel — Create/edit orders for a table
+ * OrderPanel — Create orders for a table (API-driven)
  *
- * - Browse menu by category
- * - Select items with modifiers
+ * - Browse menu by category (GET /api/menu)
+ * - Select items with modifiers (GET /api/menu/items/:id)
  * - Quantity stepper
- * - Order summary with running total
- * - Confirm → send to KDS
+ * - Confirm → POST /api/orders (draft) → PATCH /:id/submit (called)
+ *   → PATCH /:id/confirm (confirmed → KDS)
+ *
+ * Replaces the in-memory orderEngine/tableEngine flow.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { menuEngine, orderEngine, tableEngine } from '@/core/engine';
-import type { Table, MenuItem, MenuCategory, Order, OrderLineItem, ModifierOption } from '@/core/types';
+import type { Table, ModifierOption } from '@/core/types';
 import { useToast } from '@/ui/components/Toast';
 import { Card } from '@/ui/components/Card';
 import { Button } from '@/ui/components/Button';
 import { Badge } from '@/ui/components/Badge';
 import { QuantityStepper } from '@/ui/components/QuantityStepper';
 import { Modal } from '@/ui/components/Modal';
+import { fetchMenuCategories, fetchMenuItems, fetchMenuItemDetail, type MenuItem } from '../_shared/api/menuApi';
+import { createOrder, submitOrder, confirmOrder } from '../_shared/api/ordersApi';
 
 interface OrderPanelProps {
   table: Table;
-  onOrderPlaced: (order: Order) => void;
+  token: string;
+  onOrderPlaced: (orderId: string) => void;
   onCancel: () => void;
   onBack: () => void;
 }
@@ -32,50 +36,107 @@ interface CartItem {
   notes: string;
 }
 
-export function OrderPanel({ table, onOrderPlaced, onCancel, onBack }: OrderPanelProps) {
+interface DetailModifier {
+  option_id: string;
+  option_name: string;
+  option_price: number;
+  option_default: number;
+}
+
+interface DetailGroup {
+  id: string;
+  name: string;
+  type: 'select' | 'multi' | 'toggle';
+  required: boolean;
+  options: DetailModifier[];
+}
+
+export function OrderPanel({ table, token, onOrderPlaced, onCancel, onBack }: OrderPanelProps) {
   const { addToast } = useToast();
-  const [categories, setCategories] = useState<MenuCategory[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string; emoji: string }[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [itemDetail, setItemDetail] = useState<MenuItem | null>(null);
+  const [detailGroups, setDetailGroups] = useState<DetailGroup[]>([]);
   const [itemQuantity, setItemQuantity] = useState(1);
   const [itemModifiers, setItemModifiers] = useState<ModifierOption[]>([]);
   const [itemNotes, setItemNotes] = useState('');
+  const [loadingMenu, setLoadingMenu] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Load menu
+  // Load menu (public endpoints)
   useEffect(() => {
-    setCategories(menuEngine.getCategories());
-    setItems(menuEngine.getItems().filter(i => i.isActive && i.isAvailable));
+    let disposed = false;
+    (async () => {
+      setLoadingMenu(true);
+      const [cats, its] = await Promise.all([fetchMenuCategories(), fetchMenuItems()]);
+      if (disposed) return;
+      if (cats.ok) setCategories(cats.categories.map(c => ({ id: c.id, name: c.name, emoji: c.emoji })));
+      if (its.ok) setItems(its.items.filter(i => i.is_active === 1 && i.is_available === 1));
+      setLoadingMenu(false);
+    })();
+    return () => { disposed = true; };
   }, []);
 
-  // Filter items by category
-  const filteredItems = activeCategory
-    ? items.filter(i => i.categoryId === activeCategory)
-    : items;
+  const filteredItems = activeCategory ? items.filter(i => i.category_id === activeCategory) : items;
 
-  // Calculate cart totals
+  // Load modifiers when an item is opened
+  const openItem = useCallback(async (item: MenuItem) => {
+    setItemDetail(item);
+    setItemQuantity(1);
+    setItemModifiers([]);
+    setItemNotes('');
+    setDetailGroups([]);
+    try {
+      const detail = await fetchMenuItemDetail(item.id);
+      if (detail.ok && detail.modifiers) {
+        setDetailGroups(detail.modifiers.map(g => ({
+          id: g.id,
+          name: g.name,
+          type: g.type,
+          required: g.required === 1,
+          options: g.options.map(o => ({
+            option_id: o.option_id,
+            option_name: o.option_name,
+            option_price: o.option_price,
+            option_default: o.option_default,
+          })),
+        })));
+      }
+    } catch (err) {
+      console.error('[OrderPanel] modifiers error:', err);
+    }
+  }, []);
+
+  const closeItem = useCallback(() => {
+    setItemDetail(null);
+    setItemQuantity(1);
+    setItemModifiers([]);
+    setItemNotes('');
+  }, []);
+
+  // Cart totals (modifier adjustments included)
   const cartTotal = cart.reduce((sum, ci) => {
-    const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + m.priceAdjustment, 0);
-    return sum + ((ci.menuItem.price + modAdjustment) * ci.quantity);
+    const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
+    return sum + (((ci.menuItem.price ?? 0) + modAdjustment) * ci.quantity);
   }, 0);
 
-  // Add item to cart from detail modal
   const addToCart = useCallback(() => {
     if (!itemDetail) return;
-
+    const mods = itemModifiers.map(m => ({
+      id: m.id,
+      name: m.name,
+      priceAdjustment: m.priceAdjustment ?? 0,
+    }));
     setCart(prev => {
       const existing = prev.find(ci =>
         ci.menuItem.id === itemDetail.id &&
         JSON.stringify(ci.selectedModifiers.map(m => m.id).sort()) === JSON.stringify(itemModifiers.map(m => m.id).sort())
       );
-
       if (existing) {
-        return prev.map(ci =>
-          ci === existing ? { ...ci, quantity: ci.quantity + itemQuantity } : ci
-        );
+        return prev.map(ci => (ci === existing ? { ...ci, quantity: ci.quantity + itemQuantity } : ci));
       }
-
       return [...prev, {
         menuItem: itemDetail,
         quantity: itemQuantity,
@@ -83,73 +144,69 @@ export function OrderPanel({ table, onOrderPlaced, onCancel, onBack }: OrderPane
         notes: itemNotes,
       }];
     });
+    closeItem();
+  }, [itemDetail, itemQuantity, itemModifiers, itemNotes, closeItem]);
 
-    setItemDetail(null);
-    setItemQuantity(1);
-    setItemModifiers([]);
-    setItemNotes('');
-  }, [itemDetail, itemQuantity, itemModifiers, itemNotes]);
-
-  // Remove from cart
   const removeFromCart = useCallback((index: number) => {
     setCart(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  // Update cart item quantity
   const updateQuantity = useCallback((index: number, quantity: number) => {
-    setCart(prev => prev.map((ci, i) => i === index ? { ...ci, quantity } : ci));
+    setCart(prev => prev.map((ci, i) => (i === index ? { ...ci, quantity } : ci)));
   }, []);
 
-  // Place order
-  const placeOrder = useCallback(() => {
+  // Place order via API: create (draft) → submit (called) → confirm (confirmed)
+  const placeOrder = useCallback(async () => {
     if (cart.length === 0) {
       addToast({ type: 'warning', message: 'Agrega items al pedido', duration: 3000 });
       return;
     }
 
-    // Create order via engine
-    const order = orderEngine.createOrder({
-      tableId: table.id,
-      tableNumber: table.number,
-      waiterId: 'mesero-1', // In production: actual logged-in user
-      waiterName: 'Mesero', // In production: actual name
-      guestCount: table.capacity,
-    });
-
-    // Add items to order
-    cart.forEach(ci => {
-      const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + m.priceAdjustment, 0);
-      const lineItem: OrderLineItem = {
-        id: `li-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        menuItemId: ci.menuItem.id,
-        menuItemName: ci.menuItem.name,
-        quantity: ci.quantity,
-        unitPrice: ci.menuItem.price,
-        modifiers: ci.selectedModifiers.map(m => ({
-          groupName: ci.menuItem.modifierGroups.find(g => g.options.some(o => o.id === m.id))?.name || '',
-          optionName: m.name,
-          priceAdjustment: m.priceAdjustment,
+    setSubmitting(true);
+    try {
+      const payload = {
+        table_id: table.id,
+        guest_count: table.capacity,
+        items: cart.map(ci => ({
+          menu_item_id: ci.menuItem.id,
+          quantity: ci.quantity,
+          notes: ci.notes || undefined,
+          modifiers: ci.selectedModifiers.map(m => ({
+            groupName: (detailGroups.find(g => g.options.some(o => o.option_id === m.id))?.name) || '',
+            optionName: m.name,
+            priceAdjustment: m.priceAdjustment ?? 0,
+          })),
         })),
-        subtotal: (ci.menuItem.price + modAdjustment) * ci.quantity,
-        status: 'pending',
-        preparationNotes: ci.notes,
-        createdAt: new Date().toISOString(),
       };
-      orderEngine.addItem(order.id, lineItem);
-    });
 
-    // Confirm order (send to KDS)
-    orderEngine.confirmOrder(order.id);
+      const created = await createOrder(token, payload);
+      if (!created.ok || !created.order) {
+        addToast({ type: 'error', message: created.error || 'No se pudo crear el pedido', duration: 5000 });
+        return;
+      }
 
-    // Update table status
-    tableEngine.assignOrder(table.id, order.id);
+      // draft → called (client sends to mesero queue)
+      const submitted = await submitOrder(token, created.order.id);
+      if (!submitted.ok) {
+        addToast({ type: 'error', message: submitted.error || 'No se pudo enviar el pedido', duration: 5000 });
+        return;
+      }
 
-    // Get final order
-    const placedOrder = orderEngine.getOrder(order.id);
-    if (placedOrder) {
-      onOrderPlaced(placedOrder);
+      // called → confirmed (mesero accepts → KDS gets it)
+      const confirmed = await confirmOrder(token, created.order.id);
+      if (!confirmed.ok) {
+        addToast({ type: 'error', message: confirmed.error || 'No se pudo confirmar el pedido', duration: 5000 });
+        return;
+      }
+
+      onOrderPlaced(created.order.id);
+    } catch (err) {
+      console.error('[OrderPanel] placeOrder error:', err);
+      addToast({ type: 'error', message: 'Error al enviar el pedido', duration: 5000 });
+    } finally {
+      setSubmitting(false);
     }
-  }, [cart, table, addToast, onOrderPlaced]);
+  }, [cart, table, token, detailGroups, addToast, onOrderPlaced]);
 
   return (
     <div className="order-panel">
@@ -175,29 +232,24 @@ export function OrderPanel({ table, onOrderPlaced, onCancel, onBack }: OrderPane
       <div className="order-panel__content">
         {/* Menu items */}
         <div className="order-panel__items">
+          {loadingMenu && <p className="order-panel__loading">Cargando menú…</p>}
+          {!loadingMenu && filteredItems.length === 0 && (
+            <p className="order-panel__empty">Sin items en esta categoría</p>
+          )}
           {filteredItems.map(item => (
             <button
               key={item.id}
               className="order-panel__item"
-              onClick={() => setItemDetail(item)}
+              onClick={() => openItem(item)}
             >
               <div className="order-panel__item-info">
                 <span className="order-panel__item-name">{item.name}</span>
                 <span className="order-panel__item-price">
-                  Bs. {item.price.toFixed(2)}
+                  {item.price != null ? `Bs. ${item.price.toFixed(2)}` : 'Ver variantes'}
                 </span>
               </div>
-              {item.modifierGroups.length > 0 && (
-                <span className="order-panel__item-mods-hint">
-                  {item.modifierGroups.map(g => g.name).join(' · ')}
-                </span>
-              )}
-              {item.tags.length > 0 && (
-                <div className="order-panel__item-tags">
-                  {item.tags.map(tag => (
-                    <Badge key={tag} variant="info">{tag}</Badge>
-                  ))}
-                </div>
+              {item.subtitle && (
+                <span className="order-panel__item-subtitle">{item.subtitle}</span>
               )}
             </button>
           ))}
@@ -216,8 +268,8 @@ export function OrderPanel({ table, onOrderPlaced, onCancel, onBack }: OrderPane
           )}
 
           {cart.map((ci, index) => {
-            const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + m.priceAdjustment, 0);
-            const lineTotal = (ci.menuItem.price + modAdjustment) * ci.quantity;
+            const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
+            const lineTotal = ((ci.menuItem.price ?? 0) + modAdjustment) * ci.quantity;
 
             return (
               <Card key={index} padded={false} className="order-panel__cart-item">
@@ -236,9 +288,7 @@ export function OrderPanel({ table, onOrderPlaced, onCancel, onBack }: OrderPane
                     {ci.selectedModifiers.map(m => m.name).join(', ')}
                   </div>
                 )}
-                {ci.notes && (
-                  <div className="order-panel__cart-item-notes">{ci.notes}</div>
-                )}
+                {ci.notes && <div className="order-panel__cart-item-notes">{ci.notes}</div>}
                 <div className="order-panel__cart-item-footer">
                   <QuantityStepper
                     value={ci.quantity}
@@ -255,17 +305,13 @@ export function OrderPanel({ table, onOrderPlaced, onCancel, onBack }: OrderPane
             );
           })}
 
-          {/* Cart total */}
           {cart.length > 0 && (
             <div className="order-panel__cart-total">
               <span>Total</span>
-              <span className="order-panel__cart-total-amount">
-                Bs. {cartTotal.toFixed(2)}
-              </span>
+              <span className="order-panel__cart-total-amount">Bs. {cartTotal.toFixed(2)}</span>
             </div>
           )}
 
-          {/* Actions */}
           <div className="order-panel__actions">
             <Button variant="secondary" onClick={onBack}>
               Cancelar
@@ -273,10 +319,11 @@ export function OrderPanel({ table, onOrderPlaced, onCancel, onBack }: OrderPane
             <Button
               variant="primary"
               onClick={placeOrder}
-              disabled={cart.length === 0}
+              disabled={cart.length === 0 || submitting}
+              loading={submitting}
               fullWidth
             >
-              Confirmar Pedido
+              {submitting ? 'Enviando…' : 'Confirmar Pedido'}
             </Button>
           </div>
         </div>
@@ -285,18 +332,20 @@ export function OrderPanel({ table, onOrderPlaced, onCancel, onBack }: OrderPane
       {/* Item detail modal */}
       <Modal
         open={!!itemDetail}
-        onClose={() => { setItemDetail(null); setItemQuantity(1); setItemModifiers([]); setItemNotes(''); }}
+        onClose={closeItem}
         title={itemDetail?.name || ''}
       >
         {itemDetail && (
           <div className="order-panel__detail">
-            <p className="order-panel__detail-desc">{itemDetail.description}</p>
-            <p className="order-panel__detail-price">
-              Bs. {itemDetail.price.toFixed(2)}
-            </p>
+            {itemDetail.description && (
+              <p className="order-panel__detail-desc">{itemDetail.description}</p>
+            )}
+            {itemDetail.price != null && (
+              <p className="order-panel__detail-price">Bs. {itemDetail.price.toFixed(2)}</p>
+            )}
 
             {/* Modifiers */}
-            {itemDetail.modifierGroups.map(group => (
+            {detailGroups.map(group => (
               <div key={group.id} className="order-panel__detail-mod-group">
                 <label className="order-panel__detail-mod-label">
                   {group.name}
@@ -304,43 +353,38 @@ export function OrderPanel({ table, onOrderPlaced, onCancel, onBack }: OrderPane
                 </label>
                 <div className="order-panel__detail-mod-options">
                   {group.options.map(opt => {
-                    const selected = itemModifiers.some(m => m.id === opt.id);
+                    const selected = itemModifiers.some(m => m.id === opt.option_id);
                     return (
                       <button
-                        key={opt.id}
+                        key={opt.option_id}
                         className={`order-panel__detail-mod-option ${selected ? 'active' : ''}`}
                         onClick={() => {
+                          const mod: ModifierOption = {
+                            id: opt.option_id,
+                            name: opt.option_name,
+                            priceAdjustment: opt.option_price,
+                            isDefault: opt.option_default === 1,
+                            sortOrder: 0,
+                          };
                           if (group.type === 'select') {
-                            // Single selection
                             setItemModifiers(prev => [
-                              ...prev.filter(m => !group.options.some(o => o.id === m.id)),
-                              opt,
+                              ...prev.filter(m => !group.options.some(o => o.option_id === m.id)),
+                              mod,
                             ]);
-                          } else if (group.type === 'multi') {
-                            // Toggle
-                            setItemModifiers(prev =>
-                              selected
-                                ? prev.filter(m => m.id !== opt.id)
-                                : [...prev, opt]
-                            );
                           } else {
-                            // Toggle (simple on/off)
                             setItemModifiers(prev =>
                               selected
-                                ? prev.filter(m => m.id !== opt.id)
-                                : [...prev, opt]
+                                ? prev.filter(m => m.id !== opt.option_id)
+                                : [...prev, mod]
                             );
                           }
                         }}
                       >
-                        {opt.name}
-                        {opt.priceAdjustment !== 0 && (
+                        {opt.option_name}
+                        {opt.option_price !== 0 && (
                           <span className="order-panel__detail-mod-price">
-                            {opt.priceAdjustment > 0 ? '+' : ''}Bs. {opt.priceAdjustment.toFixed(2)}
+                            {opt.option_price > 0 ? '+' : ''}Bs. {opt.option_price.toFixed(2)}
                           </span>
-                        )}
-                        {(opt.isDefault && itemModifiers.length === 0) && (
-                          <span className="order-panel__detail-mod-default">Default</span>
                         )}
                       </button>
                     );
@@ -372,7 +416,7 @@ export function OrderPanel({ table, onOrderPlaced, onCancel, onBack }: OrderPane
                 size="md"
               />
               <Button variant="primary" onClick={addToCart} fullWidth>
-                Agregar (Bs. {(itemDetail.price * itemQuantity).toFixed(2)})
+                Agregar (Bs. {(((itemDetail.price ?? 0) * itemQuantity)).toFixed(2)})
               </Button>
             </div>
           </div>
@@ -381,3 +425,5 @@ export function OrderPanel({ table, onOrderPlaced, onCancel, onBack }: OrderPane
     </div>
   );
 }
+
+export default OrderPanel;

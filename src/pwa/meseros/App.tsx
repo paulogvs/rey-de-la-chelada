@@ -1,39 +1,56 @@
 /**
- * PWA MESEROS — Waiter Management Interface
+ * PWA MESEROS — Waiter Management Interface (API-driven)
  *
- * State flow:
- * TableGrid → tap table → OrderPanel (if no order) or ViewOrder (if has order)
- *   OrderPanel → add items → Confirm → KDS gets order
- *   ViewOrder → PaymentPanel → Pay → Table clears
+ * Real API (SSOT = server), NOT in-memory engines:
+ *   - Login: PIN → POST /api/auth/login → JWT (persisted per-module)
+ *   - Tables: GET /api/tables (+ WS refresh + polling)
+ *   - Orders: POST /api/orders (draft) → PATCH /:id/confirm
+ *   - Payments: POST /api/payments (split) → table clears when paid
+ *   - Waiter calls: GET/PATCH /api/waiter-calls (client requests)
  *
- * Components: TableGrid, OrderPanel, PaymentPanel
- * Touch-friendly: large targets, swipe, long-press
+ * Flow:
+ *   LoginScreen → TablesView → tap table → OrderPanel (create) →
+ *   confirm → OrderDetail/PaymentPanel → pay → table free
  */
 
 import React, { useState, useCallback } from 'react';
 import { bootstrapPwa } from '../_shared/bootstrap';
 import { setCurrentPwaModule } from '../_shared/hooks/useCapability';
 import { useKDSWebSocket } from '../_shared/hooks/useKDSWebSocket';
+import { useStaffAuth } from '../_shared/hooks/useStaffAuth';
+import { useTables } from '../_shared/hooks/useTables';
+import { useWaiterCalls } from '../_shared/hooks/useWaiterCalls';
+import { LoginScreen } from '../_shared/components/LoginScreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
-import { TableGrid } from '@/modules/salon/components/TableGrid';
 import { ForchiBadge } from '@/ui/components/ForchiBadge';
-import type { Table, MenuItem, Order, PaymentMethod } from '@/core/types';
+import { ToastProvider, useToast } from '@/ui/components/Toast';
+import type { Table } from '@/core/types';
+import { TablesView } from './TablesView';
 import { OrderPanel } from './OrderPanel';
 import { PaymentPanel } from './PaymentPanel';
-import { ToastProvider, useToast } from '@/ui/components/Toast';
+import { WaiterCallsBoard } from './WaiterCallsBoard';
 import './App.css';
 
-type ViewState = 'tables' | 'order-panel' | 'payment-panel';
+type ViewState = 'tables' | 'order-panel' | 'payment-panel' | 'waiter-calls';
 
 function MeserosApp() {
   const { addToast } = useToast();
+  const { isAuthenticated, token, user, login, logout, restoring } = useStaffAuth('meseros');
+
   const [view, setView] = useState<ViewState>('tables');
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
-  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
 
-  // Real-time: KDS marks an order complete → notify the waiter.
+  // Tables — real API with WS refresh + polling
+  const tables = useTables({ token, pollMs: 15000 });
+
+  // Waiter calls — real API board
+  const waiterCalls = useWaiterCalls({ token, pollMs: 10000 });
+
+  // Real-time: KDS marks an order complete → notify waiter + refresh tables
   useKDSWebSocket({
     module: 'meseros',
+    enabled: !!token,
     onEvent: event => {
       if (event.type === 'order_complete') {
         addToast({
@@ -42,40 +59,38 @@ function MeserosApp() {
           duration: 4000,
         });
       }
+      // Any order event → refresh table statuses
+      tables.wsEvent(event);
     },
   });
 
-  // Handle table selection from grid
   const handleTableSelect = useCallback((table: Table) => {
     setSelectedTable(table);
     setView('order-panel');
   }, []);
 
-  // Handle back to table grid
   const handleBackToTables = useCallback(() => {
     setSelectedTable(null);
-    setActiveOrder(null);
+    setActiveOrderId(null);
     setView('tables');
-  }, []);
+    tables.refresh();
+  }, [tables]);
 
-  // Handle order placed
-  const handleOrderPlaced = useCallback((order: Order) => {
-    setActiveOrder(order);
-    addToast({
-      type: 'success',
-      message: `Pedido enviado a cocina — Mesa ${selectedTable?.number}`,
-      duration: 3000,
-    });
-    setView('payment-panel');
-  }, [selectedTable, addToast]);
+  // Order confirmed → go to payment view with the server order id
+  const handleOrderPlaced = useCallback(
+    (orderId: string) => {
+      setActiveOrderId(orderId);
+      addToast({
+        type: 'success',
+        message: `Pedido enviado a cocina — Mesa ${selectedTable?.number}`,
+        duration: 3000,
+      });
+      setView('payment-panel');
+      tables.refresh();
+    },
+    [selectedTable, addToast, tables]
+  );
 
-  // Handle view existing order
-  const handleViewOrder = useCallback((order: Order) => {
-    setActiveOrder(order);
-    setView('payment-panel');
-  }, []);
-
-  // Handle payment complete
   const handlePaymentComplete = useCallback(() => {
     addToast({
       type: 'success',
@@ -85,15 +100,36 @@ function MeserosApp() {
     handleBackToTables();
   }, [selectedTable, addToast, handleBackToTables]);
 
-  // Handle cancel order
   const handleOrderCancelled = useCallback(() => {
-    addToast({
-      type: 'warning',
-      message: 'Pedido cancelado',
-      duration: 3000,
-    });
+    addToast({ type: 'warning', message: 'Pedido cancelado', duration: 3000 });
     handleBackToTables();
   }, [addToast, handleBackToTables]);
+
+  const handleLogout = useCallback(async () => {
+    await logout();
+    setView('tables');
+    setSelectedTable(null);
+    setActiveOrderId(null);
+  }, [logout]);
+
+  // ── Auth gate ─────────────────────────────────────────────
+  if (restoring) {
+    return (
+      <PwaLayout title="Meseros">
+        <div className="meseros-app">
+          <p className="meseros-loading">Cargando…</p>
+        </div>
+      </PwaLayout>
+    );
+  }
+
+  if (!isAuthenticated || !token) {
+    return (
+      <PwaLayout title="Meseros">
+        <LoginScreen title="Meseros" busy={restoring} onLogin={login} />
+      </PwaLayout>
+    );
+  }
 
   return (
     <PwaLayout title="Meseros">
@@ -110,41 +146,71 @@ function MeserosApp() {
               {view === 'tables' && 'Mesas'}
               {view === 'order-panel' && `Mesa ${selectedTable?.number} — Nuevo Pedido`}
               {view === 'payment-panel' && `Mesa ${selectedTable?.number} — Pago`}
+              {view === 'waiter-calls' && 'Llamadas de clientes'}
             </h1>
           </div>
-          {selectedTable && view !== 'tables' && (
-            <span className="meseros-header__table-badge">
-              Mesa {selectedTable.number} · {selectedTable.capacity} pers.
-            </span>
-          )}
+          <div className="meseros-header__right">
+            {view === 'tables' && (
+              <button
+                className="meseros-header__calls"
+                onClick={() => setView('waiter-calls')}
+                aria-label="Llamadas de clientes"
+              >
+                🔔
+                {waiterCalls.pendingCount > 0 && (
+                  <span className="meseros-header__calls-badge">{waiterCalls.pendingCount}</span>
+                )}
+              </button>
+            )}
+            {user && (
+              <button className="meseros-header__logout" onClick={handleLogout} title="Cerrar sesión">
+                {user.displayName} · Salir
+              </button>
+            )}
+          </div>
         </header>
 
         {/* Main Content */}
         <main className="meseros-main">
           {view === 'tables' && (
-            <div className="meseros-tables">
-              <TableGrid
-                onTableSelect={handleTableSelect}
-                showConfig={false}
-              />
-            </div>
+            <TablesView
+              tables={tables.tables}
+              loading={tables.loading}
+              error={tables.error}
+              onTableSelect={handleTableSelect}
+              onRefresh={tables.refresh}
+            />
           )}
 
-          {view === 'order-panel' && selectedTable && (
+          {view === 'order-panel' && selectedTable && token && (
             <OrderPanel
               table={selectedTable}
+              token={token}
               onOrderPlaced={handleOrderPlaced}
               onCancel={handleOrderCancelled}
               onBack={handleBackToTables}
             />
           )}
 
-          {view === 'payment-panel' && selectedTable && activeOrder && (
+          {view === 'payment-panel' && selectedTable && activeOrderId && token && (
             <PaymentPanel
-              order={activeOrder}
+              orderId={activeOrderId}
               table={selectedTable}
+              token={token}
               onPaymentComplete={handlePaymentComplete}
               onBack={() => setView('order-panel')}
+            />
+          )}
+
+          {view === 'waiter-calls' && (
+            <WaiterCallsBoard
+              calls={waiterCalls.calls}
+              loading={waiterCalls.loading}
+              error={waiterCalls.error}
+              onAccept={waiterCalls.accept}
+              onComplete={waiterCalls.complete}
+              onCancel={waiterCalls.cancel}
+              onRefresh={waiterCalls.refresh}
             />
           )}
         </main>

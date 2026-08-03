@@ -441,8 +441,12 @@ router.patch('/:id/confirm', requireAuth, requireRole('admin', 'mesero'), (req, 
       });
     }
 
-    db.prepare("UPDATE orders SET status = 'confirmed', updated_at = datetime('now') WHERE id = ?")
-      .run(req.params.id);
+    // Assign confirming mesero (client-created orders start with placeholder)
+    const waiterId = req.user?.sub || existing.waiter_id;
+    const waiterName = req.user?.displayName || 'Mesero';
+    db.prepare(
+      "UPDATE orders SET status = 'confirmed', waiter_id = ?, waiter_name = ?, updated_at = datetime('now') WHERE id = ?"
+    ).run(waiterId, waiterName, req.params.id);
 
     // Mark table as ordered
     db.prepare("UPDATE tables SET status = 'ordered' WHERE id = ?").run(existing.table_id);

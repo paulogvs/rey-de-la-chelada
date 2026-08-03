@@ -1,0 +1,108 @@
+/* LoginScreen — PIN keypad (zero hardcoded colors, CSS vars only) */
+
+.login-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6, 2rem);
+  padding: var(--space-4, 1rem);
+  background: var(--bg, #121212);
+}
+
+.login-screen__card {
+  width: 100%;
+  max-width: 340px;
+  background: var(--surface, #1e1e1e);
+  border: 1px solid var(--border, #333);
+  border-radius: var(--radius-lg, 20px);
+  padding: var(--space-6, 2rem) var(--space-5, 1.5rem);
+  text-align: center;
+}
+
+.login-screen__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary, #fff);
+  margin: 0 0 var(--space-1, 0.25rem);
+}
+
+.login-screen__subtitle {
+  color: var(--text-secondary, #aaa);
+  margin: 0 0 var(--space-5, 1.5rem);
+  font-size: 0.9rem;
+}
+
+.login-screen__dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-3, 0.75rem);
+  margin-bottom: var(--space-5, 1.5rem);
+}
+
+.login-screen__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--border, #444);
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.login-screen__dot.filled {
+  background: var(--dorado-rey, #f5b942);
+  border-color: var(--dorado-rey, #f5b942);
+}
+
+.login-screen__error {
+  color: var(--danger, #e5484d);
+  font-size: 0.85rem;
+  margin: 0 0 var(--space-3, 0.75rem);
+}
+
+.login-screen__busy {
+  color: var(--text-secondary, #aaa);
+  font-size: 0.85rem;
+  margin-top: var(--space-3, 0.75rem);
+}
+
+.login-screen__keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2, 0.5rem);
+}
+
+.login-screen__key {
+  min-height: var(--touch-min-target, 48px);
+  border: 1px solid var(--border, #333);
+  border-radius: var(--radius-md, 12px);
+  background: var(--surface-2, #262626);
+  color: var(--text-primary, #fff);
+  font-size: 1.4rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.login-screen__key:active {
+  transform: scale(0.95);
+  background: var(--surface-3, #333);
+}
+
+.login-screen__key:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.login-screen__key--ok {
+  background: var(--dorado-rey, #f5b942);
+  border-color: var(--dorado-rey, #f5b942);
+  color: #1a1a1a;
+}
+
+.login-screen__key--ok:disabled {
+  background: var(--surface-2, #262626);
+  border-color: var(--border, #333);
+  color: var(--text-secondary, #888);
+}

@@ -1,31 +1,34 @@
 /**
- * PaymentPanel — Payment processing interface
+ * PaymentPanel — Payment processing (API-driven)
  *
- * - Total with IVA breakdown
- * - Split payment (multiple methods)
- * - QR generation for client to scan
- * - Cash: calculate change
- * - Card: mark as external POS
- * - Transfer: enter reference
- * - Propina selection (0%, 5%, 10%, 15%, custom)
- * - Print button for thermal ticket
+ * - Fetch the order from GET /api/orders/:id (fresh totals)
+ * - Split payments (multiple methods)
+ * - Cash: change calculation
+ * - Transfer: reference field
+ * - QR: QRDisplay for client scan
+ * - Propina selection (from config)
+ * - POST /api/payments per split → when fully paid, server marks
+ *   order paid + we clear the table via PUT /api/tables/:id
  */
 
-import React, { useState, useCallback } from 'react';
-import { orderEngine, tableEngine } from '@/core/engine';
+import React, { useState, useEffect, useCallback } from 'react';
 import { appConfig } from '@/core/config';
-import type { Order, Table, PaymentMethod } from '@/core/types';
+import type { Table, PaymentMethod } from '@/core/types';
 import { Button } from '@/ui/components/Button';
 import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { PriceDisplay } from '@/ui/components/PriceDisplay';
 import { QRDisplay } from '@/ui/components/QRDisplay';
 import { useToast } from '@/ui/components/Toast';
-import './App.css';
+import { apiFetch } from '../_shared/api/apiFetch';
+import { processPayment, type ServerPayment } from '../_shared/api/paymentsApi';
+import { updateTableStatus } from '../_shared/api/tablesApi';
+import type { Order } from '../_shared/api/ordersApi';
 
 interface PaymentPanelProps {
-  order: Order;
+  orderId: string;
   table: Table;
+  token: string;
   onPaymentComplete: () => void;
   onBack: () => void;
 }
@@ -36,27 +39,49 @@ interface SplitPayment {
   reference: string;
 }
 
-export function PaymentPanel({ order, table, onPaymentComplete, onBack }: PaymentPanelProps) {
+export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack }: PaymentPanelProps) {
   const { addToast } = useToast();
   const config = appConfig.all;
 
-  const [splitPayments, setSplitPayments] = useState<SplitPayment[]>([
-    { method: 'cash', amount: order.total, reference: '' },
-  ]);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loadingOrder, setLoadingOrder] = useState(true);
+  const [splitPayments, setSplitPayments] = useState<SplitPayment[]>([]);
   const [selectedTip, setSelectedTip] = useState(0);
   const [processing, setProcessing] = useState(false);
-  const [showQR, setShowQR] = useState(false);
 
-  const tipAmount = Math.round((order.total * (selectedTip / 100)) * 100) / 100;
-  const totalWithTip = order.total + tipAmount;
+  // Fetch fresh order from the server
+  useEffect(() => {
+    let disposed = false;
+    (async () => {
+      setLoadingOrder(true);
+      try {
+        const result = await apiFetch<{ success: boolean; order?: Order }>(`/api/orders/${orderId}`, {
+          token,
+        });
+        if (disposed) return;
+        if (result.ok && result.data?.order) {
+          const o = result.data.order as unknown as Order;
+          setOrder(o);
+          setSplitPayments([{ method: 'cash', amount: o.total, reference: '' }]);
+        } else {
+          addToast({ type: 'error', message: result.error || 'No se pudo cargar el pedido', duration: 5000 });
+        }
+      } catch (err) {
+        console.error('[PaymentPanel] load order error:', err);
+        if (!disposed) addToast({ type: 'error', message: 'Error al cargar el pedido', duration: 5000 });
+      } finally {
+        if (!disposed) setLoadingOrder(false);
+      }
+    })();
+    return () => { disposed = true; };
+  }, [orderId, token, addToast]);
 
-  // Calculate change for cash payments
-  const cashAmount = splitPayments
-    .filter(s => s.method === 'cash')
-    .reduce((sum, s) => sum + s.amount, 0);
+  const tipAmount = Math.round((order?.total ?? 0) * (selectedTip / 100) * 100) / 100;
+  const totalWithTip = (order?.total ?? 0) + tipAmount;
+
+  const cashAmount = splitPayments.filter(s => s.method === 'cash').reduce((sum, s) => sum + s.amount, 0);
   const cashChange = cashAmount > totalWithTip ? cashAmount - totalWithTip : 0;
 
-  // Add split payment
   const addSplit = useCallback(() => {
     const remaining = totalWithTip - splitPayments.reduce((s, p) => s + p.amount, 0);
     if (remaining <= 0) {
@@ -66,55 +91,58 @@ export function PaymentPanel({ order, table, onPaymentComplete, onBack }: Paymen
     setSplitPayments(prev => [...prev, { method: 'cash', amount: remaining, reference: '' }]);
   }, [totalWithTip, splitPayments, addToast]);
 
-  // Update split payment
   const updateSplit = useCallback((index: number, updates: Partial<SplitPayment>) => {
-    setSplitPayments(prev => prev.map((sp, i) => i === index ? { ...sp, ...updates } : sp));
+    setSplitPayments(prev => prev.map((sp, i) => (i === index ? { ...sp, ...updates } : sp)));
   }, []);
 
-  // Remove split
   const removeSplit = useCallback((index: number) => {
     setSplitPayments(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  // Calculate remaining amount
   const coveredAmount = splitPayments.reduce((sum, sp) => sum + sp.amount, 0);
   const remaining = Math.max(0, totalWithTip - coveredAmount);
 
-  // Process payment
-  const processPayment = useCallback(async () => {
+  // Process payment via API (one POST per split) then clear the table
+  const processPaymentNow = useCallback(async () => {
+    if (!order) return;
     if (remaining > 0.01) {
       addToast({ type: 'warning', message: 'El total no está cubierto', duration: 3000 });
       return;
     }
 
     setProcessing(true);
-
     try {
-      // Process each split payment
       for (const split of splitPayments) {
         if (split.amount <= 0) continue;
-        orderEngine.processPayment(order.id, split.method, split.reference || undefined);
+        const result = await processPayment(token, {
+          order_id: order.id,
+          amount: split.amount,
+          method: split.method,
+          reference: split.reference || undefined,
+        });
+        if (!result.ok) {
+          addToast({ type: 'error', message: result.error || 'Error al registrar el pago', duration: 5000 });
+          return;
+        }
       }
 
-      // Clear table
-      tableEngine.clearTable(table.id);
+      // Mark table free after payment
+      await updateTableStatus(token, table.id, 'free');
 
       addToast({
         type: 'success',
         message: `Pago completado — Mesa ${table.number}`,
         duration: 3000,
       });
-
       setTimeout(onPaymentComplete, 500);
     } catch (err) {
-      console.error('[PaymentPanel] Error processing payment:', err);
+      console.error('[PaymentPanel] process error:', err);
       addToast({ type: 'error', message: 'Error al procesar el pago', duration: 5000 });
     } finally {
       setProcessing(false);
     }
-  }, [remaining, splitPayments, order.id, table.id, table.number, addToast, onPaymentComplete]);
+  }, [order, remaining, splitPayments, token, table.id, table.number, addToast, onPaymentComplete]);
 
-  // Payment method labels
   const methodLabels: Record<PaymentMethod, string> = {
     cash: 'Efectivo',
     qr_yape: 'Yape',
@@ -131,6 +159,19 @@ export function PaymentPanel({ order, table, onPaymentComplete, onBack }: Paymen
     transfer: '🏦',
   };
 
+  if (loadingOrder) {
+    return <div className="payment-panel"><p className="payment-panel__loading">Cargando pedido…</p></div>;
+  }
+
+  if (!order) {
+    return (
+      <div className="payment-panel">
+        <p className="payment-panel__loading">Pedido no encontrado</p>
+        <Button variant="secondary" onClick={onBack}>Volver</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="payment-panel">
       {/* Order summary */}
@@ -145,9 +186,7 @@ export function PaymentPanel({ order, table, onPaymentComplete, onBack }: Paymen
             <div key={item.id} className="payment-panel__item">
               <span className="payment-panel__item-qty">{item.quantity}x</span>
               <span className="payment-panel__item-name">{item.menuItemName}</span>
-              <span className="payment-panel__item-price">
-                Bs. {item.subtotal.toFixed(2)}
-              </span>
+              <span className="payment-panel__item-price">Bs. {item.subtotal.toFixed(2)}</span>
             </div>
           ))}
         </div>
@@ -241,7 +280,6 @@ export function PaymentPanel({ order, table, onPaymentComplete, onBack }: Paymen
               )}
             </div>
 
-            {/* Reference field for transfers */}
             {split.method === 'transfer' && (
               <input
                 type="text"
@@ -252,7 +290,6 @@ export function PaymentPanel({ order, table, onPaymentComplete, onBack }: Paymen
               />
             )}
 
-            {/* QR for QR payments */}
             {(split.method === 'qr_yape' || split.method === 'qr_simple') && (
               <div className="payment-panel__split-qr">
                 <QRDisplay
@@ -265,7 +302,6 @@ export function PaymentPanel({ order, table, onPaymentComplete, onBack }: Paymen
           </div>
         ))}
 
-        {/* Remaining */}
         <div className="payment-panel__remaining">
           <span>Por cubrir:</span>
           <span className={remaining > 0 ? 'payment-panel__remaining-amount' : 'payment-panel__remaining-paid'}>
@@ -273,7 +309,6 @@ export function PaymentPanel({ order, table, onPaymentComplete, onBack }: Paymen
           </span>
         </div>
 
-        {/* Cash change */}
         {cashChange > 0 && (
           <div className="payment-panel__change">
             <span>Cambio:</span>
@@ -290,20 +325,6 @@ export function PaymentPanel({ order, table, onPaymentComplete, onBack }: Paymen
             ? 'Monto mayor a Bs. 1,000 — requiere NIT para factura'
             : 'Factura sin NIT (consumidor final)'}
         </p>
-        {order.total >= config.invoicing.nitThreshold && (
-          <div className="payment-panel__invoice-nit">
-            <input
-              type="text"
-              className="payment-panel__invoice-input"
-              placeholder="NIT"
-            />
-            <input
-              type="text"
-              className="payment-panel__invoice-input"
-              placeholder="Razón Social"
-            />
-          </div>
-        )}
       </Card>
 
       {/* Actions */}
@@ -313,7 +334,7 @@ export function PaymentPanel({ order, table, onPaymentComplete, onBack }: Paymen
         </Button>
         <Button
           variant="primary"
-          onClick={processPayment}
+          onClick={processPaymentNow}
           loading={processing}
           disabled={remaining > 0.01 || processing}
           fullWidth
@@ -324,3 +345,5 @@ export function PaymentPanel({ order, table, onPaymentComplete, onBack }: Paymen
     </div>
   );
 }
+
+export default PaymentPanel;

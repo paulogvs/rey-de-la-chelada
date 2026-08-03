@@ -1,0 +1,222 @@
+/**
+ * Caja — ClosingView (API-driven corte de caja)
+ *
+ * Closing lifecycle via server (cash_closings table):
+ *   - GET  /api/payments/closing/current → open closing + today's payments
+ *   - POST /api/payments/closing         → open a new closing (expected = today total)
+ *   - PUT  /api/payments/closing/close   → close with actual cash + reconcile flag
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  fetchClosingCurrent,
+  openClosing,
+  closeClosing,
+  fetchDailySales,
+  type ServerClosing,
+  type DailySales,
+} from '../_shared/api/reportsApi';
+import { Card } from '@/ui/components/Card';
+import { Button } from '@/ui/components/Button';
+import { useToast } from '@/ui/components/Toast';
+
+interface ClosingViewProps {
+  token: string;
+  today: string;
+  ivaRate: number;
+  refreshTick: number;
+  onClosingUpdated: () => void;
+}
+
+export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdated }: ClosingViewProps) {
+  const { addToast } = useToast();
+
+  const [closing, setClosing] = useState<ServerClosing | null>(null);
+  const [daily, setDaily] = useState<DailySales | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const [actualCash, setActualCash] = useState<number>(0);
+  const [notes, setNotes] = useState('');
+  const [reconciled, setReconciled] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [curResult, dailyResult] = await Promise.all([
+      fetchClosingCurrent(token),
+      fetchDailySales(token, today, ivaRate),
+    ]);
+
+    const open = curResult.ok ? curResult.closing : null;
+    setClosing(open);
+    setDaily(dailyResult.ok ? dailyResult.daily : null);
+
+    // Pre-fill actual cash with expected when opening fresh
+    if (open && open.expected_cash !== undefined) {
+      setActualCash(open.expected_cash);
+    }
+    setLoading(false);
+  }, [token, today, ivaRate]);
+
+  useEffect(() => {
+    load();
+  }, [load, refreshTick]);
+
+  // Derived: expected cash = opening balance + today's cash sales (if any closing)
+  const expectedCash =
+    (closing?.expected_cash ?? 0) +
+    (closing && closing.expected_cash !== undefined && closing.expected_cash > 0
+      ? 0
+      : (daily?.byMethod['cash'] ?? 0));
+
+  const difference = Math.round((actualCash - expectedCash) * 100) / 100;
+
+  const handleOpen = useCallback(async () => {
+    setBusy(true);
+    const result = await openClosing(token);
+    setBusy(false);
+    if (!result.ok) {
+      addToast({ type: 'warning', message: result.error || 'No se pudo abrir el corte', duration: 4000 });
+      return;
+    }
+    addToast({ type: 'success', message: 'Corte de caja iniciado', duration: 3000 });
+    onClosingUpdated();
+  }, [token, addToast, onClosingUpdated]);
+
+  const handleClose = useCallback(async () => {
+    setBusy(true);
+    const result = await closeClosing(token, actualCash, reconciled, notes);
+    setBusy(false);
+    if (!result.ok) {
+      addToast({ type: 'warning', message: result.error || 'No se pudo cerrar el corte', duration: 4000 });
+      return;
+    }
+    addToast({ type: 'success', message: 'Cierre de caja completado', duration: 4000 });
+    onClosingUpdated();
+  }, [token, actualCash, reconciled, notes, addToast, onClosingUpdated]);
+
+  if (loading && !closing) {
+    return (
+      <div className="caja-close">
+        <Card className="caja-close__card">
+          <p>Cargando corte de caja…</p>
+        </Card>
+      </div>
+    );
+  }
+
+  const byMethod = daily?.byMethod ?? {};
+  const qrTotal = (byMethod['qr_yape'] ?? 0) + (byMethod['qr_simple'] ?? 0);
+
+  return (
+    <div className="caja-close">
+      <Card className="caja-close__card">
+        <h3>{closing ? 'Corte de Caja Activo' : 'Corte de Caja'}</h3>
+
+        {closing ? (
+          <div className="caja-close__fields">
+            <div className="caja-close__field">
+              <label>Iniciado</label>
+              <div className="caja-close__value">
+                {new Date(closing.opened_at).toLocaleString('es-BO')}
+              </div>
+            </div>
+
+            <div className="caja-close__field">
+              <label>Efectivo esperado (ventas del día)</label>
+              <div className="caja-close__value">
+                Bs. {(closing.expected_cash ?? 0).toFixed(2)}
+              </div>
+            </div>
+
+            <div className="caja-close__field">
+              <label>Efectivo real en caja</label>
+              <input
+                type="number"
+                className="caja-close__input"
+                value={actualCash}
+                step={0.01}
+                onChange={e => setActualCash(parseFloat(e.target.value) || 0)}
+              />
+            </div>
+
+            <div className="caja-close__field">
+              <label>Diferencia</label>
+              <div className={`caja-close__diff ${difference >= 0 ? 'positive' : 'negative'}`}>
+                {difference >= 0 ? '+' : ''}Bs. {difference.toFixed(2)}
+              </div>
+            </div>
+
+            <div className="caja-close__field">
+              <label>Notas</label>
+              <textarea
+                className="caja-close__textarea"
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Observaciones del cierre..."
+                rows={3}
+              />
+            </div>
+          </div>
+        ) : (
+          <p className="caja-close__hint">
+            No hay corte de caja abierto. Inícialo para registrar las ventas del día.
+          </p>
+        )}
+
+        <div className="caja-close__actions">
+          {closing ? (
+            <>
+              <Button variant="secondary" onClick={() => setReconciled(r => !r)}>
+                {reconciled ? 'Diferencia conciliada ✓' : 'Marcar diferencia conciliada'}
+              </Button>
+              <Button variant="primary" onClick={handleClose} disabled={busy} fullWidth>
+                {busy ? 'Cerrando…' : 'Cerrar Día'}
+              </Button>
+            </>
+          ) : (
+            <Button variant="primary" onClick={handleOpen} disabled={busy} fullWidth>
+              {busy ? 'Abriendo…' : 'Abrir Corte de Caja'}
+            </Button>
+          )}
+        </div>
+      </Card>
+
+      <Card className="caja-close__history">
+        <h3>Resumen de hoy</h3>
+        <div className="caja-close__history-list">
+          <div className="caja-close__history-item">
+            <span>Total ventas</span>
+            <span className="caja-close__history-value">Bs. {(daily?.totalSales ?? 0).toFixed(2)}</span>
+          </div>
+          <div className="caja-close__history-item">
+            <span>IVA total</span>
+            <span className="caja-close__history-value">Bs. {(daily?.totalIva ?? 0).toFixed(2)}</span>
+          </div>
+          <div className="caja-close__history-item">
+            <span>Total pedidos</span>
+            <span className="caja-close__history-value">{daily?.totalOrders ?? 0}</span>
+          </div>
+          <div className="caja-close__history-item">
+            <span>Ventas efectivo</span>
+            <span className="caja-close__history-value">Bs. {(byMethod['cash'] ?? 0).toFixed(2)}</span>
+          </div>
+          <div className="caja-close__history-item">
+            <span>Ventas QR</span>
+            <span className="caja-close__history-value">Bs. {qrTotal.toFixed(2)}</span>
+          </div>
+          <div className="caja-close__history-item">
+            <span>Ventas tarjeta</span>
+            <span className="caja-close__history-value">Bs. {(byMethod['card'] ?? 0).toFixed(2)}</span>
+          </div>
+          <div className="caja-close__history-item">
+            <span>Ventas transferencia</span>
+            <span className="caja-close__history-value">Bs. {(byMethod['transfer'] ?? 0).toFixed(2)}</span>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+export default ClosingView;
