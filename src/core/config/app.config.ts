@@ -283,6 +283,8 @@ export const DEFAULT_CONFIG: RestaurantConfig = {
 // SINGLETON — AppConfig runtime
 // ============================================================
 
+import { computeTotals, extractIvaAmount, priceWithoutIva as ivaPriceWithoutIva } from './iva';
+
 class AppConfig {
   private config: RestaurantConfig;
 
@@ -333,14 +335,12 @@ class AppConfig {
 
   /** Calcula IVA de un monto que YA incluye IVA */
   extractIva(amountWithIva: number): number {
-    const rate = this.config.taxes.iva.percentage / 100;
-    return Math.round((amountWithIva - (amountWithIva / (1 + rate))) * 100) / 100;
+    return extractIvaAmount(amountWithIva);
   }
 
   /** Calcula el precio sin IVA desde un precio con IVA incluido */
   priceWithoutIva(priceWithIva: number): number {
-    const rate = this.config.taxes.iva.percentage / 100;
-    return Math.round((priceWithIva / (1 + rate)) * 100) / 100;
+    return ivaPriceWithoutIva(priceWithIva);
   }
 
   /**
@@ -349,10 +349,8 @@ class AppConfig {
    * IVA = priceWithIVA - withoutIVA
    */
   calculateIVA(priceWithIVA: number): { base: number; iva: number; total: number } {
-    const rate = this.config.taxes.iva.percentage / 100;
-    const base = Math.round((priceWithIVA / (1 + rate)) * 100) / 100;
-    const iva = Math.round((priceWithIVA - base) * 100) / 100;
-    return { base, iva, total: priceWithIVA };
+    const { subtotal: base, iva, total } = computeTotals(priceWithIVA);
+    return { base, iva, total };
   }
 
   /**

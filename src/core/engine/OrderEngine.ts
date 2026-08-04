@@ -18,6 +18,7 @@ import type {
   KDSIncomingEvent,
   SyncEvent,
 } from '../types';
+import { computeTotals } from '../config/iva';
 
 class OrderEngine {
   private orders: Map<string, Order> = new Map();
@@ -437,21 +438,14 @@ class OrderEngine {
 
   /** Recalculate order totals */
   private _recalculateOrder(order: Order): void {
-    order.subtotal = Math.round(
-      order.items.reduce((sum, item) => sum + item.subtotal, 0) * 100
-    ) / 100;
+    // MODELO SSOT EXTRACTIVO (precio INCLUYE IVA — iva.js):
+    // item.subtotal ya incluye IVA → total = suma (gross), iva extraído.
+    const grossTotal = order.items.reduce((sum, item) => sum + item.subtotal, 0);
+    const { subtotal, iva, total } = computeTotals(grossTotal);
 
-    order.ivaAmount = Math.round(
-      order.items.reduce((sum, item) => {
-        // IVA is included in price, so we need to extract it
-        const ivaInItem = item.subtotal - (item.subtotal / 1.13);
-        return sum + ivaInItem;
-      }, 0) * 100
-    ) / 100;
-
-    order.total = Math.round(
-      (order.subtotal - order.discount) * 100
-    ) / 100;
+    order.subtotal = subtotal;
+    order.ivaAmount = iva;
+    order.total = Math.round((total - order.discount) * 100) / 100;
 
     order.updatedAt = new Date().toISOString();
   }

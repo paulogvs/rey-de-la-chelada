@@ -137,14 +137,16 @@ describe('buildReceiptData', () => {
 });
 
 describe('computeReceiptTotals', () => {
-  it('computes subtotal, 13% IVA and total', () => {
+  it('computes subtotal (base), extracted IVA and total (line total incluye IVA)', () => {
     const totals = computeReceiptTotals([
       { name: 'A', quantity: 1, unitPrice: 60, lineTotal: 60 },
       { name: 'B', quantity: 1, unitPrice: 40, lineTotal: 40 },
     ]);
-    expect(totals.subtotal).toBe(100);
-    expect(totals.ivaAmount).toBe(13);
-    expect(totals.total).toBe(113);
+    // Modelo SSOT EXTRACTIVO: lineTotal ya incluye IVA → total 100,
+    // subtotal (base) 100/1.13 = 88.5, iva 11.5.
+    expect(totals.subtotal).toBe(88.5);
+    expect(totals.ivaAmount).toBe(11.5);
+    expect(totals.total).toBe(100);
   });
 
   it('returns zeros for empty items', () => {

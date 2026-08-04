@@ -7,6 +7,7 @@
 
 import { apiFetch, type ApiResult } from './apiFetch';
 import { fetchClosingCurrent, openClosing, closeClosing, type ServerClosing } from './paymentsApi';
+import { computeTotals } from '@/core/config/iva';
 
 export { fetchClosingCurrent, openClosing, closeClosing };
 export type { ServerClosing };
@@ -47,7 +48,7 @@ interface ServerDailyReport {
 export async function fetchDailySales(
   token: string,
   date: string,
-  ivaRate = 0.13,
+  _ivaRate = 0.13,
   fetchImpl: typeof fetch = fetch
 ): Promise<DailySalesResult> {
   const result = await apiFetch<ServerDailyReport>(
@@ -68,8 +69,7 @@ export async function fetchDailySales(
   // IVA is included in prices (per appConfig.taxes.iva.includedInPrices):
   // totalSales → base = totalSales / (1 + rate), iva = totalSales - base
   const totalSales = s.net_revenue ?? 0;
-  const baseRevenue = Math.round((totalSales / (1 + ivaRate)) * 100) / 100;
-  const totalIva = Math.round((totalSales - baseRevenue) * 100) / 100;
+  const { subtotal: baseRevenue, iva: totalIva } = computeTotals(totalSales);
 
   const daily: DailySales = {
     date: result.data.date,

@@ -22,6 +22,12 @@ import { fetchMenuCategories, fetchMenuItems, fetchMenuItemDetail, type MenuItem
 import { createOrder, submitOrder, confirmOrder } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
+import { computeTotals } from '@/core/config/iva';
+
+/** Totales de comanda con modelo SSOT EXTRACTIVO (precio incluye IVA). */
+function orderPanelTotals(cartTotal: number) {
+  return computeTotals(cartTotal);
+}
 
 interface OrderPanelProps {
   table: Table;
@@ -442,9 +448,8 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel, onBack }: Or
           id: `comanda-${Date.now()}`,
           tableNumber: table.number,
           createdAt: new Date().toISOString(),
-          subtotal: Math.round((cartTotal / 1.13) * 100) / 100,
-          ivaAmount: Math.round((cartTotal - cartTotal / 1.13) * 100) / 100,
-          total: cartTotal,
+          // Modelo SSOT EXTRACTIVO: cartTotal ya incluye IVA
+          ...orderPanelTotals(cartTotal),
           paymentMethod: undefined,
           items: cart.map(ci => ({
             menuItemName: ci.menuItem.name,

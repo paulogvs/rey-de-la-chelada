@@ -147,10 +147,11 @@ describe('createPublicOrder service', () => {
     const order = mockDb._state.orders[0];
     expect(order.status).toBe('called');
     expect(order.table_number).toBe(1);
-    // m1: 20 * 2 = 40, m2: 85 * 1 = 85 → subtotal 125, iva 13% = 16.25, total 141.25
-    expect(order.subtotal).toBe(125);
-    expect(order.iva_amount).toBe(16.25);
-    expect(order.total).toBe(141.25);
+    // Modelo SSOT EXTRACTIVO (precio INCLUYE IVA): total = 40 + 85 = 125
+    // (lo que paga el cliente), subtotal = 125/1.13 = 110.62, iva = 14.38.
+    expect(order.subtotal).toBe(110.62);
+    expect(order.iva_amount).toBe(14.38);
+    expect(order.total).toBe(125);
     expect(mockDb._state.orderItems).toHaveLength(2);
   });
 
@@ -164,6 +165,7 @@ describe('createPublicOrder service', () => {
 
     expect(result.success).toBe(true);
     const order = mockDb._state.orders[0];
+    // m3 price null → 0 (sin IVA, total 0)
     expect(order.subtotal).toBe(0);
     expect(order.total).toBe(0);
   });
@@ -225,9 +227,9 @@ describe('createPublicOrder service', () => {
     });
     expect(result.success).toBe(true);
     const order = mockDb._state.orders[0];
-    // subtotal 15, iva 1.95, total 16.95
-    expect(order.subtotal).toBe(15);
-    expect(order.total).toBe(16.95);
+    // subtotal (base) 15 / 1.13 = 13.27, iva 1.73, total 15
+    expect(order.subtotal).toBe(13.27);
+    expect(order.total).toBe(15);
   });
 
   it('sums multiple modifier adjustments and multiplies by quantity', async () => {
@@ -242,9 +244,9 @@ describe('createPublicOrder service', () => {
       }],
     });
     const order = mockDb._state.orders[0];
-    // unit 45 * 2 = 90, iva 11.70, total 101.70
-    expect(order.subtotal).toBe(90);
-    expect(order.total).toBe(101.7);
+    // unit 45 * 2 = 90 (gross, incluye IVA) → total 90, subtotal 79.65, iva 10.35
+    expect(order.subtotal).toBe(79.65);
+    expect(order.total).toBe(90);
   });
 
   it('rejects invalid modifier options with a clear code', async () => {
@@ -276,7 +278,8 @@ describe('getPublicOrderStatus service', () => {
     const status = getPublicOrderStatus(mockDb, orderId);
     expect(status.success).toBe(true);
     expect(status.status).toBe('called');
-    expect(status.total).toBe(22.6);
+    // total incluye IVA = 20 (precio del item, ya incluye IVA)
+    expect(status.total).toBe(20);
   });
 
   it('returns not-found for unknown order id', async () => {

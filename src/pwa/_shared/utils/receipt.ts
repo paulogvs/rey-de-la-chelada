@@ -12,6 +12,8 @@
 // Types
 // ============================================================
 
+import { computeTotals } from '@/core/config/iva';
+
 export interface ReceiptItem {
   name: string;
   quantity: number;
@@ -141,12 +143,15 @@ export function buildReceiptData(
 /**
  * Compute receipt totals from line items (defensive — used when the
  * order object lacks precomputed totals).
+ *
+ * MODELO SSOT EXTRACTIVO (precio INCLUYE IVA): los lineTotal ya incluyen
+ * IVA → subtotal(base) = total/1.13, iva = total - subtotal, total = total.
  */
 export function computeReceiptTotals(items: ReceiptItem[]) {
-  const subtotal = items.reduce((sum, i) => sum + i.lineTotal, 0);
-  const ivaAmount = Math.round(subtotal * 0.13 * 100) / 100;
-  const total = Math.round((subtotal + ivaAmount) * 100) / 100;
-  return { subtotal, ivaAmount, total };
+  const total = items.reduce((sum, i) => sum + i.lineTotal, 0);
+  const { subtotal, iva, total: gross } = computeTotals(total);
+  const ivaAmount = iva;
+  return { subtotal, ivaAmount, total: gross };
 }
 
 // ============================================================

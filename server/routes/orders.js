@@ -24,6 +24,7 @@ import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { broadcastOrderConfirmed, broadcastOrderStatusChange } from '../services/order-broadcaster.js';
+import { computeTotals, round2 } from '../../src/core/config/iva.js';
 
 const router = Router();
 
@@ -48,11 +49,15 @@ const ITEM_STATUS_MAP = {
 
 const KDS_MODULES = { cocina: 'cocina', bar: 'bar', kds: 'all' };
 
-const IVA_RATE = 0.13;
-
-function round2(n) {
-  return Math.round(n * 100) / 100;
-}
+/**
+ * Recalcula subtotal/iva/total de un pedido.
+ *
+ * MODELO SSOT (iva.js — precio INCLUYE IVA): el `grossTotal` es la suma de
+ * precios de línea (que ya incluyen IVA). Entonces:
+ *   - total   = grossTotal (lo que paga el cliente)
+ *   - subtotal = total / 1.13 (base, sin IVA)
+ *   - iva     = total - subtotal
+ */
 
 /**
  * Resolve modifier adjustments for an order item from the DB.
@@ -95,10 +100,9 @@ function resolveModifierAdjustment(db, menuItemId, modifiers) {
 
 /** Recalcula subtotal/iva/total de un pedido */
 function recalcOrder(db, orderId) {
-  const items = db.prepare('SELECT COALESCE(SUM(subtotal), 0) as subtotal FROM order_items WHERE order_id = ?').get(orderId);
-  const subtotal = round2(items.subtotal || 0);
-  const iva = round2(subtotal * IVA_RATE);
-  const total = round2(subtotal + iva);
+  const sum = db.prepare('SELECT COALESCE(SUM(subtotal), 0) as subtotal FROM order_items WHERE order_id = ?').get(orderId);
+  const grossTotal = round2(sum.subtotal || 0);
+  const { subtotal, iva, total } = computeTotals(grossTotal);
   db.prepare('UPDATE orders SET subtotal = ?, iva_amount = ?, total = ? WHERE id = ?')
     .run(subtotal, iva, total, orderId);
   return { subtotal, iva, total };
@@ -336,8 +340,9 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
       });
     }
 
-    const iva = round2(subtotal * IVA_RATE);
-    const total = round2(subtotal + iva);
+    // Modelo SSOT EXTRACTIVO (precio INCLUYE IVA): `subtotal` acumulado es
+    // la suma de precios (gross). total = gross, subtotal(base) = gross/1.13.
+    const { subtotal: baseSubtotal, iva, total } = computeTotals(subtotal);
     const orderId = randomUUID();
 
     db.prepare(`
@@ -348,7 +353,7 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
     `).run(
       orderId, table_id, table.number, req.user.sub,
       req.user.displayName || req.user.username,
-      'draft', subtotal, iva, total,
+      'draft', baseSubtotal, iva, total,
       notes || '', guest_count || 1, local_id || orderId
     );
 

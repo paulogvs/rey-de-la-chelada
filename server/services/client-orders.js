@@ -14,12 +14,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-
-const IVA_RATE = 0.13;
-
-function round2(n) {
-  return Math.round(n * 100) / 100;
-}
+import { computeTotals, round2 } from '../../src/core/config/iva.js';
 
 /**
  * Create a public order from the clientes PWA.
@@ -112,8 +107,17 @@ export function createPublicOrder(db, input) {
     });
   }
 
-  const iva = round2(subtotal * IVA_RATE);
-  const total = round2(subtotal + iva);
+  // Modelo EXTRACTIVO (precio INCLUYE IVA — SSOT iva.js):
+  //   - total  = suma de precios del carrito (lo que paga el cliente, ya incluye IVA)
+  //   - subtotal = base (sin IVA) = total / 1.13
+  //   - iva   = total - subtotal
+  const grossTotal = round2(subtotal);
+  const totals = computeTotals(grossTotal);
+  const iva = totals.iva;
+  const total = totals.total;
+  // Reasignar subtotal a BASE (sin IVA) para consistencia con el resto de capas,
+  // y mantener separada la cifra bruta para insertar como `total`.
+  subtotal = totals.subtotal;
   const orderId = randomUUID();
 
   // FK: waiter_id references staff(id) — assign the default mesero as

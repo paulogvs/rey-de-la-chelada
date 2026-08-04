@@ -21,6 +21,7 @@ import { OrderSummary } from '@/ui/components/OrderSummary';
 import { ItemDetailModal } from '../components/ItemDetailModal';
 import { CategoryButton, MenuBanner, PageHeader, CustomerActions } from '../components/MenuChrome';
 import { canSubmitClientOrder } from '../utils/orderSendGate';
+import { computeTotals } from '@/core/config/iva';
 import './MenuPage.css';
 
 /** Draft item type for local state */
@@ -117,10 +118,12 @@ export function MenuPage({
     });
   }, []);
 
-  // Draft totals
+  // Draft totals — MODELO SSOT EXTRACTIVO (precio INCLUYE IVA).
+  // draftTotal = suma de precios (ya incluye IVA → es lo que paga el cliente).
   const draftTotal = draftItems.reduce((sum, d) => sum + d.unitPrice * d.quantity, 0);
-  const draftIva = Math.round(draftTotal * 0.13 * 100) / 100;
-  const draftTotalWithIva = Math.round((draftTotal + draftIva) * 100) / 100;
+  const draftBreakdown = computeTotals(draftTotal);
+  const draftIva = draftBreakdown.iva;
+  const draftTotalWithIva = draftBreakdown.total; // = draftTotal (incluye IVA)
   const draftItemCount = draftItems.reduce((sum, d) => sum + d.quantity, 0);
 
   // Send draft to waiter via the PUBLIC client-orders endpoint
