@@ -14,11 +14,13 @@
     "hub_url": "https://forch-i-a-hub.vercel.app/",
     "author": "Paulo Velasco",
     "country": "Bolivia",
-    "sello": "Built with FORCH.i by Paulo Velasco",
+    "sello": "Built with FORCH.i",
     "badge_path": "/badges/forch-i.svg",
     "badge_in_footer": true,
     "credit_in_readme": true,
-    "always_link_to_hub": true
+    "always_link_to_hub": true,
+    "subtle_minimal": true,
+    "badge_locations": ["pwa-footer"]
   },
   "design_system_base": "restaurant-golden-amber",
   "design_system_path": "./DESIGN.md",

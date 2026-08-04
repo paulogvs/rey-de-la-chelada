@@ -15,7 +15,6 @@
 import React, { useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/ui/components/Button';
-import { ForchiBadge } from '@/ui/components/ForchiBadge';
 import {
   formatBs,
   formatReceiptDate,
@@ -125,7 +124,6 @@ function OrderReceiptBody({ receipt }: { receipt: ReceiptData }) {
 
       <div className="print-receipt__footer">
         <div>{DEFAULT_THANKS}</div>
-        <ForchiBadge />
       </div>
     </div>
   );
@@ -195,7 +193,6 @@ function ClosingReceiptBody({ receipt }: { receipt: ClosingReceiptData }) {
 
       <div className="print-receipt__footer">
         <div>{DEFAULT_THANKS}</div>
-        <ForchiBadge />
       </div>
     </div>
   );
@@ -247,7 +244,6 @@ function InvoiceReceiptBody({ receipt }: { receipt: InvoiceReceiptData }) {
 
       <div className="print-receipt__footer">
         <div>{DEFAULT_THANKS}</div>
-        <ForchiBadge />
       </div>
     </div>
   );

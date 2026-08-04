@@ -6,7 +6,6 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { ForchiBadge } from '@/ui/components/ForchiBadge';
 import './Login.css';
 
 interface LoginScreenProps {
@@ -126,7 +125,6 @@ export function LoginScreen({ title, busy = false, onLogin }: LoginScreenProps) 
 
         {busy && <p className="login-screen__busy">Restaurando sesión…</p>}
       </div>
-      <ForchiBadge />
     </div>
   );
 }

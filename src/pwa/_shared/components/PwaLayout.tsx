@@ -24,13 +24,12 @@ export function PwaLayout({ children, title }: PwaLayoutProps) {
       <footer className="forchi-badge">
         <span>Built with </span>
         <a
-          href="https://github.com/paulogvs/FORCH-IA-ECOSYSTEM"
+          href="https://forch-i-a-hub.vercel.app/"
           target="_blank"
           rel="noopener noreferrer"
         >
           FORCH.i
         </a>
-        <span> by Paulo Velasco</span>
       </footer>
     </div>
   );

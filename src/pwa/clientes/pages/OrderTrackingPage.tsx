@@ -15,7 +15,6 @@
  */
 
 import React, { useMemo } from 'react';
-import { ForchiBadge } from '@/ui/components/ForchiBadge';
 import { ToastInline } from '@/ui/components/Toast';
 import { statusLabel, isTerminalStatus } from '../hooks/useClientOrder';
 import type { TrackedOrder } from '../hooks/useClientOrder';
@@ -60,7 +59,6 @@ export function OrderTrackingPage({ order, error, polling, onReset }: OrderTrack
         <button className="tracking-btn tracking-btn--primary" onClick={onReset}>
           Nuevo pedido
         </button>
-        <ForchiBadge />
       </div>
     );
   }
@@ -79,7 +77,6 @@ export function OrderTrackingPage({ order, error, polling, onReset }: OrderTrack
         <button className="tracking-btn tracking-btn--primary" onClick={onReset}>
           Volver al menú
         </button>
-        <ForchiBadge />
       </div>
     );
   }
@@ -150,8 +147,6 @@ export function OrderTrackingPage({ order, error, polling, onReset }: OrderTrack
           Volver al menú
         </button>
       </div>
-
-      <ForchiBadge />
     </div>
   );
 }

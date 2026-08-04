@@ -183,7 +183,7 @@ export function generateTicket(
   ticket += center('Rey de la Chelada') + '\n';
   ticket += center('Cochabamba, Bolivia') + '\n';
   ticket += '\n';
-  ticket += center('Built with FORCH.i by Paulo Velasco') + '\n';
+  ticket += center('Built with FORCH.i') + '\n';
   ticket += '\n';
   ticket += '\n';
 
@@ -275,7 +275,7 @@ export function usePrinter(config: Partial<PrinterConfig> = {}) {
         'Si ves esto, la impresora\n' +
         'funciona correctamente.\n' +
         '\n' +
-        'Built with FORCH.i by Paulo Velasco\n' +
+        'Built with FORCH.i\n' +
         '\n' +
         ESCPOS.CUT;
 

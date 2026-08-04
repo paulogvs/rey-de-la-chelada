@@ -18,7 +18,6 @@ import { setCurrentPwaModule } from '../_shared/hooks/useCapability';
 import { useStaffAuth } from '../_shared/hooks/useStaffAuth';
 import { LoginScreen } from '../_shared/components/LoginScreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
-import { ForchiBadge } from '@/ui/components/ForchiBadge';
 import { Badge } from '@/ui/components/Badge';
 import { ToastProvider, useToast } from '@/ui/components/Toast';
 import { DashboardView } from './views/DashboardView';
@@ -90,7 +89,6 @@ function AdminApp() {
             <p>Acceso restringido — el módulo Admin requiere rol de administrador.</p>
             <button className="admin-input-btn" onClick={handleLogout}>Volver al inicio de sesión</button>
           </div>
-          <ForchiBadge />
         </div>
       </PwaLayout>
     );
@@ -140,8 +138,6 @@ function AdminApp() {
           {view === 'tables' && <TablesView token={token} onToast={handleToast} />}
           {view === 'closings' && <ClosingsView token={token} onToast={handleToast} />}
         </main>
-
-        <ForchiBadge />
       </div>
     </PwaLayout>
   );

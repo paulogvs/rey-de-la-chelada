@@ -29,9 +29,6 @@ export type { ToastItem, ToastType } from './Toast/Toast';
 export { Modal } from './Modal/Modal';
 export type { ModalProps } from './Modal/Modal';
 
-export { ForchiBadge } from './ForchiBadge/ForchiBadge';
-export type { ForchiBadgeProps } from './ForchiBadge/ForchiBadge';
-
 export { QuantityStepper } from './QuantityStepper/QuantityStepper';
 export type { QuantityStepperProps } from './QuantityStepper/QuantityStepper';
 

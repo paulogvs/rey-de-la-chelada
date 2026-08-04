@@ -16,7 +16,6 @@ import { useTableSession } from '../hooks/useTableSession';
 import { useMenu } from '../hooks/useMenu';
 import { MenuItemCard, MenuItemCardSkeleton, MenuItemCardEmpty } from '@/ui/components/MenuItemCard';
 import { ToastInline } from '@/ui/components/Toast';
-import { ForchiBadge } from '@/ui/components/ForchiBadge';
 import { OrderBar } from '@/ui/components/OrderBar';
 import { OrderSummary } from '@/ui/components/OrderSummary';
 import { ItemDetailModal } from '../components/ItemDetailModal';
@@ -316,9 +315,6 @@ export function MenuPage({
           onAdd={handleAddToDraft}
         />
       )}
-
-      {/* FORCH.i badge */}
-      <ForchiBadge />
     </div>
   );
 }

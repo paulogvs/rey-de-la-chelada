@@ -22,7 +22,6 @@ import { useTables } from '../_shared/hooks/useTables';
 import { useWaiterCalls } from '../_shared/hooks/useWaiterCalls';
 import { LoginScreen } from '../_shared/components/LoginScreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
-import { ForchiBadge } from '@/ui/components/ForchiBadge';
 import { ToastProvider, useToast } from '@/ui/components/Toast';
 import type { Table } from '@/core/types';
 import { TablesView } from './TablesView';
@@ -214,8 +213,6 @@ function MeserosApp() {
             />
           )}
         </main>
-
-        <ForchiBadge />
       </div>
     </PwaLayout>
   );

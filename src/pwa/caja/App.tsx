@@ -16,7 +16,6 @@ import { setCurrentPwaModule } from '../_shared/hooks/useCapability';
 import { useStaffAuth } from '../_shared/hooks/useStaffAuth';
 import { LoginScreen } from '../_shared/components/LoginScreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
-import { ForchiBadge } from '@/ui/components/ForchiBadge';
 import { Badge } from '@/ui/components/Badge';
 import { ToastProvider, useToast } from '@/ui/components/Toast';
 import { appConfig } from '@/core/config';
@@ -82,7 +81,6 @@ function CajaApp() {
               Volver al inicio de sesión
             </button>
           </div>
-          <ForchiBadge />
         </div>
       </PwaLayout>
     );
@@ -131,8 +129,6 @@ function CajaApp() {
 
           {view === 'invoice' && <InvoiceView />}
         </main>
-
-        <ForchiBadge />
       </div>
     </PwaLayout>
   );
