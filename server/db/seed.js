@@ -16,45 +16,57 @@
 
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
+import { pathToFileURL } from 'node:url';
 import { getDb, closeDb } from './index.js';
-
-const db = getDb();
 
 // ============================================================
 // Staff (v2: 3 roles, shared PIN per role)
 // ============================================================
 
-function ensureStaff({ pin, role, display_name }) {
+/**
+ * Ensure a staff role exists with the given PIN (idempotent).
+ * @param {object} db — better-sqlite3 instance
+ * @param {{ pin: string|number, role: string, display_name: string }} opts
+ * @returns {{ created: boolean, role: string }}
+ */
+export function ensureStaff(db, { pin, role, display_name }) {
   const existing = db.prepare('SELECT id FROM staff WHERE role = ?').get(role);
   if (existing) {
-    console.log(`[Seed] Staff ${role} ya existe — skip`);
-    return;
+    return { created: false, role };
   }
   const pinHash = bcrypt.hashSync(String(pin), 10);
   db.prepare(
     'INSERT INTO staff (id, pin_hash, role, display_name) VALUES (?, ?, ?, ?)'
   ).run(randomUUID(), pinHash, role, display_name);
-  console.log(`[Seed] Staff creado: ${role} (PIN ${pin})`);
+  return { created: true, role };
 }
 
 // ============================================================
 // Tables
 // ============================================================
 
-function ensureTables(count = 10) {
+/**
+ * Ensure tables 1..count exist (idempotent).
+ * @param {object} db — better-sqlite3 instance
+ * @param {number} [count=10]
+ * @returns {{ created: number }}
+ */
+export function ensureTables(db, count = 10) {
+  let created = 0;
   for (let i = 1; i <= count; i++) {
     const existing = db.prepare('SELECT id FROM tables WHERE number = ?').get(i);
     if (!existing) {
       db.prepare(
         'INSERT INTO tables (id, number, capacity, status, section, position) VALUES (?, ?, ?, ?, ?, ?)'
       ).run(randomUUID(), i, i <= 6 ? 4 : 6, 'free', i % 2 === 0 ? 'terraza' : 'interior', i);
+      created++;
     }
   }
-  console.log(`[Seed] Mesas 1-${count} aseguradas`);
+  return { created };
 }
 
 // ============================================================
-// Menu
+// Menu (base genérico — el menú REAL lo carga load-menu.js)
 // ============================================================
 
 const CATEGORIES = [
@@ -89,7 +101,11 @@ const ITEMS = {
   ],
 };
 
-function ensureMenu() {
+/**
+ * Ensure the generic base menu exists (idempotent).
+ * @param {object} db — better-sqlite3 instance
+ */
+export function ensureMenu(db) {
   for (const cat of CATEGORIES) {
     let category = db.prepare('SELECT id FROM menu_categories WHERE name = ?').get(cat.name);
     if (!category) {
@@ -98,7 +114,6 @@ function ensureMenu() {
         'INSERT INTO menu_categories (id, name, emoji, sort_order) VALUES (?, ?, ?, ?)'
       ).run(id, cat.name, cat.emoji, cat.sort_order);
       category = { id };
-      console.log(`[Seed] Categoría creada: ${cat.name}`);
     }
 
     for (const item of ITEMS[cat.name] || []) {
@@ -115,23 +130,31 @@ function ensureMenu() {
       }
     }
   }
-  console.log('[Seed] Menú asegurado');
 }
 
 // ============================================================
 // Run (v2: 3 roles only)
 // ============================================================
 
-const ADMIN_PIN = process.env.ADMIN_PIN || '0000';
-const MESERO_PIN = process.env.MESERO_PIN || '1111';
-const KDS_PIN = process.env.KDS_PIN || '2222';
+export function runSeed(db = getDb()) {
+  const ADMIN_PIN = process.env.ADMIN_PIN || '0000';
+  const MESERO_PIN = process.env.MESERO_PIN || '1111';
+  const KDS_PIN = process.env.KDS_PIN || '2222';
 
-ensureStaff({ pin: ADMIN_PIN, role: 'admin', display_name: 'Administrador' });
-ensureStaff({ pin: MESERO_PIN, role: 'mesero', display_name: 'Mesero' });
-ensureStaff({ pin: KDS_PIN, role: 'kds', display_name: 'KDS' });
+  ensureStaff(db, { pin: ADMIN_PIN, role: 'admin', display_name: 'Administrador' });
+  ensureStaff(db, { pin: MESERO_PIN, role: 'mesero', display_name: 'Mesero' });
+  ensureStaff(db, { pin: KDS_PIN, role: 'kds', display_name: 'KDS' });
 
-ensureTables(10);
-ensureMenu();
+  ensureTables(db, 10);
+  ensureMenu(db);
 
-console.log('[Seed] Completo ✅');
-closeDb();
+  return db;
+}
+
+// CLI entry — solo cuando se ejecuta directamente
+const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isDirectRun) {
+  const db = runSeed();
+  console.log('[Seed] Completo ✅');
+  closeDb();
+}

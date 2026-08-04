@@ -25,16 +25,12 @@
  * ═══════════════════════════════════════════════════════════
  */
 
+import { pathToFileURL } from 'node:url';
 import { getDb, closeDb } from '../db/index.js';
 import {
   applyBulkPriceUpdates,
   applyBulkModifierPriceUpdates,
 } from '../services/menu-bulk-updates.js';
-
-// ── Flags ──────────────────────────────────────────────────
-const args = process.argv.slice(2);
-const DRY_RUN = args.includes('--dry-run');
-const RESET = args.includes('--reset');
 
 // ── Pricing plan: category → prices in sort_order ──────────
 const PRICING_PLAN = {
@@ -58,102 +54,132 @@ function round2(n) {
   return Math.round(n * 100) / 100;
 }
 
-// ── Main ───────────────────────────────────────────────────
-const db = getDb();
+/**
+ * Apply demo BOB prices to all menu items + pizza size adjustments.
+ * Idempotent: skips items whose price already matches.
+ *
+ * Reusable from server/db/bootstrap.js (auto-seed at startup) and
+ * from the CLI entry below.
+ *
+ * @param {object} db — better-sqlite3 instance
+ * @param {{ log?: (msg: string) => void, dryRun?: boolean, reset?: boolean }} [opts]
+ * @returns {{ updated: number, failed: number, message: string }}
+ */
+export function applyDemoPrices(db, { log = console.log, dryRun = false, reset = false } = {}) {
+  // ── Flags ──────────────────────────────────────────────────
+  const DRY_RUN = dryRun;
+  const RESET = reset;
 
-// 1. Cargar items con su categoría (ordenados por sort_order)
-const items = db.prepare(`
-  SELECT mi.id, mi.name, mi.price, mc.name as category
-  FROM menu_items mi
-  JOIN menu_categories mc ON mi.category_id = mc.id
-  ORDER BY mc.sort_order ASC, mi.sort_order ASC
-`).all();
+  // 1. Cargar items con su categoría (ordenados por sort_order)
+  const items = db.prepare(`
+    SELECT mi.id, mi.name, mi.price, mc.name as category
+    FROM menu_items mi
+    JOIN menu_categories mc ON mi.category_id = mc.id
+    ORDER BY mc.sort_order ASC, mi.sort_order ASC
+  `).all();
 
-// 2. Cargar opciones de mods (tamaños de pizza)
-const modOptions = db.prepare(`
-  SELECT mo.id, mo.name, mo.price_adjustment, mg.menu_item_id, mi.name as item_name
-  FROM modifier_options mo
-  JOIN modifier_groups mg ON mo.group_id = mg.id
-  JOIN menu_items mi ON mg.menu_item_id = mi.id
-`).all();
+  // 2. Cargar opciones de mods (tamaños de pizza)
+  const modOptions = db.prepare(`
+    SELECT mo.id, mo.name, mo.price_adjustment, mg.menu_item_id, mi.name as item_name
+    FROM modifier_options mo
+    JOIN modifier_groups mg ON mo.group_id = mg.id
+    JOIN menu_items mi ON mg.menu_item_id = mi.id
+  `).all();
 
-// ── Construir updates ──────────────────────────────────────
-const itemUpdates = []; // { id, price }
-const modUpdates = []; // { id, priceAdjustment }
-const summary = []; // human-readable lines
+  // ── Construir updates ──────────────────────────────────────
+  const itemUpdates = []; // { id, price }
+  const modUpdates = []; // { id, priceAdjustment }
+  const summary = []; // human-readable lines
 
-if (RESET) {
-  // Reset: devolver todo a NULL / 0 (estado "sin precios")
-  const tx = db.transaction(() => {
-    db.prepare('UPDATE menu_items SET price = NULL, updated_at = datetime(\'now\')').run();
-    db.prepare('UPDATE modifier_options SET price_adjustment = 0').run();
-  });
-  tx();
-  console.log('[demo-prices] RESET aplicado: todos los precios en NULL y ajustes en 0.');
-  console.log(`  Items: ${items.length} | Opciones de tamaño: ${modOptions.length}`);
-  closeDb();
-  process.exit(0);
-}
-
-// Plan por categoría
-const byCategory = {};
-for (const item of items) {
-  if (!byCategory[item.category]) byCategory[item.category] = [];
-  byCategory[item.category].push(item);
-}
-
-for (const [category, catItems] of Object.entries(byCategory)) {
-  const plan = PRICING_PLAN[category];
-  catItems.forEach((item, idx) => {
-    const price = plan ? (plan[idx] ?? FALLBACK_PRICE) : FALLBACK_PRICE;
-    if (item.price !== price) {
-      itemUpdates.push({ id: item.id, price });
-      summary.push(`  ${category} · ${item.name}: ${item.price ?? 'NULL'} → Bs ${price}`);
-    }
-  });
-}
-
-// Ajustes de tamaño (pizza): Mediana 0, Familiar +20, XL +40
-for (const opt of modOptions) {
-  const adjust = PIZZA_SIZE_ADJUST[opt.name];
-  if (adjust === undefined) continue;
-  if (opt.price_adjustment !== adjust) {
-    modUpdates.push({ id: opt.id, priceAdjustment: adjust });
-    summary.push(`  Tamaño ${opt.name} (${opt.item_name}): ${opt.price_adjustment} → +${adjust}`);
+  if (RESET) {
+    // Reset: devolver todo a NULL / 0 (estado "sin precios")
+    const tx = db.transaction(() => {
+      db.prepare('UPDATE menu_items SET price = NULL, updated_at = datetime(\'now\')').run();
+      db.prepare('UPDATE modifier_options SET price_adjustment = 0').run();
+    });
+    tx();
+    log('[demo-prices] RESET aplicado: todos los precios en NULL y ajustes en 0.');
+    log(`  Items: ${items.length} | Opciones de tamaño: ${modOptions.length}`);
+    return { updated: 0, failed: 0, message: 'reset' };
   }
+
+  // Plan por categoría
+  const byCategory = {};
+  for (const item of items) {
+    if (!byCategory[item.category]) byCategory[item.category] = [];
+    byCategory[item.category].push(item);
+  }
+
+  for (const [category, catItems] of Object.entries(byCategory)) {
+    const plan = PRICING_PLAN[category];
+    catItems.forEach((item, idx) => {
+      const price = plan ? (plan[idx] ?? FALLBACK_PRICE) : FALLBACK_PRICE;
+      if (item.price !== price) {
+        itemUpdates.push({ id: item.id, price });
+        summary.push(`  ${category} · ${item.name}: ${item.price ?? 'NULL'} → Bs ${price}`);
+      }
+    });
+  }
+
+  // Ajustes de tamaño (pizza): Mediana 0, Familiar +20, XL +40
+  for (const opt of modOptions) {
+    const adjust = PIZZA_SIZE_ADJUST[opt.name];
+    if (adjust === undefined) continue;
+    if (opt.price_adjustment !== adjust) {
+      modUpdates.push({ id: opt.id, priceAdjustment: adjust });
+      summary.push(`  Tamaño ${opt.name} (${opt.item_name}): ${opt.price_adjustment} → +${adjust}`);
+    }
+  }
+
+  // ── Apply / dry-run ────────────────────────────────────────
+  if (DRY_RUN) {
+    log('[demo-prices] DRY RUN — no se escribirá nada. Cambios:');
+    log(`  Items a actualizar: ${itemUpdates.length}`);
+    log(`  Opciones a actualizar: ${modUpdates.length}`);
+    log('');
+    log(summary.join('\n') || '  (sin cambios)');
+    return { updated: itemUpdates.length, failed: 0, message: 'dry-run' };
+  }
+
+  if (itemUpdates.length === 0 && modUpdates.length === 0) {
+    log('[demo-prices] Sin cambios — los precios ya están cargados.');
+    return { updated: 0, failed: 0, message: 'no-op' };
+  }
+
+  const itemResult = applyBulkPriceUpdates(db, itemUpdates);
+  const modResult = applyBulkModifierPriceUpdates(db, modUpdates);
+
+  log('[demo-prices] Resultado:');
+  log(`  Items actualizados:   ${itemResult.updated}${itemResult.failed > 0 ? ` (${itemResult.failed} fallaron)` : ''}`);
+  log(`  Opciones actualizadas: ${modResult.updated}${modResult.failed > 0 ? ` (${modResult.failed} fallaron)` : ''}`);
+  log('');
+  log(summary.join('\n'));
+
+  if (itemResult.failed > 0 || modResult.failed > 0) {
+    const errors = [...itemResult.errors, ...modResult.errors];
+    log('\nErrores:');
+    for (const e of errors) log(`  ${e.id}: ${e.reason}`);
+  }
+
+  return {
+    updated: itemResult.updated + modResult.updated,
+    failed: itemResult.failed + modResult.failed,
+    message: 'applied',
+  };
 }
 
-// ── Apply / dry-run ────────────────────────────────────────
-if (DRY_RUN) {
-  console.log('[demo-prices] DRY RUN — no se escribirá nada. Cambios:');
-  console.log(`  Items a actualizar: ${itemUpdates.length}`);
-  console.log(`  Opciones a actualizar: ${modUpdates.length}`);
-  console.log('');
-  console.log(summary.join('\n') || '  (sin cambios)');
+// CLI entry — solo cuando se ejecuta directamente
+const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isDirectRun) {
+  const args = process.argv.slice(2);
+  const db = getDb();
+  const result = applyDemoPrices(db, {
+    dryRun: args.includes('--dry-run'),
+    reset: args.includes('--reset'),
+  });
+  if (result.failed > 0) {
+    closeDb();
+    process.exit(2);
+  }
   closeDb();
-  process.exit(0);
 }
-
-if (itemUpdates.length === 0 && modUpdates.length === 0) {
-  console.log('[demo-prices] Sin cambios — los precios ya están cargados.');
-  closeDb();
-  process.exit(0);
-}
-
-const itemResult = applyBulkPriceUpdates(db, itemUpdates);
-const modResult = applyBulkModifierPriceUpdates(db, modUpdates);
-
-console.log('[demo-prices] Resultado:');
-console.log(`  Items actualizados:   ${itemResult.updated}${itemResult.failed > 0 ? ` (${itemResult.failed} fallaron)` : ''}`);
-console.log(`  Opciones actualizadas: ${modResult.updated}${modResult.failed > 0 ? ` (${modResult.failed} fallaron)` : ''}`);
-console.log('');
-console.log(summary.join('\n'));
-
-if (itemResult.failed > 0 || modResult.failed > 0) {
-  const errors = [...itemResult.errors, ...modResult.errors];
-  console.log('\nErrores:');
-  for (const e of errors) console.log(`  ${e.id}: ${e.reason}`);
-}
-
-closeDb();
-process.exit(itemResult.failed > 0 || modResult.failed > 0 ? 2 : 0);

@@ -37,6 +37,7 @@ import { requireAuth, optionalAuth } from './middleware/auth.js';
 
 // ── Database ──────────────────────────────────────────────
 import { getDb } from './db/index.js';
+import { ensureBootstrap } from './db/bootstrap.js';
 
 // ── WebSocket Broadcaster (SSOT) ──────────────────────────
 import { broadcaster, buildKDSEvent, KDSEventType } from './services/websocket-broadcaster.js';
@@ -65,6 +66,13 @@ let db;
 try {
   db = getDb();
   console.log('[DB] Database connected and schema applied');
+  // Auto-seed idempotente: garantiza staff + mesas + menú + precios
+  // en el primer arranque (fix: PROD arrancaba con staff vacío).
+  try {
+    ensureBootstrap(db);
+  } catch (bootstrapErr) {
+    console.error('[Bootstrap] Error en auto-seed:', bootstrapErr.message);
+  }
 } catch (err) {
   console.error('[DB] Failed to initialize database:', err.message);
   // Non-blocking — app can still run in dev mode
