@@ -334,7 +334,7 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
         unit_price: unitPrice,
         subtotal: itemSubtotal,
         modifiers_json: summary.length > 0 ? JSON.stringify(summary) : null,
-        preparation_notes: item.notes || item.preparation_notes || '',
+        preparation_notes: item.notes || '',
         status: 'pending',
         kds_module: item.kds_module || menuItem.area || 'cocina',
       });
@@ -422,7 +422,7 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
 
         insertItem.run(randomUUID(), req.params.id, menuItem.id, menuItem.name, quantity,
                        unitPrice, item.modifiers ? JSON.stringify(item.modifiers) : null,
-                       itemSubtotal, 'pending', item.notes || item.preparation_notes || '');
+                       itemSubtotal, 'pending', item.notes || '');
       }
 
       recalcOrder(db, req.params.id);
