@@ -15,7 +15,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useKDSWebSocket } from '@/pwa/_shared/hooks/useKDSWebSocket';
 import { useFullscreen } from '@/pwa/_shared/hooks/useFullscreen';
-import { fetchKDSOrders } from '@/pwa/_shared/api/kdsApi';
+import { fetchKDSOrders, updateKDSItemStatus } from '@/pwa/_shared/api/kdsApi';
 import { orderEngine } from '@/core/engine';
 import { KDSOrderCard, KDSOrderCardSkeleton } from '@/ui/components/KDSOrderCard';
 import { Badge } from '@/ui/components/Badge';
@@ -197,13 +197,23 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
     return unsubscribe;
   }, []);
 
-  // Handle item status change
+  // Handle item status change — FASE 2: optimista local + persistencia
+  // server-side (PATCH item status) para que el circuito cerrado funcione:
+  // el servidor guarda y hace broadcast a meseros/otros KDS.
   const handleItemStatusChange = useCallback((orderId: string, itemId: string, status: KDSStatus) => {
     const success = orderEngine.updateItemStatus(orderId, itemId, status);
-    if (success && status === 'ready') {
+    if (!success) return;
+    if (status === 'ready') {
       kdsAudio.completed();
     }
-  }, []);
+    if (token) {
+      void updateKDSItemStatus(token, orderId, itemId, status).then(result => {
+        if (!result.ok) {
+          console.warn(`[KDS] Item status persist failed (${itemId} → ${status}): ${result.code}`);
+        }
+      });
+    }
+  }, [token]);
 
   // Handle order acknowledge (confirmed → preparing)
   const handleAcknowledge = useCallback((orderId: string) => {
@@ -222,17 +232,23 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
     }
   }, []);
 
-  // Handle order reject (pending → cancelled)
+  // Handle order reject (pending → cancelled) — FASE 2: persistir igual
   const handleReject = useCallback((orderId: string) => {
     const order = orderEngine.getOrder(orderId);
-    if (order) {
-      order.items.forEach(item => {
-        if (item.status === 'pending') {
-          orderEngine.updateItemStatus(orderId, item.id, 'cancelled');
+    if (!order) return;
+    order.items.forEach(item => {
+      if (item.status === 'pending') {
+        orderEngine.updateItemStatus(orderId, item.id, 'cancelled');
+        if (token) {
+          void updateKDSItemStatus(token, orderId, item.id, 'cancelled').then(result => {
+            if (!result.ok) {
+              console.warn(`[KDS] Item reject persist failed (${item.id}): ${result.code}`);
+            }
+          });
         }
-      });
-    }
-  }, []);
+      }
+    });
+  }, [token]);
 
   // Toggle audio
   const toggleAudio = useCallback(() => {

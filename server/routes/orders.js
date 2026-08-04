@@ -24,6 +24,7 @@ import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { broadcastOrderConfirmed, broadcastOrderStatusChange } from '../services/order-broadcaster.js';
+import { broadcaster, buildKDSEvent, KDSEventType } from '../services/websocket-broadcaster.js';
 import { computeTotals, round2 } from '../../src/core/config/iva.js';
 
 const router = Router();
@@ -626,6 +627,77 @@ router.post('/:id/items', requireAuth, requireRole('admin', 'mesero'), (req, res
   } catch (err) {
     console.error('[Orders] Add item error:', err.message);
     res.status(500).json({ success: false, error: 'Error al agregar item', code: 'ORDER_ADD_ITEM_ERROR' });
+  }
+});
+
+// ============================================================
+// PATCH /api/orders/:id/items/:itemId/status — Persistir estado de item KDS
+//
+// FASE 2 (circuito cerrado): el KDS marcaba items solo en memoria del
+// cliente; este endpoint persiste order_items.status y emite broadcast
+// para que meseros/otros KDS vean el cambio en tiempo real.
+//   body: { status: pending|preparing|ready|delivered|cancelled }
+// Roles: kds o admin (el bartender/cocinero marca sus items).
+// ============================================================
+
+router.patch('/:id/items/:itemId/status', requireAuth, requireRole('admin', 'kds'), (req, res) => {
+  try {
+    const { status } = req.body;
+    const canonical = ITEM_STATUS_MAP[status];
+    if (!canonical) {
+      return res.status(400).json({
+        success: false,
+        error: `Estado de item inválido. Use: ${Object.keys(ITEM_STATUS_MAP).join(', ')}`,
+        code: 'INVALID_ITEM_STATUS',
+      });
+    }
+
+    const db = getDb();
+    const item = db.prepare('SELECT id, order_id FROM order_items WHERE id = ? AND order_id = ?')
+      .get(req.params.itemId, req.params.id);
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item no encontrado en el pedido', code: 'ORDER_ITEM_NOT_FOUND' });
+    }
+
+    // Persistir estado del item
+    db.prepare("UPDATE order_items SET status = ? WHERE id = ?")
+      .run(canonical, req.params.itemId);
+
+    // ¿Todos los items en estado terminal (delivered/cancelled)? → pedido served
+    const remaining = db.prepare(
+      "SELECT COUNT(*) as n FROM order_items WHERE order_id = ? AND status NOT IN ('delivered','cancelled')"
+    ).get(req.params.id);
+    if (Number(remaining.n) === 0) {
+      db.prepare("UPDATE orders SET status = 'served', updated_at = datetime('now') WHERE id = ? AND status NOT IN ('paid','cancelled')")
+        .run(req.params.id);
+    }
+
+    // Broadcast real-time: item_ready cuando queda listo, status_change en el resto
+    const orderForWs = buildOrder(db, req.params.id);
+    const itemPayload = orderForWs.items.find(i => i.id === req.params.itemId) || { id: req.params.itemId };
+
+    if (canonical === 'ready') {
+      broadcaster.broadcastKDS(buildKDSEvent(KDSEventType.ITEM_READY, {
+        orderId: req.params.id,
+        tableNumber: orderForWs.table_number,
+        itemId: req.params.itemId,
+        status: 'ready',
+        items: [itemPayload],
+      }));
+    } else {
+      broadcaster.broadcastKDS(buildKDSEvent(KDSEventType.STATUS_CHANGE, {
+        orderId: req.params.id,
+        tableNumber: orderForWs.table_number,
+        itemId: req.params.itemId,
+        status: canonical,
+        items: [itemPayload],
+      }));
+    }
+
+    res.json({ success: true, itemId: req.params.itemId, status: canonical });
+  } catch (err) {
+    console.error('[Orders] Item status error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al cambiar estado del item', code: 'ORDER_ITEM_STATUS_ERROR' });
   }
 });
 

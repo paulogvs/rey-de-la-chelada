@@ -64,3 +64,6 @@ secrets/
 
 # Local agent state
 .serena/
+
+# E2E session tokens (rate-limit safe login)
+scripts/.e2e-session.json

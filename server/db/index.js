@@ -17,8 +17,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // DB path: /data/rey-de-la-chelada.db (relativo a la raíz del proyecto)
+// DB_PATH env var → entornos de prueba aislados (FASE 2: PORT=3003
+// DB_PATH=data/test-e2e.db node server/index.js). Sin ella, default.
 const DB_DIR = path.resolve(__dirname, '..', '..', 'data');
-const DB_PATH = path.join(DB_DIR, 'rey-de-la-chelada.db');
+const DB_PATH = process.env.DB_PATH
+  ? path.resolve(__dirname, '..', '..', process.env.DB_PATH)
+  : path.join(DB_DIR, 'rey-de-la-chelada.db');
 
 let _db = null;
 

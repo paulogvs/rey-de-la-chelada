@@ -90,4 +90,22 @@ export async function fetchKDSOrders(
   return { ...result, data: { orders: result.data.orders }, orders };
 }
 
-export default { fetchKDSOrders, normalizeKDSOrder };
+/**
+ * PATCH /api/orders/:id/items/:itemId/status — persistir estado de item.
+ * FASE 2: sin esto el KDS solo mutaba el engine en memoria (se perdía
+ * al refrescar y los demás clientes no se enteraban).
+ */
+export async function updateKDSItemStatus(
+  token: string,
+  orderId: string,
+  itemId: string,
+  status: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<ApiResult<{ success: boolean; status?: string }>> {
+  return apiFetch<{ success: boolean; status?: string }>(
+    `/api/orders/${orderId}/items/${itemId}/status`,
+    { method: 'PATCH', token, body: { status }, fetchImpl }
+  );
+}
+
+export default { fetchKDSOrders, normalizeKDSOrder, updateKDSItemStatus };
