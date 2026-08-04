@@ -28,45 +28,45 @@
 /* ---- Variants ---- */
 
 .badge--pending {
-  background: rgba(224, 139, 39, 0.1);
+  background: color-mix(in srgb, var(--status-pending) 10%, transparent);
   color: var(--status-pending);
-  border-color: rgba(224, 139, 39, 0.2);
+  border-color: color-mix(in srgb, var(--status-pending) 20%, transparent);
 }
 
 .badge--preparing {
   background: var(--dorado-rey-soft);
   color: var(--status-preparing);
-  border-color: rgba(212, 175, 55, 0.2);
+  border-color: color-mix(in srgb, var(--status-preparing) 20%, transparent);
 }
 
 .badge--ready {
-  background: rgba(5, 150, 105, 0.1);
+  background: color-mix(in srgb, var(--status-delivered) 10%, transparent);
   color: var(--status-confirmed);
-  border-color: rgba(5, 150, 105, 0.2);
+  border-color: color-mix(in srgb, var(--status-delivered) 20%, transparent);
 }
 
 .badge--cancelled {
-  background: rgba(220, 38, 38, 0.1);
+  background: color-mix(in srgb, var(--status-cancelled) 10%, transparent);
   color: var(--status-cancelled);
-  border-color: rgba(220, 38, 38, 0.2);
+  border-color: color-mix(in srgb, var(--status-cancelled) 20%, transparent);
 }
 
 .badge--paid {
-  background: rgba(13, 92, 58, 0.1);
+  background: color-mix(in srgb, var(--status-confirmed) 10%, transparent);
   color: var(--verde-esmeralda);
-  border-color: rgba(13, 92, 58, 0.2);
+  border-color: color-mix(in srgb, var(--status-confirmed) 20%, transparent);
 }
 
 .badge--info {
   background: var(--dorado-rey-soft);
   color: var(--dorado-rey);
-  border-color: rgba(212, 175, 55, 0.15);
+  border-color: color-mix(in srgb, var(--dorado-rey) 15%, transparent);
 }
 
 .badge--warning {
-  background: rgba(245, 158, 11, 0.1);
+  background: color-mix(in srgb, var(--kds-warning) 10%, transparent);
   color: var(--kds-warning);
-  border-color: rgba(245, 158, 11, 0.2);
+  border-color: color-mix(in srgb, var(--kds-warning) 20%, transparent);
 }
 
 /* ---- Dot indicator ---- */

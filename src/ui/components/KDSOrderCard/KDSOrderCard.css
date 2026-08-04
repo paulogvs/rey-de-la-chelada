@@ -42,8 +42,8 @@
 }
 
 @keyframes kds-urgent-pulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(239, 68, 68, 0.3); }
-  50% { box-shadow: 0 0 24px rgba(239, 68, 68, 0.6); }
+  0%, 100% { box-shadow: 0 0 8px color-mix(in srgb, var(--kds-urgent) 30%, transparent); }
+  50% { box-shadow: 0 0 24px color-mix(in srgb, var(--kds-urgent) 60%, transparent); }
 }
 
 /* ---- Header ---- */
@@ -192,7 +192,7 @@
 
 .kds-order__action--accept {
   background: var(--status-confirmed);
-  color: #FFFFFF;
+  color: var(--text-inverse);
 }
 
 .kds-order__action--accept:hover {
@@ -206,7 +206,7 @@
 }
 
 .kds-order__action--reject:hover {
-  background: rgba(220, 38, 38, 0.1);
+  background: color-mix(in srgb, var(--status-cancelled) 10%, transparent);
 }
 
 .kds-order__complete-badge {
@@ -228,7 +228,7 @@
 @media (prefers-reduced-motion: reduce) {
   .kds-order--urgent {
     animation: none;
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--kds-urgent) 30%, transparent);
   }
   .kds-order--new {
     animation: none;

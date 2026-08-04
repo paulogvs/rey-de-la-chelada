@@ -99,7 +99,7 @@
 
 .btn--danger {
   background: var(--status-cancelled);
-  color: #FFFFFF;
+  color: var(--text-inverse);
   border-color: var(--status-cancelled);
 }
 

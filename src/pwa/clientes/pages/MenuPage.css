@@ -73,7 +73,7 @@
 }
 
 .clientes-alert--error {
-  background: rgba(220, 38, 38, 0.1);
+  background: color-mix(in srgb, var(--status-cancelled) 10%, transparent);
   color: var(--status-cancelled);
   border: 1px solid var(--status-cancelled);
 }

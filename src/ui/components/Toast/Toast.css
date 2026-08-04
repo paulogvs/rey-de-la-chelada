@@ -36,19 +36,19 @@
 /* ---- Types ---- */
 
 .toast--success {
-  background: rgba(5, 150, 105, 0.15);
+  background: color-mix(in srgb, var(--status-delivered) 15%, transparent);
   border-color: var(--status-confirmed);
   color: var(--status-confirmed);
 }
 
 .toast--error {
-  background: rgba(220, 38, 38, 0.15);
+  background: color-mix(in srgb, var(--status-cancelled) 15%, transparent);
   border-color: var(--status-cancelled);
   color: var(--status-cancelled);
 }
 
 .toast--warning {
-  background: rgba(245, 158, 11, 0.15);
+  background: color-mix(in srgb, var(--kds-warning) 15%, transparent);
   border-color: var(--kds-warning);
   color: var(--kds-warning);
 }

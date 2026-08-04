@@ -50,7 +50,7 @@
 
 .caja-header__nav-btn.active {
   background: var(--verde-esmeralda);
-  color: #FFFFFF;
+  color: var(--text-inverse);
   border-color: var(--verde-esmeralda);
   font-weight: 600;
 }

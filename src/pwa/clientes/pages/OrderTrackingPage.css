@@ -112,7 +112,7 @@
 }
 
 .tracking-stepper__dot.done {
-  color: var(--on-accent, #fff);
+  color: var(--on-accent);
 }
 
 .tracking-stepper__line {
@@ -192,7 +192,7 @@
 
 .tracking-btn--primary {
   width: 100%;
-  color: var(--on-accent, #fff);
+  color: var(--on-accent);
 }
 
 .tracking-btn--ghost {

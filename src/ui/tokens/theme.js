@@ -112,6 +112,18 @@ class ThemeManager {
     this._setProp(root, '--crema-espuma', palette.brand['crema-espuma']);
     this._setProp(root, '--verde-esmeralda', palette.brand['verde-esmeralda']);
 
+    // 1.5 Accent/inverse (constantes de paleta — texto sobre acento/imágenes)
+    this._setProp(root, '--on-accent', palette.brand['on-accent']);
+    this._setProp(root, '--text-inverse', palette.brand['text-inverse']);
+
+    // 1.6 Overlay + receipt (constantes de paleta)
+    this._setProp(root, '--overlay', palette.overlay?.default);
+    this._setProp(root, '--overlay-strong', palette.overlay?.strong);
+    this._setProp(root, '--receipt-bg', palette.receipt?.bg);
+    this._setProp(root, '--receipt-text', palette.receipt?.text);
+    this._setProp(root, '--receipt-muted', palette.receipt?.muted);
+    this._setProp(root, '--receipt-strong', palette.receipt?.strong);
+
     // 2. Surfaces (theme-specific)
     const surfaces = palette.surfaces[theme];
     if (surfaces) {

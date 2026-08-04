@@ -173,7 +173,7 @@
 }
 
 .admin-bulk-item__ok {
-  color: var(--status-paid);
+  color: var(--status-delivered);
   font-weight: 700;
 }
 
@@ -269,7 +269,7 @@
 }
 
 .admin-closing-row__pos {
-  color: var(--status-paid);
+  color: var(--status-delivered);
   font-family: var(--font-mono);
 }
 
@@ -307,7 +307,7 @@
 .admin-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;

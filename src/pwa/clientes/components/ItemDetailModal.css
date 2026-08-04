@@ -9,7 +9,7 @@
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--overlay-strong);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -143,11 +143,11 @@
 .clientes-detail__mod-option.selected {
   background: var(--dorado-rey);
   border-color: var(--dorado-rey);
-  color: var(--on-accent, #fff);
+  color: var(--on-accent);
 }
 
 .clientes-detail__mod-option.selected .clientes-detail__mod-price {
-  color: var(--on-accent, #fff);
+  color: var(--on-accent);
 }
 
 .clientes-detail__mod-price {
@@ -163,7 +163,7 @@
   border: none;
   border-radius: var(--radius-md);
   background: var(--dorado-rey);
-  color: var(--on-accent, #fff);
+  color: var(--on-accent);
   font-family: var(--font-body);
   font-size: var(--text-lg);
   font-weight: 700;

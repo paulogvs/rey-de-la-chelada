@@ -12,7 +12,7 @@
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  background: rgba(0, 0, 0, 0.72);
+  background: var(--overlay-strong);
   backdrop-filter: blur(4px);
   padding: var(--space-4);
 }
@@ -51,8 +51,8 @@
 .print-receipt {
   width: 80mm;
   max-width: 100%;
-  background: #FFFFFF;
-  color: #111111;
+  background: var(--receipt-bg);
+  color: var(--receipt-text);
   padding: 6mm;
   font-family: 'Courier New', Courier, monospace;
   font-size: 11px;
@@ -94,7 +94,7 @@
 }
 
 .print-receipt__divider {
-  border-top: 1px dashed #444;
+  border-top: 1px dashed var(--receipt-muted);
   margin: 3mm 0;
 }
 
@@ -135,7 +135,7 @@
 .print-receipt__total-row--grand {
   font-weight: 700;
   font-size: 13px;
-  border-top: 1px solid #111;
+  border-top: 1px solid var(--receipt-text);
   padding-top: 2mm;
   margin-top: 1mm;
 }
@@ -151,7 +151,7 @@
 
 .print-receipt__notes {
   margin-top: 3mm;
-  border-top: 1px dashed #444;
+  border-top: 1px dashed var(--receipt-muted);
   padding-top: 2mm;
   white-space: pre-wrap;
 }
@@ -168,7 +168,7 @@
     position: absolute;
     inset: 0;
     padding: 0;
-    background: #FFFFFF;
+    background: var(--receipt-bg);
     backdrop-filter: none;
     overflow: visible;
   }
@@ -189,7 +189,7 @@
     box-shadow: none;
     margin: 0;
     padding: 0;
-    color: #000;
+    color: var(--receipt-strong);
   }
 
   .print-receipt * {
@@ -197,15 +197,15 @@
   }
 
   .print-receipt__divider {
-    border-top-color: #000;
+    border-top-color: var(--receipt-strong);
   }
 
   .print-receipt__total-row--grand {
-    border-top-color: #000;
+    border-top-color: var(--receipt-strong);
   }
 
   .print-receipt__notes {
-    border-top-color: #000;
+    border-top-color: var(--receipt-strong);
   }
 }
 
