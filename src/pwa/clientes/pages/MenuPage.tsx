@@ -21,6 +21,7 @@ import { OrderBar } from '@/ui/components/OrderBar';
 import { OrderSummary } from '@/ui/components/OrderSummary';
 import { ItemDetailModal } from '../components/ItemDetailModal';
 import { CategoryButton, MenuBanner, PageHeader, CustomerActions } from '../components/MenuChrome';
+import { canSubmitClientOrder } from '../utils/orderSendGate';
 import './MenuPage.css';
 
 /** Draft item type for local state */
@@ -126,7 +127,9 @@ export function MenuPage({
   // Send draft to waiter via the PUBLIC client-orders endpoint
   // (no JWT — table_number + session_id is the permission)
   const handleSendDraft = useCallback(async () => {
-    if (draftItems.length === 0 || !session.tableId) return;
+    // FASE 1: antes usaba `session.tableId` (campo inexistente) → el pedido
+    // jamás se enviaba. Ahora usa el helper centralizado con `tableNumber`.
+    if (!canSubmitClientOrder(session, draftItems.length)) return;
     setSending(true);
     setCallFeedback(null);
     try {
@@ -150,7 +153,7 @@ export function MenuPage({
     } finally {
       setSending(false);
     }
-  }, [draftItems, session.tableId, session.tableNumber, session.sessionId, onSubmitOrder]);
+  }, [draftItems, session.tableNumber, session.sessionId, onSubmitOrder]);
 
   // Call waiter con feedback
   const handleCallWaiter = useCallback(async () => {
