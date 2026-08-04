@@ -12,6 +12,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
+import { Loader } from '@/ui/components/Loader';
 import { FormField } from '@/ui/components/FormField';
 import {
   fetchAdminMenuItems,
@@ -148,7 +149,7 @@ export function BulkPricesView({ token, onToast }: BulkPricesViewProps) {
       </Card>
 
       {loading ? (
-        <Card className="admin-section"><p className="admin-muted">Cargando menú…</p></Card>
+        <Card className="admin-section"><Loader label="Cargando menú…" /></Card>
       ) : (
         groups.map(group => (
           <Card key={group.category.id} className="admin-section">

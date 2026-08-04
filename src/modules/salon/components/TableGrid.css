@@ -84,7 +84,7 @@
 .table-card:hover {
   border-color: var(--border-hover);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-md), 0 0 18px -2px color-mix(in srgb, var(--dorado-rey) 20%, transparent);
 }
 
 .table-card:active {

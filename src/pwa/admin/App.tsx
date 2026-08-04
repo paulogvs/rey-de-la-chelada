@@ -19,6 +19,7 @@ import { useStaffAuth } from '../_shared/hooks/useStaffAuth';
 import { LoginScreen } from '../_shared/components/LoginScreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { Badge } from '@/ui/components/Badge';
+import { Loader } from '@/ui/components/Loader';
 import { ToastProvider, useToast } from '@/ui/components/Toast';
 import { DashboardView } from './views/DashboardView';
 import { PriceEditorView } from './views/PriceEditorView';
@@ -68,7 +69,7 @@ function AdminApp() {
   if (restoring) {
     return (
       <PwaLayout title="Admin">
-        <div className="admin-app"><p className="admin-loading">Cargando…</p></div>
+        <div className="admin-app"><Loader block label="Cargando…" /></div>
       </PwaLayout>
     );
   }

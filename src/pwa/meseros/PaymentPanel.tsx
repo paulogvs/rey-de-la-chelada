@@ -19,6 +19,7 @@ import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { PriceDisplay } from '@/ui/components/PriceDisplay';
 import { QRDisplay } from '@/ui/components/QRDisplay';
+import { Loader } from '@/ui/components/Loader';
 import { useToast } from '@/ui/components/Toast';
 import { apiFetch } from '../_shared/api/apiFetch';
 import { processPayment, type ServerPayment } from '../_shared/api/paymentsApi';
@@ -163,7 +164,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
   };
 
   if (loadingOrder) {
-    return <div className="payment-panel"><p className="payment-panel__loading">Cargando pedido…</p></div>;
+    return <div className="payment-panel"><Loader block label="Cargando pedido…" /></div>;
   }
 
   if (!order) {

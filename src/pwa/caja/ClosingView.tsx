@@ -17,6 +17,7 @@ import {
   type DailySales,
 } from '../_shared/api/reportsApi';
 import { Card } from '@/ui/components/Card';
+import { Loader } from '@/ui/components/Loader';
 import { Button } from '@/ui/components/Button';
 import { FormField } from '@/ui/components/FormField';
 import { useToast } from '@/ui/components/Toast';
@@ -102,7 +103,7 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
     return (
       <div className="caja-close">
         <Card className="caja-close__card">
-          <p>Cargando corte de caja…</p>
+          <Loader block label="Cargando corte de caja…" />
         </Card>
       </div>
     );

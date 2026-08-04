@@ -6,11 +6,6 @@
 
 /* ---- Shell ---- */
 
-.admin-loading {
-  padding: var(--space-8);
-  color: var(--text-muted);
-}
-
 .admin-restricted {
   padding: var(--space-8);
   display: flex;

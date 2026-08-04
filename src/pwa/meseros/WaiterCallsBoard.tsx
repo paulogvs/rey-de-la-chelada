@@ -10,6 +10,7 @@ import { Button } from '@/ui/components/Button';
 import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { EmptyState } from '@/ui/components/EmptyState';
+import { Loader } from '@/ui/components/Loader';
 import type { WaiterCall } from '../_shared/api/waiterCallsApi';
 
 interface WaiterCallsBoardProps {
@@ -42,7 +43,7 @@ export function WaiterCallsBoard({
       </div>
 
       {error && <p className="waiter-calls__error">{error}</p>}
-      {loading && pending.length === 0 && <p className="text-muted">Cargando…</p>}
+      {loading && pending.length === 0 && <Loader label="Cargando…" />}
 
       {pending.length === 0 && !loading && (
         <EmptyState compact icon="🔔" message="Sin llamadas pendientes" />

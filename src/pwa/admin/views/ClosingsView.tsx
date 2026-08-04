@@ -10,6 +10,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
+import { Loader } from '@/ui/components/Loader';
 import { fetchClosings, type ClosingRow } from '../../_shared/api/adminApi';
 
 interface ClosingsViewProps {
@@ -60,7 +61,7 @@ export function ClosingsView({ token, onToast }: ClosingsViewProps) {
       </Card>
 
       {loading ? (
-        <Card className="admin-section"><p className="admin-muted">Cargando cortes…</p></Card>
+        <Card className="admin-section"><Loader label="Cargando cortes…" /></Card>
       ) : closings.length === 0 ? (
         <Card className="admin-section"><p className="admin-muted">Aún no hay cortes cerrados.</p></Card>
       ) : (

@@ -12,6 +12,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
+import { Loader } from '@/ui/components/Loader';
+import { EmptyState } from '@/ui/components/EmptyState';
 import { FormField } from '@/ui/components/FormField';
 import { QRDisplay } from '@/ui/components/QRDisplay';
 import { fetchTables, createTable, deleteTable, type Table } from '../../_shared/api/tablesApi';
@@ -165,7 +167,9 @@ export function TablesView({ token, onToast }: TablesViewProps) {
 
       <Card className="admin-section">
         {loading ? (
-          <p className="admin-muted">Cargando mesas…</p>
+          <Loader label="Cargando mesas…" />
+        ) : tables.length === 0 ? (
+          <EmptyState compact icon="🪑" message="No hay mesas configuradas todavía" />
         ) : (
           <div className="admin-tables__list">
             {tables.map(t => (
@@ -214,7 +218,7 @@ export function TablesView({ token, onToast }: TablesViewProps) {
             </p>
             <div className="admin-qr-modal__qr">
               {qrLoading ? (
-                <p className="admin-muted">Generando QR…</p>
+                <Loader label="Generando QR…" />
               ) : qrUrl ? (
                 <QRDisplay
                   data={qrUrl}

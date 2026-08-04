@@ -15,7 +15,7 @@
 .admin-sidebar {
   width: 220px;
   flex-shrink: 0;
-  background: var(--surface);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--dorado-rey-soft) 45%, var(--surface)) 0%, var(--surface) 100%);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;

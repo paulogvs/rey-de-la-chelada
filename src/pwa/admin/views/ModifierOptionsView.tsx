@@ -11,6 +11,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
+import { Loader } from '@/ui/components/Loader';
 import { FormField } from '@/ui/components/FormField';
 import {
   fetchModifierOptions,
@@ -150,7 +151,7 @@ export function ModifierOptionsView({ token, onToast }: ModifierOptionsViewProps
       </Card>
 
       {loading ? (
-        <Card className="admin-section"><p className="admin-muted">Cargando tamaños…</p></Card>
+        <Card className="admin-section"><Loader label="Cargando tamaños…" /></Card>
       ) : (
         groups.map(group => (
           <Card key={group.itemName} className="admin-section">

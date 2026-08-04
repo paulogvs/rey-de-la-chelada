@@ -18,7 +18,7 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--space-3) var(--space-4);
-  background: var(--surface);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--dorado-rey-soft) 45%, var(--surface)) 0%, var(--surface) 100%);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -710,11 +710,6 @@
   min-height: var(--touch-min-target);
 }
 
-.meseros-loading {
-  text-align: center;
-  padding: var(--space-6);
-  color: var(--text-muted);
-}
 
 .meseros-main {
   flex: 1;

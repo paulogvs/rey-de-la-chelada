@@ -12,6 +12,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
+import { Loader } from '@/ui/components/Loader';
 import { FormField } from '@/ui/components/FormField';
 import {
   fetchAdminMenuItems,
@@ -144,7 +145,7 @@ export function PriceEditorView({ token, onToast }: PriceEditorViewProps) {
 
       <Card className="admin-section">
         {loading ? (
-          <p className="admin-muted">Cargando menú…</p>
+          <Loader label="Cargando menú…" />
         ) : filtered.length === 0 ? (
           <p className="admin-muted">Sin resultados.</p>
         ) : (

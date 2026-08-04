@@ -11,6 +11,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
+import { Loader } from '@/ui/components/Loader';
 import { fetchAdminMenuItems } from '../../_shared/api/adminApi';
 import { fetchTables } from '../../_shared/api/tablesApi';
 import { fetchClosings } from '../../_shared/api/adminApi';
@@ -98,7 +99,7 @@ export function DashboardView({ token, onToast }: DashboardViewProps) {
   return (
     <div className="admin-view">
       {loading && stats.itemCount === 0 ? (
-        <p className="admin-muted">Cargando estadísticas…</p>
+        <Loader label="Cargando estadísticas…" />
       ) : (
         <>
           <div className="admin-dashboard__grid">

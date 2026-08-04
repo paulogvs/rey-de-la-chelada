@@ -21,7 +21,7 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--space-3) var(--space-4);
-  background: var(--surface);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--dorado-rey-soft) 45%, var(--surface)) 0%, var(--surface) 100%);
   border-bottom: 2px solid var(--dorado-rey);
   z-index: 10;
   flex-shrink: 0;

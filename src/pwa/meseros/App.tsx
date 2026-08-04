@@ -23,6 +23,7 @@ import { useWaiterCalls } from '../_shared/hooks/useWaiterCalls';
 import { LoginScreen } from '../_shared/components/LoginScreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { ToastProvider, useToast } from '@/ui/components/Toast';
+import { Loader } from '@/ui/components/Loader';
 import type { Table } from '@/core/types';
 import { TablesView } from './TablesView';
 import { OrderPanel } from './OrderPanel';
@@ -116,7 +117,7 @@ function MeserosApp() {
     return (
       <PwaLayout title="Meseros">
         <div className="meseros-app">
-          <p className="meseros-loading">Cargando…</p>
+          <Loader block label="Cargando…" />
         </div>
       </PwaLayout>
     );

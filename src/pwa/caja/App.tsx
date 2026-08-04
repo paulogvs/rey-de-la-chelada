@@ -17,6 +17,7 @@ import { useStaffAuth } from '../_shared/hooks/useStaffAuth';
 import { LoginScreen } from '../_shared/components/LoginScreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { Badge } from '@/ui/components/Badge';
+import { Loader } from '@/ui/components/Loader';
 import { ToastProvider, useToast } from '@/ui/components/Toast';
 import { appConfig } from '@/core/config';
 import { SummaryView } from './SummaryView';
@@ -57,7 +58,7 @@ function CajaApp() {
     return (
       <PwaLayout title="Caja">
         <div className="caja-app">
-          <p className="caja-loading">Cargando…</p>
+          <Loader block label="Cargando…" />
         </div>
       </PwaLayout>
     );

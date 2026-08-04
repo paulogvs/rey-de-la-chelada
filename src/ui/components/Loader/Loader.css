@@ -1,0 +1,47 @@
+/* ============================================================
+   LOADER — Shared loading spinner (SSOT)
+   Reemplaza los textos "Cargando…" planos en todas las PWAs.
+   ZERO hardcoded colors — all variables from tokens.json
+   ============================================================ */
+
+.loader {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+}
+
+.loader--block {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-8) var(--space-4);
+}
+
+.loader--compact {
+  display: inline-flex;
+  font-size: var(--text-sm);
+}
+
+.loader__spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--dorado-rey);
+  border-radius: 50%;
+  animation: loader-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.loader__label {
+  font-size: var(--text-sm);
+}
+
+@keyframes loader-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader__spinner {
+    animation-duration: 0.01ms;
+  }
+}

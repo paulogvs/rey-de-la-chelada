@@ -12,6 +12,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
+import { Loader } from '@/ui/components/Loader';
+import { EmptyState } from '@/ui/components/EmptyState';
 import { FormField } from '@/ui/components/FormField';
 import { fetchStaff, updateStaff, type AdminStaff } from '../../_shared/api/adminApi';
 
@@ -113,7 +115,9 @@ export function StaffView({ token, onToast }: StaffViewProps) {
       </Card>
 
       {loading ? (
-        <Card className="admin-section"><p className="admin-muted">Cargando personal…</p></Card>
+        <Card className="admin-section"><Loader label="Cargando personal…" /></Card>
+      ) : staff.length === 0 ? (
+        <Card className="admin-section"><EmptyState compact icon="👤" message="No hay personal registrado todavía" /></Card>
       ) : (
         staff.map(member => {
           const pinDraft = pins[member.id];
