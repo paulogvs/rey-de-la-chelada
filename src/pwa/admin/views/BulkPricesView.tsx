@@ -12,6 +12,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
+import { FormField } from '@/ui/components/FormField';
 import {
   fetchAdminMenuItems,
   bulkUpdateItemPrices,
@@ -166,11 +167,11 @@ export function BulkPricesView({ token, onToast }: BulkPricesViewProps) {
                     </span>
                     <div className="admin-price-input">
                       <span className="admin-price-input__prefix">Bs.</span>
-                      <input
+                      <FormField
                         type="number"
                         min="0"
                         step="0.5"
-                        className="admin-input admin-input--sm"
+                        variant="sm" className="form-input--mono"
                         value={value}
                         placeholder="—"
                         onChange={e => handleChange(item.id, e.target.value)}

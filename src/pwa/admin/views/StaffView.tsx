@@ -12,6 +12,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
+import { FormField } from '@/ui/components/FormField';
 import { fetchStaff, updateStaff, type AdminStaff } from '../../_shared/api/adminApi';
 
 interface StaffViewProps {
@@ -134,8 +135,8 @@ export function StaffView({ token, onToast }: StaffViewProps) {
                   <div className="admin-staff-field">
                     <label>Nombre visible</label>
                     <div className="admin-staff-inline">
-                      <input
-                        className="admin-input admin-input--sm"
+                      <FormField
+                        variant="sm" className="form-input--mono"
                         value={names[member.id] ?? member.display_name}
                         onChange={e => handleNameChange(member.id, e.target.value)}
                         aria-label={`Nombre de ${ROLE_LABEL[member.role]}`}
@@ -147,11 +148,11 @@ export function StaffView({ token, onToast }: StaffViewProps) {
                   <div className="admin-staff-field">
                     <label>Nuevo PIN (4-6 dígitos)</label>
                     <div className="admin-staff-inline">
-                      <input
+                      <FormField
                         type="password"
                         inputMode="numeric"
                         maxLength={6}
-                        className="admin-input admin-input--sm"
+                        variant="sm" className="form-input--mono"
                         value={pinDraft?.pin ?? ''}
                         placeholder="••••"
                         onChange={e => handlePinChange(member.id, e.target.value)}

@@ -18,6 +18,7 @@ import {
 } from '../_shared/api/reportsApi';
 import { Card } from '@/ui/components/Card';
 import { Button } from '@/ui/components/Button';
+import { FormField } from '@/ui/components/FormField';
 import { useToast } from '@/ui/components/Toast';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 
@@ -133,9 +134,10 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
 
             <div className="caja-close__field">
               <label>Efectivo real en caja</label>
-              <input
+              <FormField
                 type="number"
-                className="caja-close__input"
+                variant="lg"
+                className="form-input--mono"
                 value={actualCash}
                 step={0.01}
                 onChange={e => setActualCash(parseFloat(e.target.value) || 0)}

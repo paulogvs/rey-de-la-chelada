@@ -12,6 +12,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
+import { FormField } from '@/ui/components/FormField';
 import { QRDisplay } from '@/ui/components/QRDisplay';
 import { fetchTables, createTable, deleteTable, type Table } from '../../_shared/api/tablesApi';
 import { getStaticTableQrUrl } from '../../_shared/api/clientSessionsApi';
@@ -135,11 +136,11 @@ export function TablesView({ token, onToast }: TablesViewProps) {
           <div className="admin-tables__config">
             <div className="admin-tables__field">
               <label>Número</label>
-              <input
+              <FormField
                 type="number"
                 min="1"
                 max="50"
-                className="admin-input admin-input--sm"
+                variant="sm" className="form-input--mono"
                 value={newNumber}
                 onChange={e => setNewNumber(e.target.value)}
                 aria-label="Número de mesa"
@@ -147,11 +148,11 @@ export function TablesView({ token, onToast }: TablesViewProps) {
             </div>
             <div className="admin-tables__field">
               <label>Capacidad</label>
-              <input
+              <FormField
                 type="number"
                 min="1"
                 max="20"
-                className="admin-input admin-input--sm"
+                variant="sm" className="form-input--mono"
                 value={newCapacity}
                 onChange={e => setNewCapacity(e.target.value)}
                 aria-label="Capacidad de mesa"

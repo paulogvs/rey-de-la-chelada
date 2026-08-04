@@ -223,22 +223,6 @@
   color: var(--text-muted);
 }
 
-.caja-close__input {
-  padding: var(--space-3);
-  background: var(--surface-soft);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: var(--text-lg);
-  font-weight: 600;
-  min-height: var(--touch-min-target);
-}
-
-.caja-close__input:focus {
-  border-color: var(--verde-esmeralda);
-  outline: none;
-}
 
 .caja-close__value {
   font-family: var(--font-mono);
@@ -343,26 +327,6 @@
   color: var(--text-muted);
 }
 
-.caja-invoice__input {
-  padding: var(--space-3);
-  background: var(--surface-soft);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text);
-  font-family: var(--font-body);
-  font-size: var(--text-base);
-  min-height: var(--touch-min-target);
-}
-
-.caja-invoice__input--mono {
-  font-family: var(--font-mono);
-  font-weight: 600;
-}
-
-.caja-invoice__input:focus {
-  border-color: var(--verde-esmeralda);
-  outline: none;
-}
 
 .caja-invoice__actions {
   margin-bottom: var(--space-4);
@@ -399,11 +363,6 @@
 
 /* ---- Empty ---- */
 
-.caja-empty {
-  padding: var(--space-8);
-  text-align: center;
-  color: var(--text-muted);
-}
 
 /* ---- Responsive ---- */
 

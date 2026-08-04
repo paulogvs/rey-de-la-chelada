@@ -9,6 +9,7 @@ import React, { useState, useCallback } from 'react';
 import { appConfig } from '@/core/config';
 import { Card } from '@/ui/components/Card';
 import { Button } from '@/ui/components/Button';
+import { FormField } from '@/ui/components/FormField';
 import { useToast } from '@/ui/components/Toast';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 
@@ -58,9 +59,9 @@ export function InvoiceView() {
         <div className="caja-invoice__fields">
           <div className="caja-invoice__field">
             <label>NIT / CI</label>
-            <input
+            <FormField
               type="text"
-              className="caja-invoice__input"
+              variant="lg"
               value={invoiceNit}
               onChange={e => setInvoiceNit(e.target.value)}
               placeholder="Ej: 1234567890"
@@ -69,9 +70,9 @@ export function InvoiceView() {
 
           <div className="caja-invoice__field">
             <label>Razón Social / Nombre</label>
-            <input
+            <FormField
               type="text"
-              className="caja-invoice__input"
+              variant="lg"
               value={invoiceName}
               onChange={e => setInvoiceName(e.target.value)}
               placeholder="Nombre completo o razón social"
@@ -80,9 +81,9 @@ export function InvoiceView() {
 
           <div className="caja-invoice__field">
             <label>Nº de Pedido</label>
-            <input
+            <FormField
               type="text"
-              className="caja-invoice__input"
+              variant="lg"
               value={invoiceOrderId}
               onChange={e => setInvoiceOrderId(e.target.value)}
               placeholder="ID del pedido"
@@ -91,9 +92,9 @@ export function InvoiceView() {
 
           <div className="caja-invoice__field">
             <label>Monto (Bs.)</label>
-            <input
+            <FormField
               type="number"
-              className="caja-invoice__input caja-invoice__input--mono"
+              variant="lg" className="form-input--mono"
               value={invoiceAmount || ''}
               step={0.01}
               onChange={e => setInvoiceAmount(parseFloat(e.target.value) || 0)}

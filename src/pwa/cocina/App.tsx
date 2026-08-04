@@ -21,6 +21,7 @@ import { PwaLayout } from '../_shared/components/PwaLayout';
 import { orderEngine } from '@/core/engine';
 import { KDSOrderCard, KDSOrderCardSkeleton } from '@/ui/components/KDSOrderCard';
 import { Badge } from '@/ui/components/Badge';
+import { EmptyState } from '@/ui/components/EmptyState';
 import type { Order, KDSEvent, KDSStatus } from '@/core/types';
 import './App.css';
 
@@ -318,11 +319,11 @@ export default function App() {
           )}
 
           {!loading && sortedOrders.length === 0 && (
-            <div className="kds-empty">
-              <div className="kds-empty__icon">🍽</div>
-              <h2>Todos los pedidos completados</h2>
-              <p>Esperando nuevos pedidos...</p>
-            </div>
+            <EmptyState
+              icon="🍽"
+              title="Todos los pedidos completados"
+              message="Esperando nuevos pedidos..."
+            />
           )}
 
           {!loading && sortedOrders.length > 0 && (

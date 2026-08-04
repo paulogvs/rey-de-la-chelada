@@ -351,28 +351,6 @@
   color: var(--text-muted);
 }
 
-/* Shared input */
-
-.admin-input {
-  padding: var(--space-2) var(--space-3);
-  background: var(--surface-soft);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: var(--text-base);
-  max-width: 400px;
-  min-height: var(--touch-min-target);
-}
-
-.admin-input:focus {
-  border-color: var(--dorado-rey);
-  outline: none;
-}
-
-.admin-input--sm {
-  max-width: 140px;
-}
 
 /* ---- Responsive ---- */
 

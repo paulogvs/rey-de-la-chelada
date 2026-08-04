@@ -18,6 +18,7 @@ import { Button } from '@/ui/components/Button';
 import { Badge } from '@/ui/components/Badge';
 import { QuantityStepper } from '@/ui/components/QuantityStepper';
 import { Modal } from '@/ui/components/Modal';
+import { EmptyState } from '@/ui/components/EmptyState';
 import { fetchMenuCategories, fetchMenuItems, fetchMenuItemDetail, type MenuItem } from '../_shared/api/menuApi';
 import { createOrder, submitOrder, confirmOrder } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
@@ -241,9 +242,9 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel, onBack }: Or
       <div className="order-panel__content">
         {/* Menu items */}
         <div className="order-panel__items">
-          {loadingMenu && <p className="order-panel__loading">Cargando menú…</p>}
+          {loadingMenu && <p className="text-muted">Cargando menú…</p>}
           {!loadingMenu && filteredItems.length === 0 && (
-            <p className="order-panel__empty">Sin items en esta categoría</p>
+            <EmptyState compact icon="🍺" message="Sin items en esta categoría" />
           )}
           {filteredItems.map(item => (
             <button

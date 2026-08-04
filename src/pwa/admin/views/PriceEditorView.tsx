@@ -12,6 +12,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
+import { FormField } from '@/ui/components/FormField';
 import {
   fetchAdminMenuItems,
   updateMenuItemPrice,
@@ -105,16 +106,16 @@ export function PriceEditorView({ token, onToast }: PriceEditorViewProps) {
   return (
     <div className="admin-view">
       <div className="admin-toolbar">
-        <input
+        <FormField
           type="search"
-          className="admin-input admin-toolbar__search"
+          variant="constrained" className="form-input--mono admin-toolbar__search"
           placeholder="Buscar por nombre…"
           value={search}
           onChange={e => setSearch(e.target.value)}
           aria-label="Buscar item"
         />
         <select
-          className="admin-input"
+          variant="constrained" className="form-input--mono"
           value={categoryId}
           onChange={e => setCategoryId(e.target.value)}
           aria-label="Filtrar por categoría"
@@ -161,11 +162,11 @@ export function PriceEditorView({ token, onToast }: PriceEditorViewProps) {
                   <div className="admin-price-row__edit">
                     <div className="admin-price-input">
                       <span className="admin-price-input__prefix">Bs.</span>
-                      <input
+                      <FormField
                         type="number"
                         min="0"
                         step="0.5"
-                        className="admin-input admin-input--sm"
+                        variant="sm" className="form-input--mono"
                         value={value}
                         placeholder="—"
                         onChange={e => handleDraftChange(item.id, e.target.value)}
