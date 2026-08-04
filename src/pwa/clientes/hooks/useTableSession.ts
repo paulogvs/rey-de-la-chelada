@@ -13,9 +13,9 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { securityEngine } from '@/core/config';
 import { orderEngine } from '@/core/engine';
 import type { Order } from '@/core/types';
+import { validateClientSession, getOrCreateSession } from './sessionApi';
 
 const SESSION_STORAGE_KEY = 'rdlc-table-session';
 
@@ -109,10 +109,25 @@ export function useTableSession(): TableSession {
   const MAX_RETRIES = 3;
 
   // Evaluate session state
-  const evaluateSession = useCallback(() => {
+  const evaluateSession = useCallback(async () => {
     const { tableNumber, sessionId } = getSessionFromUrl();
-    
-    if (!tableNumber || !sessionId) {
+
+    // QR ESTÁTICO (Opción A): la URL trae SOLO `?mesa=N`, sin sid.
+    // Se crea/obtiene la sesión LAZY en el servidor y se persiste en
+    // localStorage para próximas validaciones. Casos legacy (con sid)
+    // siguen funcionando sin cambios.
+    let resolvedSessionId = sessionId;
+    let fromLazy = false;
+
+    if (tableNumber && !resolvedSessionId) {
+      const lazy = await getOrCreateSession(tableNumber);
+      if (lazy.success && lazy.sessionId) {
+        resolvedSessionId = lazy.sessionId;
+        fromLazy = true;
+      }
+    }
+
+    if (!tableNumber || !resolvedSessionId) {
       // Try persisted session
       const persisted = getPersistedSession();
       if (persisted) {
@@ -133,24 +148,25 @@ export function useTableSession(): TableSession {
       return;
     }
 
-    // Persist for future visits
-    persistSession(tableNumber, sessionId);
+    // Persist for future visits (creada lazy o ya existente)
+    persistSession(tableNumber, resolvedSessionId);
 
     try {
-      // Buscar pedido activo en esta mesa
+      // Validar sesión contra el SERVIDOR (fix: antes era local y fallaba)
+      const validation = await validateClientSession(resolvedSessionId, tableNumber);
+
+      // Buscar pedido activo en esta mesa (motor local para UI)
       const tableOrders = orderEngine.getTableOrders(`table-${tableNumber}`);
       const activeOrder = tableOrders.find(o =>
         ['draft', 'confirmed', 'preparing', 'ready', 'served'].includes(o.status)
       ) || null;
 
-      const hasActiveOrder = activeOrder !== null;
-
-      // Validar sesión
-      const validation = securityEngine.validateSession(sessionId, tableNumber, hasActiveOrder);
+      const hasActiveOrder = activeOrder !== null || !!validation.hasActiveOrder;
+      const freshSessionId = validation.sessionId || resolvedSessionId;
 
       setSession({
         tableNumber,
-        sessionId,
+        sessionId: freshSessionId,
         hasActiveOrder,
         activeOrder,
         isReadOnly: !hasActiveOrder || validation.reason === 'readonly',
@@ -163,21 +179,27 @@ export function useTableSession(): TableSession {
         requestBill: async () => { /* debounced below */ },
       });
 
+      // Si el servidor renovó el sid (sesión expirada + pedido activo) o se
+      // creó lazy, persistirlo
+      if (freshSessionId !== sessionId || fromLazy) {
+        persistSession(tableNumber, freshSessionId);
+      }
+
       // Reset retry count on success
       retryCountRef.current = 0;
     } catch (err) {
       console.error('[useTableSession] Error evaluating session:', err);
-      
+
       // Retry logic
       if (retryCountRef.current < MAX_RETRIES) {
         retryCountRef.current++;
-        setTimeout(evaluateSession, 1000 * Math.pow(2, retryCountRef.current));
+        setTimeout(() => void evaluateSession(), 1000 * Math.pow(2, retryCountRef.current));
       }
 
       setSession(prev => ({
         ...prev,
         tableNumber,
-        sessionId,
+        sessionId: resolvedSessionId,
         isValid: false,
         error: 'Error al validar la sesión. Reintentando...',
         retry: evaluateSession,

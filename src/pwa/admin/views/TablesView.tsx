@@ -5,6 +5,7 @@
  *   - Lista las 10 mesas con estado + capacidad
  *   - Agregar mesa (número + capacidad)
  *   - Eliminar mesa (solo sin pedidos activos)
+ *   - QR server-side por mesa (sesión en SQLite, URL con host real)
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -12,8 +13,8 @@ import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
 import { QRDisplay } from '@/ui/components/QRDisplay';
-import { securityEngine } from '@/core/config';
 import { fetchTables, createTable, deleteTable, type Table } from '../../_shared/api/tablesApi';
+import { getStaticTableQrUrl } from '../../_shared/api/clientSessionsApi';
 
 interface TablesViewProps {
   token: string;
@@ -47,11 +48,24 @@ export function TablesView({ token, onToast }: TablesViewProps) {
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [qrTable, setQrTable] = useState<Table | null>(null);
+  const [qrUrl, setQrUrl] = useState('');
+  const [qrLoading, setQrLoading] = useState(false);
 
-  /** Genera el QR URL para una mesa (sesión de 3h, se renueva con pedido) */
-  const getQrUrl = useCallback((tableNumber: number): string => {
-    return securityEngine.generateQrUrl(tableNumber);
-  }, []);
+  /** Abre el modal QR con la URL ESTÁTICA (sin sid) para la mesa */
+  const openQr = useCallback(async (table: Table) => {
+    setQrTable(table);
+    setQrUrl('');
+    setQrLoading(true);
+    // Opción A: URL estática estable → el QR es único e imprimible una vez.
+    // La sesión se crea lazy en el servidor cuando el cliente abre la URL.
+    const result = await getStaticTableQrUrl(token, table.number);
+    setQrLoading(false);
+    if (result.ok && result.url) {
+      setQrUrl(result.url);
+    } else {
+      onToast('error', result.error ?? 'Error al generar QR');
+    }
+  }, [token, onToast]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -163,7 +177,7 @@ export function TablesView({ token, onToast }: TablesViewProps) {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => setQrTable(t)}
+                  onClick={() => openQr(t)}
                   title="Ver/imprimir QR del menú de esta mesa"
                 >
                   QR
@@ -194,19 +208,26 @@ export function TablesView({ token, onToast }: TablesViewProps) {
             <p className="admin-muted">
               El cliente escanea este código para abrir el menú digital de la mesa.
               <br />
-              Sesión válida por 3 horas (se renueva con pedido activo).
+              QR ESTÁTICO — esta URL es estable y se imprime una sola vez
+              (la sesión se crea automáticamente al escanear).
             </p>
             <div className="admin-qr-modal__qr">
-              <QRDisplay
-                data={getQrUrl(qrTable.number)}
-                size={220}
-                label={`Mesa ${qrTable.number} — Rey de la Chelada`}
-              />
+              {qrLoading ? (
+                <p className="admin-muted">Generando QR…</p>
+              ) : qrUrl ? (
+                <QRDisplay
+                  data={qrUrl}
+                  size={220}
+                  label={`Mesa ${qrTable.number} — Rey de la Chelada`}
+                />
+              ) : (
+                <p className="admin-muted">Error al generar el QR. Intenta de nuevo.</p>
+              )}
             </div>
             <div className="admin-qr-modal__url admin-muted">
-              {getQrUrl(qrTable.number)}
+              {qrUrl}
             </div>
-            <Button variant="primary" onClick={() => window.print()}>
+            <Button variant="primary" onClick={() => window.print()} disabled={!qrUrl}>
               🖨 Imprimir QR
             </Button>
           </Card>

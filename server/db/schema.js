@@ -11,7 +11,7 @@
  * ═══════════════════════════════════════════════════════════
  */
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const CREATE_TABLES = [
   // ── Staff / Users (v2: 3 roles only, no username) ─────
@@ -199,6 +199,20 @@ const CREATE_TABLES = [
     accepted_at   TEXT,
     created_at    TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (table_id) REFERENCES tables(id)
+  )`,
+
+  // ── Client Sessions (QR mesas — server-side) ──────────
+  // v3: Sesiones QR que ANTES vivían en memoria del navegador Admin.
+  // Ahora viven en el servidor → el cliente puede validarlas.
+  `CREATE TABLE IF NOT EXISTS client_sessions (
+    id          TEXT PRIMARY KEY,
+    session_id  TEXT NOT NULL UNIQUE,
+    table_number INTEGER NOT NULL,
+    expires_at  TEXT NOT NULL,
+    order_id    TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    last_active_at TEXT,
+    interactions INTEGER NOT NULL DEFAULT 0
   )`,
 
   // ── Sync Log ──────────────────────────────────────────

@@ -197,6 +197,7 @@ import syncRoutes from './routes/sync.js';
 import reportsRoutes from './routes/reports.js';
 import waiterCallsRoutes from './routes/waiter-calls.js';
 import clientOrdersRoutes from './routes/client-orders.js';
+import clientSessionsRoutes from './routes/client-sessions.js';
 import { requireRole } from './middleware/auth.js';
 
 // ── Route registration ────────────────────────────────────
@@ -210,6 +211,7 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/waiter-calls', waiterCallsRoutes);
 app.use('/api/client-orders', clientOrdersRoutes);  // PUBLIC — clientes PWA (sin JWT)
+app.use('/api/client-sessions', clientSessionsRoutes); // POST admin + GET validate público
 
 // ============================================================
 // WebSocket — KDS Real-Time (delegated to broadcaster SSOT)
