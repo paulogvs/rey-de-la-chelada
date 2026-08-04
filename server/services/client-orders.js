@@ -62,12 +62,14 @@ export function createPublicOrder(db, input) {
     const quantity = item.quantity || 1;
 
     // Resolve unit price: base price (null = size-variant item) + modifier adjustments.
-    // Modifiers arrive as [{ option_id, quantity? }] from the clientes PWA.
+    // Contrato SSOT: modifiers llegan como [{ option_id }] (camelCase en el
+    // payload público clientes → snake_case opción única). Ya NO se tolera
+    // el doble-nombre modifier_option_id.
     let modifierAdjustment = 0;
     let modifierSummary = [];
     const rawModifiers = Array.isArray(item.modifiers) ? item.modifiers : [];
     if (rawModifiers.length > 0) {
-      const optionIds = rawModifiers.map(m => m.option_id || m.modifier_option_id).filter(Boolean);
+      const optionIds = rawModifiers.map(m => m.option_id).filter(Boolean);
       let options = [];
       if (optionIds.length > 0) {
         const placeholders = optionIds.map(() => '?').join(',');
@@ -76,12 +78,12 @@ export function createPublicOrder(db, input) {
         ).all(...optionIds);
       }
       for (const m of rawModifiers) {
-        const opt = options.find(o => o.id === (m.option_id || m.modifier_option_id));
+        const opt = options.find(o => o.id === m.option_id);
         if (!opt) {
           return {
             success: false,
             code: 'INVALID_MODIFIER_OPTION',
-            error: `Opción inválida: ${m.option_id || m.modifier_option_id}`,
+            error: `Opción inválida: ${m.option_id}`,
           };
         }
         modifierAdjustment += Number(opt.price_adjustment || 0);
@@ -102,7 +104,9 @@ export function createPublicOrder(db, input) {
       unit_price: unitPrice,
       subtotal: itemSubtotal,
       modifiers_json: modifierSummary.length > 0 ? JSON.stringify(modifierSummary) : null,
-      preparation_notes: item.notes || item.preparation_notes || '',
+      // Contrato SSOT: el campo de notas es `notes` (único). No se tolera
+      // el doble-nombre preparation_notes en la entrada pública.
+      preparation_notes: item.notes || '',
       status: 'pending',
     });
   }

@@ -263,6 +263,23 @@ describe('createPublicOrder service', () => {
     expect(result.success).toBe(false);
     expect(result.code).toBe('INVALID_MODIFIER_OPTION');
   });
+
+  it('NO tolera el doble-nombre modifier_option_id (contrato SSOT: option_id único)', async () => {
+    // FASE 5: se eliminó la tolerancia frágil de doble-nombre en cliente.
+    const { createPublicOrder } = await import('../../server/services/client-orders.js');
+    const result = createPublicOrder(mockDb, {
+      table_number: 1,
+      session_id: 'abc-123',
+      items: [{
+        menu_item_id: 'm3',
+        quantity: 1,
+        modifiers: [{ modifier_option_id: 'o2' }], // nombre NO autorizado
+      }],
+    });
+    // El option_id no es válido (undefined) → debe rechazar con código claro.
+    expect(result.success).toBe(false);
+    expect(result.code).toBe('INVALID_MODIFIER_OPTION');
+  });
 });
 
 describe('getPublicOrderStatus service', () => {

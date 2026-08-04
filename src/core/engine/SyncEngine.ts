@@ -20,6 +20,7 @@
 
 import { SyncQueue, getBackoffDelay, type SyncAction, type SyncQueueItem, type SyncFlushResult } from './SyncQueue';
 import { isBrowserOnline, subscribeOnlineStatus } from '@/pwa/_shared/hooks/useOnlineStatus';
+import { TOKEN_KEY_PREFIX } from '@/pwa/_shared/api/apiFetch';
 
 // ============================================================
 // Constantes y tipos
@@ -67,10 +68,12 @@ export interface SyncEngineOptions {
   network?: NetworkMonitor;
   /** fetch (default: globalThis.fetch) */
   fetchImpl?: typeof fetch;
-  /** Provee el JWT para Authorization (default: localStorage rdlc:authToken) */
+  /** Provee el JWT para Authorization (default: localStorage rdlc-token:{moduleId}) */
   tokenProvider?: () => string | null;
   /** Nombre de la base IndexedDB de la cola */
   dbName?: string;
+  /** Módulo PWA para leer el token por-módulo (SSOT con apiFetch). */
+  moduleId?: string;
 }
 
 // ============================================================
@@ -95,9 +98,11 @@ export class SyncEngine {
     this.storage = options.storage ?? this.defaultStorage();
     this.network = options.network ?? browserNetwork;
     this.fetchImpl = options.fetchImpl ?? this.defaultFetch();
-    this.tokenProvider = options.tokenProvider ?? this.defaultTokenProvider();
+    // SSOT: el token por defecto se lee con la MISMA clave que apiFetch
+    // (rdlc-token:{moduleId}). Antes leía `rdlc:authToken` (clave que nada
+    // escribía) → sync nunca llevaba Authorization.
+    this.tokenProvider = options.tokenProvider ?? this.defaultTokenProvider(options.moduleId ?? 'staff');
     this.online = this.network.isOnline();
-
     // Restaurar lastSync desde storage (independiente de start())
     this.restoreLastSync();
 
@@ -130,10 +135,10 @@ export class SyncEngine {
     }) as typeof fetch;
   }
 
-  private defaultTokenProvider(): () => string | null {
+  private defaultTokenProvider(moduleId: string): () => string | null {
     return () => {
       if (typeof localStorage === 'undefined') return null;
-      return localStorage.getItem('rdlc:authToken');
+      return localStorage.getItem(`${TOKEN_KEY_PREFIX}${moduleId}`);
     };
   }
 
