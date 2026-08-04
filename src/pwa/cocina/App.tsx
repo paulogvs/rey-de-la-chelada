@@ -17,6 +17,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { bootstrapPwa } from '../_shared/bootstrap';
 import { setCurrentPwaModule } from '../_shared/hooks/useCapability';
 import { useKDSWebSocket } from '../_shared/hooks/useKDSWebSocket';
+import { useFullscreen } from '../_shared/hooks/useFullscreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { orderEngine } from '@/core/engine';
 import { KDSOrderCard, KDSOrderCardSkeleton } from '@/ui/components/KDSOrderCard';
@@ -88,6 +89,8 @@ interface KDSState {
 export default function App() {
   setCurrentPwaModule('cocina');
   bootstrapPwa('cocina');
+
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
 
   const [state, setState] = useState<KDSState>({
     orders: [],
@@ -304,6 +307,14 @@ export default function App() {
               aria-label={state.audioEnabled ? 'Silenciar alertas' : 'Activar alertas'}
             >
               {state.audioEnabled ? '🔊' : '🔇'}
+            </button>
+            <button
+              className={`kds-header__audio-btn ${isFullscreen ? 'active' : ''}`}
+              onClick={toggleFullscreen}
+              aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Entrar en pantalla completa'}
+              title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+            >
+              {isFullscreen ? '⤢' : '⛶'}
             </button>
           </div>
         </header>

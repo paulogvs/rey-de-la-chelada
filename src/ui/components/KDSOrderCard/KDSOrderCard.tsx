@@ -116,12 +116,12 @@ export function KDSOrderCard({
         {order.items.map(item => (
           <button
             key={item.id}
-            className={`kds-order__item ${item.status === 'delivered' ? 'kds-order__item--done' : ''} ${item.status === 'cancelled' ? 'kds-order__item--cancelled' : ''}`}
+            className={`kds-order__item ${item.status === 'ready' ? 'kds-order__item--ready' : ''} ${item.status === 'delivered' ? 'kds-order__item--done' : ''} ${item.status === 'cancelled' ? 'kds-order__item--cancelled' : ''}`}
             onClick={() => handleItemClick(item.id, item.status)}
             disabled={item.status === 'delivered' || item.status === 'cancelled'}
           >
             <span className="kds-order__item-check" aria-hidden="true">
-              {item.status === 'delivered' ? '✓' : item.status === 'cancelled' ? '✕' : item.status === 'preparing' ? '○' : '·'}
+              {item.status === 'ready' || item.status === 'delivered' ? '✓' : item.status === 'cancelled' ? '✕' : item.status === 'preparing' ? '○' : '·'}
             </span>
             <span className="kds-order__item-qty">{item.quantity}x</span>
             <span className="kds-order__item-name">{item.menuItemName}</span>
@@ -133,8 +133,8 @@ export function KDSOrderCard({
             {item.preparationNotes && (
               <span className="kds-order__item-notes">{item.preparationNotes}</span>
             )}
-            <span className="kds-order__item-status">
-              {item.status === 'delivered' ? 'LISTO' : item.status === 'preparing' ? '...' : ''}
+            <span className={`kds-order__item-status ${item.status === 'ready' ? 'kds-order__item-status--ready' : ''}`}>
+              {item.status === 'ready' ? 'LISTO' : item.status === 'delivered' ? 'ENTREGADO' : item.status === 'preparing' ? '...' : ''}
             </span>
           </button>
         ))}

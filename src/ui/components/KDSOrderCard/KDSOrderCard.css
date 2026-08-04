@@ -125,6 +125,28 @@
   text-decoration: line-through;
 }
 
+/* ---- Ready highlight (pulsing glow — item ready to be picked up) ---- */
+
+.kds-order__item--ready {
+  background: color-mix(in srgb, var(--kds-completed) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--kds-completed) 40%, transparent);
+  animation: kds-ready-pulse 2s var(--ease-in-out) infinite;
+}
+
+@keyframes kds-ready-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--kds-completed) 30%, transparent); }
+  50% { box-shadow: 0 0 14px color-mix(in srgb, var(--kds-completed) 50%, transparent); }
+}
+
+.kds-order__item-status--ready {
+  color: var(--kds-completed);
+  font-weight: 800;
+  background: color-mix(in srgb, var(--kds-completed) 20%, transparent);
+  border-radius: var(--radius-full);
+  padding: 2px var(--space-2);
+  white-space: nowrap;
+}
+
 .kds-order__item--cancelled {
   opacity: 0.4;
   text-decoration: line-through;
