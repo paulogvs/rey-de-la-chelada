@@ -17,6 +17,7 @@ import { appConfig, type PwaModuleId } from '@/core/config';
 import { PWA_REGISTRY } from '@/core/config/pwa-registry';
 import { MODULE_CAPABILITIES } from '@/core/config/capabilities';
 import themeManager from '@/ui/tokens/theme';
+import { registerServiceWorkerWithAutoUpdate } from './serviceWorkerAutoUpdate';
 
 export interface PwaEnv {
   moduleId: PwaModuleId;
@@ -54,13 +55,16 @@ export function bootstrapPwa(moduleId: PwaModuleId): PwaEnv {
   document.documentElement.dataset.pwa = moduleId;
   document.documentElement.dataset.themeVariant = reg.themeVariant;
 
-  // 4. Service Worker — registro por módulo (FASE 3)
+  // 4. Service Worker — registro por módulo (FASE 3) + auto-actualización
   //    Solo en producción: sw.js vive en /[pwa]/sw.js con scope /[pwa]/
+  //    Auto-update: si hay un SW nuevo (build reciente), activarlo de inmediato
+  //    y recargar una vez — evita la "pantalla café" de SW viejo con hashes
+  //    antiguos que ya no existen en el servidor. Lógica en módulo testeado.
   if (import.meta.env.PROD && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker
-        .register(`/${moduleId}/sw.js`, { scope: `/${moduleId}/` })
-        .catch(err => console.error(`[PWA] SW registration failed (${moduleId}):`, err));
+      registerServiceWorkerWithAutoUpdate(moduleId, navigator.serviceWorker, window).catch(err =>
+        console.error(`[PWA] SW registration failed (${moduleId}):`, err)
+      );
     });
   }
 
