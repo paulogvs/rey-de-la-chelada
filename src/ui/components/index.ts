@@ -37,3 +37,8 @@ export type { QRDisplayProps } from './QRDisplay/QRDisplay';
 
 export { MenuItemCard, MenuItemCardSkeleton, MenuItemCardEmpty } from './MenuItemCard/MenuItemCard';
 export type { MenuItemCardProps } from './MenuItemCard/MenuItemCard';
+
+export { KDSBoard } from './KDSBoard/KDSBoard';
+export type { KDSBoardProps } from './KDSBoard/KDSBoard';
+export { filterItemsByModule } from './KDSBoard/filter';
+export type { KDSModule } from './KDSBoard/filter';

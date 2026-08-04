@@ -1,62 +1,43 @@
 /**
- * PWA BAR — Redirect to Unified KDS
+ * PWA BAR — KDS de barra (solo area='bar').
  *
- * Since KDS is now unified (cocina+bar merged), this PWA
- * redirects to the unified KDS at /cocina/.
- * Keeps the bar PWA entry point for backward compatibility.
+ * FASE 1 (KDS separado): usa el componente compartido KDSBoard con
+ * module='bar'. Muestra SOLO items de bebidas/micheladas (mi.area='bar').
+ * Auth: rol 'kds' (PIN 2222) o 'admin' (PIN 0000) — ver MODULE_ROLES.
+ *
+ * Reemplaza el antiguo redirect a /cocina/ (KDS unificado).
  */
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { bootstrapPwa } from '../_shared/bootstrap';
 import { setCurrentPwaModule } from '../_shared/hooks/useCapability';
+import { useStaffAuth } from '../_shared/hooks/useStaffAuth';
+import { LoginScreen } from '../_shared/components/LoginScreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
+import { Loader } from '@/ui/components/Loader';
+import { KDSBoard } from '@/ui/components/KDSBoard';
 
 export default function App() {
   setCurrentPwaModule('bar');
   bootstrapPwa('bar');
 
-  useEffect(() => {
-    // Redirect to unified KDS after a brief moment
-    const timer = setTimeout(() => {
-      window.location.href = '/cocina/';
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, []);
+  const { isAuthenticated, token, login, restoring } = useStaffAuth('bar');
 
-  return (
-    <PwaLayout title="Bar — Redirigiendo">
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '60vh',
-        gap: 'var(--space-4)',
-        textAlign: 'center',
-        padding: 'var(--space-4)',
-      }}>
-        <div style={{ fontSize: '48px' }}>🍺</div>
-        <h2>KDS Unificado</h2>
-        <p style={{ color: 'var(--text-muted)' }}>
-          Bar y cocina ahora comparten el mismo KDS.
-        </p>
-        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
-          Redirigiendo a /cocina/...
-        </p>
-        <a
-          href="/cocina/"
-          style={{
-            background: 'var(--dorado-rey)',
-            color: 'var(--madera-oscura)',
-            padding: 'var(--space-3) var(--space-5)',
-            borderRadius: 'var(--radius-md)',
-            fontWeight: 700,
-            textDecoration: 'none',
-          }}
-        >
-          Ir a KDS Unificado
-        </a>
-      </div>
-    </PwaLayout>
-  );
+  if (restoring) {
+    return (
+      <PwaLayout title="Bar">
+        <Loader block label="Cargando…" />
+      </PwaLayout>
+    );
+  }
+
+  if (!isAuthenticated || !token) {
+    return (
+      <PwaLayout title="Bar">
+        <LoginScreen title="Barra" busy={restoring} onLogin={login} />
+      </PwaLayout>
+    );
+  }
+
+  return <KDSBoard module="bar" title="Barra" icon="🍺" token={token} />;
 }
