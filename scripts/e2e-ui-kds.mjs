@@ -54,7 +54,8 @@ async function run() {
   try {
     // ── 1. KDS BAR: login + header + sin redirect ──
     console.log('1. PWA /bar/ → KDS Barra');
-    const barPage = await browser.newPage();
+    const barContext = await browser.newContext(); // localStorage limpio
+    const barPage = await barContext.newPage();
     await barPage.goto(`${BASE}/bar/`, { waitUntil: 'domcontentloaded' });
     // NO debe redirigir a /cocina/
     await barPage.waitForTimeout(2500); // el antiguo redirect tardaba 1.5s
@@ -69,7 +70,8 @@ async function run() {
 
     // ── 2. KDS COCINA: login + header ──
     console.log('2. PWA /cocina/ → KDS Cocina');
-    const cocinaPage = await browser.newPage();
+    const cocinaContext = await browser.newContext(); // localStorage limpio
+    const cocinaPage = await cocinaContext.newPage();
     await cocinaPage.goto(`${BASE}/cocina/`, { waitUntil: 'domcontentloaded' });
     await loginWithKeypad(cocinaPage, '2222');
     await cocinaPage.waitForSelector('.kds-header__title', { timeout: 20000 });
@@ -144,7 +146,9 @@ async function run() {
     db.prepare('DELETE FROM tables WHERE id = ?').run(table.id);
 
     await barPage.close();
+    await barContext.close();
     await cocinaPage.close();
+    await cocinaContext.close();
   } finally {
     await browser.close();
   }
