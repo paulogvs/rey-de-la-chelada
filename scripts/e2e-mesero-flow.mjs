@@ -101,11 +101,14 @@ async function run() {
   const confirm = await api(`/api/orders/${orderId}/confirm`, { method: 'PATCH', auth: true });
   assert(confirm.status === 200 && confirm.json.status === 'confirmed', 'confirmed');
 
-  // 8. Waiter calls — create a client call for table 99
+  // 8. Waiter calls — create a client call for table 99 (sesión QR real:
+  //    la validación exige que la session_id exista — "el QR es el permiso")
   console.log('8. Waiter call lifecycle');
+  const sess = await api(`/api/client-sessions/table/99`, { method: 'POST' });
+  assert(sess.status === 200 && sess.json?.sessionId, 'client QR session created');
   const call = await api('/api/waiter-calls', {
     method: 'POST',
-    body: { table_id: table99.id, table_number: 99, session_id: 'smoke-sess', call_type: 'call_waiter' },
+    body: { table_number: 99, session_id: sess.json.sessionId, call_type: 'call_waiter' },
   });
   assert(call.status === 201 && call.json.call, 'client call created');
   const callId = call.json.call.id;

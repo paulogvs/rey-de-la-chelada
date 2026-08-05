@@ -88,17 +88,21 @@ export function PageHeader({
 /** Floating customer actions (call waiter / request bill). */
 export function CustomerActions({
   canCallWaiter,
+  canRequestBill,
   isReadOnly,
   isValid,
   onCallWaiter,
   onRequestBill,
 }: {
   canCallWaiter: boolean;
+  canRequestBill: boolean;
   isReadOnly: boolean;
   isValid: boolean;
   onCallWaiter: () => void;
   onRequestBill: () => void;
 }) {
+  // FASE 1: llamar mesero está disponible con sesión válida (con o sin
+  // pedido activo). Pedir cuenta requiere pedido activo.
   if (canCallWaiter) {
     return (
       <footer className="clientes-actions">
@@ -108,19 +112,21 @@ export function CustomerActions({
         >
           Llamar Mesero
         </button>
-        <button
-          className="clientes-actions__btn clientes-actions__btn--bill animate-fade-in-up"
-          onClick={onRequestBill}
-        >
-          Pedir Cuenta
-        </button>
+        {canRequestBill && (
+          <button
+            className="clientes-actions__btn clientes-actions__btn--bill animate-fade-in-up"
+            onClick={onRequestBill}
+          >
+            Pedir Cuenta
+          </button>
+        )}
       </footer>
     );
   }
   if (isReadOnly && !canCallWaiter && isValid) {
     return (
       <footer className="clientes-actions clientes-actions--readonly">
-        <p>Escanea el QR cuando tengas un pedido activo para llamar al mesero.</p>
+        <p>Escanea el QR para llamar al mesero.</p>
       </footer>
     );
   }

@@ -16,6 +16,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { orderEngine } from '@/core/engine';
 import type { Order } from '@/core/types';
 import { validateClientSession, getOrCreateSession } from './sessionApi';
+import { resolveClientCapabilities } from '../utils/clientCapabilities';
+import { createClientCall } from '../../_shared/api/waiterCallsApi';
 
 const SESSION_STORAGE_KEY = 'rdlc-table-session';
 
@@ -164,14 +166,23 @@ export function useTableSession(): TableSession {
       const hasActiveOrder = activeOrder !== null || !!validation.hasActiveOrder;
       const freshSessionId = validation.sessionId || resolvedSessionId;
 
+      // FASE 1: capacidades centralizadas (canCallWaiter = sesión válida,
+      // con o sin pedido activo — el cliente puede llamar al mesero desde
+      // el QR aunque no haya pedido; el mesero crea el pedido).
+      const caps = resolveClientCapabilities({
+        valid: validation.valid,
+        hasActiveOrder,
+        readonlyReason: validation.reason,
+      });
+
       setSession({
         tableNumber,
         sessionId: freshSessionId,
         hasActiveOrder,
         activeOrder,
-        isReadOnly: !hasActiveOrder || validation.reason === 'readonly',
-        canCallWaiter: hasActiveOrder && validation.valid,
-        canRequestBill: hasActiveOrder && validation.valid,
+        isReadOnly: caps.isReadOnly,
+        canCallWaiter: caps.canCallWaiter,
+        canRequestBill: caps.canRequestBill,
         isValid: validation.valid,
         error: validation.valid ? undefined : validation.reason,
         retry: evaluateSession,
@@ -225,7 +236,9 @@ export function useTableSession(): TableSession {
     };
   }, [evaluateSession]);
 
-  // Call waiter con debounce (prevent spam)
+  // Call waiter con debounce (prevent spam) + POST real al servidor.
+  // FASE 1: antes era un setTimeout simulado — la llamada jamás llegaba
+  // al mesero. Ahora crea una waiter_call real (public, session QR = permiso).
   const callWaiter = useCallback(async (): Promise<void> => {
     const now = Date.now();
     if (now - callWaiterDebounceRef.current < 10000) {
@@ -233,38 +246,46 @@ export function useTableSession(): TableSession {
     }
     callWaiterDebounceRef.current = now;
 
-    return new Promise((resolve, reject) => {
-      try {
-        console.log(`[Clientes] Mesa ${session.tableNumber} llama al mesero`);
-        // Aquí se integrará con WebSocket
-        // ws.send({ type: 'call_waiter', table: session.tableNumber, orderId: session.activeOrder?.id });
-        
-        // Simulate async network call
-        setTimeout(() => {
-          resolve();
-        }, 500);
-      } catch (err) {
-        reject(err);
-      }
-    });
-  }, [session.tableNumber, session.activeOrder?.id]);
+    if (!session.tableNumber || !session.sessionId) {
+      throw new Error('Sesión de mesa inválida. Escanea el QR nuevamente.');
+    }
 
-  // Request bill
-  const requestBill = useCallback(async (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      try {
-        console.log(`[Clientes] Mesa ${session.tableNumber} solicita la cuenta`);
-        // Aquí se integrará con WebSocket
-        // ws.send({ type: 'request_bill', table: session.tableNumber, orderId: session.activeOrder?.id });
-        
-        setTimeout(() => {
-          resolve();
-        }, 500);
-      } catch (err) {
-        reject(err);
-      }
+    console.log(`[Clientes] Mesa ${session.tableNumber} llama al mesero`);
+    const result = await createClientCall({
+      table_number: session.tableNumber,
+      session_id: session.sessionId,
+      call_type: 'call_waiter',
     });
-  }, [session.tableNumber, session.activeOrder?.id]);
+    if (!result.ok) {
+      const code = result.data?.success === false ? (result.data as { code?: string }).code : null;
+      if (code === 'CALL_ALREADY_PENDING') {
+        throw new Error('Ya hay una llamada pendiente para esta mesa.');
+      }
+      throw new Error('No se pudo notificar al mesero. Intenta de nuevo.');
+    }
+  }, [session.tableNumber, session.sessionId]);
+
+  // Request bill — POST real (requiere pedido activo, la UI lo garantiza).
+  // FASE 1: era setTimeout simulado; ahora crea una waiter_call request_bill.
+  const requestBill = useCallback(async (): Promise<void> => {
+    if (!session.tableNumber || !session.sessionId) {
+      throw new Error('Sesión de mesa inválida. Escanea el QR nuevamente.');
+    }
+
+    console.log(`[Clientes] Mesa ${session.tableNumber} solicita la cuenta`);
+    const result = await createClientCall({
+      table_number: session.tableNumber,
+      session_id: session.sessionId,
+      call_type: 'request_bill',
+    });
+    if (!result.ok) {
+      const code = result.data?.success === false ? (result.data as { code?: string }).code : null;
+      if (code === 'CALL_ALREADY_PENDING') {
+        throw new Error('Ya hay una solicitud de cuenta pendiente.');
+      }
+      throw new Error('No se pudo solicitar la cuenta. Intenta de nuevo.');
+    }
+  }, [session.tableNumber, session.sessionId]);
 
   return {
     ...session,

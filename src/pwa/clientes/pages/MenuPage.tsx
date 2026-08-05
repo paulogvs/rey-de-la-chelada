@@ -278,6 +278,7 @@ export function MenuPage({
       {/* Customer actions */}
       <CustomerActions
         canCallWaiter={session.canCallWaiter}
+        canRequestBill={session.canRequestBill}
         isReadOnly={session.isReadOnly}
         isValid={session.isValid}
         onCallWaiter={handleCallWaiter}

@@ -22,15 +22,22 @@ const router = Router();
 // ============================================================
 // POST /api/waiter-calls — Create a call (client, no auth)
 // ============================================================
+//
+// "El QR es el permiso": la llamada solo se crea si la session_id
+// existe en client_sessions y pertenece a la mesa del QR. El table_id
+// se resuelve desde table_number (el cliente PWA no conoce table_id).
+// Esto habilita llamar al mesero SIN pedido activo (FASE 1).
+//
+// Compatible con table_id directo (E2E/mesero). Si falta, se resuelve.
 
 router.post('/', (req, res) => {
   try {
     const { table_id, table_number, session_id, call_type } = req.body;
 
-    if (!table_id || !table_number || !session_id || !call_type) {
+    if ((!table_id && !table_number) || !session_id || !call_type) {
       return res.status(400).json({
         success: false,
-        error: 'table_id, table_number, session_id y call_type son requeridos',
+        error: 'table_id o table_number, session_id y call_type son requeridos',
         code: 'WAITER_CALL_DATA_REQUIRED',
       });
     }
@@ -45,10 +52,44 @@ router.post('/', (req, res) => {
 
     const db = getDb();
 
+    // Resolver table_id desde table_number si no vino directo
+    let resolvedTableId = table_id;
+    if (!resolvedTableId && table_number) {
+      const table = db.prepare('SELECT id, number FROM tables WHERE number = ?').get(table_number);
+      if (!table) {
+        return res.status(404).json({
+          success: false,
+          error: 'Mesa no encontrada',
+          code: 'TABLE_NOT_FOUND',
+        });
+      }
+      resolvedTableId = table.id;
+    }
+
+    // Validar sesión QR: existe y pertenece a la mesa ("el QR es el permiso")
+    const session = db.prepare(
+      'SELECT * FROM client_sessions WHERE session_id = ?'
+    ).get(session_id);
+
+    if (!session) {
+      return res.status(403).json({
+        success: false,
+        error: 'Sesión QR inválida. Escanea el QR de la mesa.',
+        code: 'INVALID_CLIENT_SESSION',
+      });
+    }
+    if (session.table_number !== Number(table_number ?? tableNumberOf(resolvedTableId, db))) {
+      return res.status(403).json({
+        success: false,
+        error: 'La sesión no pertenece a esta mesa',
+        code: 'SESSION_TABLE_MISMATCH',
+      });
+    }
+
     // Check for existing pending call of same type on this table
     const existing = db.prepare(
       "SELECT id FROM waiter_calls WHERE table_id = ? AND call_type = ? AND status = 'pending'"
-    ).get(table_id, call_type);
+    ).get(resolvedTableId, call_type);
 
     if (existing) {
       return res.status(409).json({
@@ -63,7 +104,7 @@ router.post('/', (req, res) => {
     db.prepare(`
       INSERT INTO waiter_calls (id, table_id, table_number, session_id, call_type, status)
       VALUES (?, ?, ?, ?, ?, 'pending')
-    `).run(id, table_id, table_number, session_id, call_type);
+    `).run(id, resolvedTableId, table_number ?? session.table_number, session_id, call_type);
 
     const call = db.prepare('SELECT * FROM waiter_calls WHERE id = ?').get(id);
 
@@ -73,6 +114,12 @@ router.post('/', (req, res) => {
     res.status(500).json({ success: false, error: 'Error al crear llamada', code: 'WAITER_CALL_CREATE_ERROR' });
   }
 });
+
+/** Resuelve el número de mesa desde un table_id (fallback para validación). */
+function tableNumberOf(tableId, db) {
+  const row = db.prepare('SELECT number FROM tables WHERE id = ?').get(tableId);
+  return row?.number;
+}
 
 // ============================================================
 // GET /api/waiter-calls — List calls (meseros poll)

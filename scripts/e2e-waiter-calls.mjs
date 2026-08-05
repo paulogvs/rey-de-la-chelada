@@ -13,7 +13,6 @@ import { tokenFor } from './e2e-session.mjs';
 
 const reporter = makeReporter('waiter-calls');
 const TABLE_NUMBER = 96;
-const SESSION = `e2e-waiter-${Date.now()}`;
 
 async function run() {
   console.log('== Flujo 8: Llamar mesero ==');
@@ -24,12 +23,18 @@ async function run() {
 
   const table = await ensureThrowawayTable(TABLE_NUMBER, { adminToken });
 
-  // 1. Cliente llama mesero (sin auth — endpoint público)
-  console.log('1. Cliente llama mesero (call_waiter)');
+  // 0. Cliente obtiene su sesión QR real (mismo flujo que la PWA: QR estático)
+  console.log('0. Sesión QR del cliente (lazy, sin pedido activo)');
+  const sess = await api(`/api/client-sessions/table/${TABLE_NUMBER}`, { method: 'POST' });
+  reporter.assert(sess.status === 200 && sess.json?.sessionId, `sesión QR creada (${sess.status})`);
+  const SESSION = sess.json.sessionId;
+
+  // 1. Cliente llama mesero SIN pedido activo (FASE 1 — solo table_number,
+  //    el servidor resuelve table_id y valida la sesión QR)
+  console.log('1. Cliente llama mesero sin pedido (call_waiter)');
   const call = await api('/api/waiter-calls', {
     method: 'POST',
     body: {
-      table_id: table.id,
       table_number: TABLE_NUMBER,
       session_id: SESSION,
       call_type: 'call_waiter',
@@ -39,12 +44,22 @@ async function run() {
   const callId = call.json.call.id;
   reporter.assert(call.json.call.status === 'pending', `status pending (${call.json.call.status})`);
 
+  // 1b. Sesión QR inválida → 403 (el QR es el permiso)
+  const invalid = await api('/api/waiter-calls', {
+    method: 'POST',
+    body: {
+      table_number: TABLE_NUMBER,
+      session_id: `sess_inventada_${Date.now()}`,
+      call_type: 'call_waiter',
+    },
+  });
+  reporter.assert(invalid.status === 403 && invalid.json.code === 'INVALID_CLIENT_SESSION', `sesión inválida → 403 (${invalid.status})`);
+
   // 2. Duplicado → 409 (no spamear al mesero)
   console.log('2. Duplicado bloqueado');
   const dup = await api('/api/waiter-calls', {
     method: 'POST',
     body: {
-      table_id: table.id,
       table_number: TABLE_NUMBER,
       session_id: SESSION,
       call_type: 'call_waiter',
@@ -81,7 +96,6 @@ async function run() {
   const bill = await api('/api/waiter-calls', {
     method: 'POST',
     body: {
-      table_id: table.id,
       table_number: TABLE_NUMBER,
       session_id: SESSION,
       call_type: 'request_bill',
@@ -102,6 +116,7 @@ async function run() {
   // Limpieza
   const db = await getCleanupDb();
   db.prepare('DELETE FROM waiter_calls WHERE session_id = ?').run(SESSION);
+  db.prepare('DELETE FROM client_sessions WHERE session_id = ?').run(SESSION);
   await api(`/api/tables/${table.id}`, { method: 'DELETE', token: adminToken });
   reporter.assert(true, 'limpieza completa');
 

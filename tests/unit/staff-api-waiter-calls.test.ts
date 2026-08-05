@@ -110,4 +110,17 @@ describe('createClientCall', () => {
     const body = JSON.parse(init.body as string);
     expect(body).toMatchObject({ call_type: 'request_bill', table_number: 3 });
   });
+
+  it('supports the PWA flow: only table_number + session_id (no table_id)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ success: true, call: serverCall }, 201));
+    const result = await createClientCall(
+      { table_number: 3, session_id: 's1', call_type: 'call_waiter' },
+      fetchMock as unknown as typeof fetch
+    );
+    expect(result.ok).toBe(true);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body).toMatchObject({ table_number: 3, session_id: 's1', call_type: 'call_waiter' });
+    expect(body.table_id).toBeUndefined();
+  });
 });

@@ -104,7 +104,8 @@ export async function cancelCall(
 }
 
 export interface ClientCallPayload {
-  table_id: string;
+  /** Opcional — el cliente PWA solo conoce table_number; el servidor resuelve table_id */
+  table_id?: string;
   table_number: number;
   session_id: string;
   call_type: 'call_waiter' | 'request_bill';
