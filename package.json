@@ -33,9 +33,9 @@
     "pm2:restart": "pm2 restart rey-de-la-chelada",
     "pm2:logs": "pm2 logs rey-de-la-chelada",
     "pm2:monit": "pm2 monit",
-    "setup": "setup.bat",
-    "update": "update.bat",
-    "backup": "backup.bat"
+    "setup": "scripts\\setup.bat",
+    "update": "scripts\\update.bat",
+    "backup": "scripts\\backup.bat"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",

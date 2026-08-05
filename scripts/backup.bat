@@ -4,10 +4,12 @@ setlocal enabledelayedexpansion
 REM ==========================================================
 REM  Rey de la Chelada - Daily Database Backup
 REM  Creates a timestamped copy. Keeps last 7 days.
+REM  v1.4: ahora vive en scripts\ - APP_DIR apunta a la raiz.
 REM ==========================================================
 
-set "APP_DIR=%~dp0"
-set "APP_DIR=%APP_DIR:~0,-1%"
+set "SCRIPT_DIR=%~dp0"
+set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
+set "APP_DIR=%SCRIPT_DIR%\.."
 
 set "DB_PATH=!APP_DIR!data\rey-de-la-chelada.db"
 set "BACKUP_DIR=!APP_DIR!backups"

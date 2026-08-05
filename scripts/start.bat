@@ -1,8 +1,8 @@
 @echo off
 REM ============================================================
 REM  Rey de la Chelada - Start Server
-REM  Starts the server (hidden via VBScript, no console window).
-REM  Safe to close this window - server keeps running.
+REM  Inicia el servidor (oculto via VBScript, sin ventana de consola).
+REM  Seguro cerrar esta ventana - el servidor sigue corriendo.
 REM ============================================================
 setlocal enabledelayedexpansion
 title Rey de la Chelada - Start Server
@@ -10,8 +10,19 @@ title Rey de la Chelada - Start Server
 set "SCRIPT_DIR=%~dp0"
 set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
 set "ROOT=%SCRIPT_DIR%\.."
-
 set "PORT=3002"
+
+REM Leer PORT del .env si existe
+if exist "%ROOT%\.env" (
+    for /f "usebackq delims=" %%a in ("%ROOT%\.env") do (
+        set "LINE=%%a"
+        if not "!LINE!"=="" if not "!LINE:~0,1!"=="#" (
+            for /f "tokens=1,* delims==" %%b in ("!LINE!") do (
+                if "%%b"=="PORT" set "PORT=%%c"
+            )
+        )
+    )
+)
 
 echo.
 echo   ==========================================
@@ -29,6 +40,7 @@ if !errorlevel! equ 0 (
     echo.
     goto :DONE
 )
+echo     [INFO] No esta corriendo, iniciando...
 
 REM -------------------------------------------------------
 REM 2. Start server hidden (VBScript, no window)
@@ -61,6 +73,7 @@ echo   ==========================================
 echo.
 echo     Clientes:  http://localhost:!PORT!/clientes/
 echo     Cocina:    http://localhost:!PORT!/cocina/
+echo     Bar:       http://localhost:!PORT!/bar/
 echo     Meseros:   http://localhost:!PORT!/meseros/
 echo     Caja:      http://localhost:!PORT!/caja/
 echo     Admin:     http://localhost:!PORT!/admin/
@@ -68,3 +81,5 @@ echo.
 echo     Para detener: scripts\stop.bat
 echo.
 pause
+
+endlocal

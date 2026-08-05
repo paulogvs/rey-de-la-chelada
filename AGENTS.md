@@ -2,7 +2,7 @@
 
 > **SSOT — Este archivo GANA sobre cualquier otro.**
 > Creado: 2026-07-29 | Versión: 1.2.0 | Stack: React 19 + Express 5 + SQLite + Multi-PWA
-> Actualizado: 2026-08-03 — App completa FASE 8-13 (Admin PWA, flujo cliente, impresión, E2E)
+> Actualizado: 2026-08-05 — Scripts reordenados a scripts/ (v1.4)
 
 ---
 
@@ -15,9 +15,12 @@
 | `npm run test` | Ejecuta todos los tests |
 | `npm run lint` | ESLint check |
 | `npm run dev:server` | Inicia servidor Express |
-| `npm run pm2:start` | Inicia con PM2 |
-| `npm run setup` | setup.bat |
-| `npm run update` | update.bat |
+| `npm run setup` | `scripts\setup.bat` — instalación en PC nueva |
+| `npm run update` | `scripts\update.bat` — auto-update desde GitHub |
+| `scripts\start.bat` | Inicia el servicio (oculto) |
+| `scripts\stop.bat` | Detiene el servicio (libera puerto) |
+| `scripts\backup.bat` | Backup diario de la DB |
+| `scripts\sync.bat` | Sync con ecosistema FORCH.iA |
 
 ## 2. TESTING
 
@@ -38,9 +41,15 @@ rey-de-la-chelada/
 ├── forchi-brand.md          ← Nivel 2
 ├── branding.json            ← Brand tracking
 ├── ecosystem.config.js      ← PM2 config
-├── setup.bat               ← Windows installer
-├── update.bat              ← Auto-update
-├── backup.bat              ← Daily backup
+├── elevate.vbs             ← Elevación UAC (para setup bootstrap manual)
+├── scripts/                 ← TODOS los .bat (setup, update, start, stop, backup, sync)
+│   ├── setup.bat           ← instalación PC nueva (auto-eleva, clona, instala, build, arranca)
+│   ├── update.bat          ← auto-update desde GitHub (pull→install→build→restart real)
+│   ├── start.bat           ← inicia el servicio (oculto)
+│   ├── stop.bat            ← detiene el servicio
+│   ├── backup.bat          ← backup diario DB
+│   ├── sync.bat            ← sync con ecosistema FORCH.iA
+│   └── start-hidden.vbs    ← arranque oculto (sin ventana)
 ├── src/
 │   ├── core/
 │   │   ├── config/         ← SSOT Config (app.config, pwa-registry, capabilities, security)
