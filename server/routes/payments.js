@@ -52,7 +52,7 @@ function processPayment(db, { order_id, method, amount, iva_amount, reference, n
     throw new Error(`Método de pago inválido: ${method}`);
   }
 
-  const order = db.prepare('SELECT id, total, status FROM orders WHERE id = ?').get(order_id);
+  const order = db.prepare('SELECT id, total, iva_amount, status FROM orders WHERE id = ?').get(order_id);
   if (!order) {
     throw new Error(`Pedido no encontrado: ${order_id}`);
   }
@@ -68,12 +68,15 @@ function processPayment(db, { order_id, method, amount, iva_amount, reference, n
   }
 
   const paymentId = randomUUID();
+  // SSOT IVA: si el cliente no envía iva_amount, derivar del pedido
+  // (orders.iva_amount) — evita pagos con IVA 0 inconsistentes.
+  const ivaAmount = iva_amount ?? order.iva_amount ?? 0;
   db.prepare(`
     INSERT INTO payments (id, order_id, method, amount, iva_amount, reference,
                           status, processed_by, notes, synced_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    paymentId, order_id, canonicalMethod, amount, iva_amount || 0, reference || '',
+    paymentId, order_id, canonicalMethod, amount, ivaAmount, reference || '',
     canonicalStatus, processed_by, notes || '', new Date().toISOString()
   );
 

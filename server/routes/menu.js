@@ -271,13 +271,15 @@ router.post('/items', requireAuth, requireRole('admin'), (req, res) => {
     }
 
     const id = randomUUID();
+    // Booleanos JS → 0/1 (SQLite no acepta true/false al bindear)
+    const availableInt = is_available ? 1 : 0;
     db.prepare(`
       INSERT INTO menu_items (id, category_id, name, subtitle, description, price, currency,
                               image_url, is_available, sort_order, area, preparation_time)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, category_id, name, subtitle || '', description || '', price,
-      currency || 'BOB', image_url || '', is_available ?? 1, sort_order ?? 0,
+      currency || 'BOB', image_url || '', availableInt, sort_order ?? 0,
       area || 'cocina', preparation_time ?? 15
     );
 

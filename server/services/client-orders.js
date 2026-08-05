@@ -46,7 +46,7 @@ export function createPublicOrder(db, input) {
   let subtotal = 0;
   const orderItems = [];
   const findItem = db.prepare(
-    'SELECT id, name, price, area, category_id FROM menu_items WHERE id = ? AND is_active = 1'
+    'SELECT id, name, price, area, category_id FROM menu_items WHERE id = ? AND is_active = 1 AND is_available = 1'
   );
 
   for (const item of items) {
@@ -59,7 +59,10 @@ export function createPublicOrder(db, input) {
       };
     }
 
-    const quantity = item.quantity || 1;
+    const quantity = item.quantity ?? 1;
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      return { success: false, code: 'INVALID_QUANTITY', error: 'Cantidad inválida (debe ser ≥ 1)' };
+    }
 
     // Resolve unit price: base price (null = size-variant item) + modifier adjustments.
     // Contrato SSOT: modifiers llegan como [{ option_id }] (camelCase en el

@@ -312,6 +312,16 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
     const orderItems = [];
 
     for (const item of items) {
+      // Validación de cantidad (FASE 2): 0 o negativa → rechazo explícito
+      const quantity = item.quantity ?? 1;
+      if (!Number.isFinite(quantity) || quantity < 1) {
+        return res.status(400).json({
+          success: false,
+          error: 'Cantidad inválida (debe ser ≥ 1)',
+          code: 'INVALID_QUANTITY',
+        });
+      }
+
       const menuItem = db.prepare(
         'SELECT id, name, price, category_id, area FROM menu_items WHERE id = ? AND is_active = 1'
       ).get(item.menu_item_id);
@@ -319,8 +329,6 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
         return res.status(400).json({ success: false, error: `Item inválido: ${item.menu_item_id}`, code: 'INVALID_MENU_ITEM' });
       }
 
-      const quantity = item.quantity || 1;
-      // Resolve size/modifier adjustments from the DB (SSOT — server computes totals)
       const { adjustment, summary } = resolveModifierAdjustment(db, menuItem.id, item.modifiers);
       const unitPrice = round2((menuItem.price || 0) + adjustment);
       const itemSubtotal = round2(unitPrice * quantity);
@@ -609,7 +617,14 @@ router.post('/:id/items', requireAuth, requireRole('admin', 'mesero'), (req, res
       return res.status(404).json({ success: false, error: 'Item de menú no encontrado', code: 'MENU_ITEM_NOT_FOUND' });
     }
 
-    const qty = quantity || 1;
+    const qty = quantity ?? 1;
+    if (!Number.isFinite(qty) || qty < 1) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cantidad inválida (debe ser ≥ 1)',
+        code: 'INVALID_QUANTITY',
+      });
+    }
     const { adjustment } = resolveModifierAdjustment(db, menuItem.id, modifiers);
     const unitPrice = round2((menuItem.price || 0) + adjustment);
     const itemSubtotal = round2(unitPrice * qty);
