@@ -119,6 +119,10 @@ export const helmetCspConfig = {
   // silently in the browser → blank page. Static assets must allow
   // cross-origin reads (CORS middleware handles the Access-Control-*).
   crossOriginResourcePolicy: false,
+  // Disable HSTS (Strict-Transport-Security). The server serves plain
+  // HTTP over LAN/Tailscale (no TLS) — HSTS would make the browser
+  // remember to force HTTPS for that IP, reinforcing the splash bug.
+  strictTransportSecurity: false,
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -131,7 +135,15 @@ export const helmetCspConfig = {
       workerSrc: ["'self'", "blob:"],                                // Service Workers
       frameSrc: ["'none'"],
       objectSrc: ["'none'"],
-      upgradeInsecureRequests: [],
+      // CRITICAL: helmet v8 merges its DEFAULT directives (which include
+      // upgrade-insecure-requests) with these. On a plain-HTTP server
+      // (LAN/Tailscale, no TLS) that directive forces the browser to
+      // request EVERY sub-resource over HTTPS → ERR_SSL_PROTOCOL_ERROR
+      // → eternal splash when accessed via IP (localhost is exempt).
+      // Setting `null` DELETES the directive from the merged header
+      // while keeping the rest of helmet's defaults (base-uri,
+      // form-action, frame-ancestors, script-src-attr, ...).
+      upgradeInsecureRequests: null,
     },
   },
 };
