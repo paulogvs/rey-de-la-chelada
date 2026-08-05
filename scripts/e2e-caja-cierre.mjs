@@ -12,7 +12,7 @@
  *   6. Consistencia: payment.amount == pedido.total (IVA incluido)
  */
 
-import { api, makeReporter, ensureThrowawayTable } from './e2e-lib.mjs';
+import { api, makeReporter, ensureThrowawayTable, getCleanupDb } from './e2e-lib.mjs';
 import { tokenFor } from './e2e-session.mjs';
 
 const reporter = makeReporter('caja-cierre');
@@ -114,9 +114,7 @@ async function run() {
 
   // Limpieza
   console.log('7. Limpieza');
-  process.env.DB_PATH = process.env.E2E_DB_PATH || 'data/test-e2e.db';
-  const { getDb } = await import('../server/db/index.js');
-  const db = getDb();
+  const db = await getCleanupDb();
   db.prepare('DELETE FROM payments WHERE order_id = ?').run(orderId);
   db.prepare('DELETE FROM order_items WHERE order_id = ?').run(orderId);
   db.prepare('DELETE FROM orders WHERE id = ?').run(orderId);

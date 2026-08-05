@@ -8,7 +8,7 @@
  * Incluye: duplicado (409), request_bill, cancelar.
  */
 
-import { api, makeReporter, ensureThrowawayTable } from './e2e-lib.mjs';
+import { api, makeReporter, ensureThrowawayTable, getCleanupDb } from './e2e-lib.mjs';
 import { tokenFor } from './e2e-session.mjs';
 
 const reporter = makeReporter('waiter-calls');
@@ -100,9 +100,7 @@ async function run() {
   reporter.assert(missing.status === 404, `llamada inexistente → 404 (${missing.status})`);
 
   // Limpieza
-  process.env.DB_PATH = process.env.E2E_DB_PATH || 'data/test-e2e.db';
-  const { getDb } = await import('../server/db/index.js');
-  const db = getDb();
+  const db = await getCleanupDb();
   db.prepare('DELETE FROM waiter_calls WHERE session_id = ?').run(SESSION);
   await api(`/api/tables/${table.id}`, { method: 'DELETE', token: adminToken });
   reporter.assert(true, 'limpieza completa');

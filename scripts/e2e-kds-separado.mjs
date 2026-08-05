@@ -11,7 +11,7 @@
  *   - limpieza completa al final (pedido + mesa throwaway)
  */
 
-import { api, makeReporter, getMenu, ensureThrowawayTable, pickMixedItems } from './e2e-lib.mjs';
+import { api, makeReporter, getMenu, ensureThrowawayTable, pickMixedItems, getCleanupDb } from './e2e-lib.mjs';
 import { tokenFor } from './e2e-session.mjs';
 
 const reporter = makeReporter('kds-separado');
@@ -116,9 +116,7 @@ async function run() {
   // 11. Limpieza (directa por DB — apunta a la MISMA DB del servidor de
   //     pruebas, vía DB_PATH, NO a la DB de DEV por defecto)
   console.log('11. Limpieza');
-  process.env.DB_PATH = process.env.E2E_DB_PATH || 'data/test-e2e.db';
-  const { getDb } = await import('../server/db/index.js');
-  const db = getDb();
+  const db = await getCleanupDb();
   db.prepare('DELETE FROM payments WHERE order_id = ?').run(orderId);
   db.prepare('DELETE FROM order_items WHERE order_id = ?').run(orderId);
   db.prepare('DELETE FROM orders WHERE id = ?').run(orderId);

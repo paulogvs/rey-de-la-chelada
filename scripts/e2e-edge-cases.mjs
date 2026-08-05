@@ -12,7 +12,7 @@
  *   - módulo KDS inválido → 400
  */
 
-import { api, makeReporter, ensureThrowawayTable } from './e2e-lib.mjs';
+import { api, makeReporter, ensureThrowawayTable, getCleanupDb } from './e2e-lib.mjs';
 import { tokenFor } from './e2e-session.mjs';
 
 const reporter = makeReporter('edge-cases');
@@ -98,9 +98,7 @@ async function run() {
   const qrExp = await api('/api/client-sessions/table/95', { method: 'POST' });
   const expSid = qrExp.json.sessionId;
   // Forzar expiración en DB y validar
-  process.env.DB_PATH = process.env.E2E_DB_PATH || 'data/test-e2e.db';
-  const { getDb } = await import('../server/db/index.js');
-  const db = getDb();
+  const db = await getCleanupDb();
   db.prepare("UPDATE client_sessions SET expires_at = datetime('now','-1 hour') WHERE session_id = ?").run(expSid);
   const validateExpired = await api(`/api/client-sessions/${expSid}/validate?mesa=95`);
   // Sin pedido activo → inválida (regenera o rechaza)

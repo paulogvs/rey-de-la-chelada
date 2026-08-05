@@ -9,7 +9,7 @@
  *   - QR estático: POST /api/client-sessions (admin) → url estable
  */
 
-import { api, makeReporter } from './e2e-lib.mjs';
+import { api, makeReporter, getCleanupDb } from './e2e-lib.mjs';
 import { tokenFor } from './e2e-session.mjs';
 
 const reporter = makeReporter('admin');
@@ -108,9 +108,7 @@ async function run() {
 
   // Limpieza
   console.log('7. Limpieza');
-  process.env.DB_PATH = process.env.E2E_DB_PATH || 'data/test-e2e.db';
-  const { getDb } = await import('../server/db/index.js');
-  const db = getDb();
+  const db = await getCleanupDb();
   db.prepare('DELETE FROM menu_items WHERE id = ?').run(itemId);
   db.prepare('DELETE FROM client_sessions WHERE session_id = ?').run(qr.json.sessionId);
   // Mesa: borrar dependencias (pedidos + sesiones + calls de la mesa)

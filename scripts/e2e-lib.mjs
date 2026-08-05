@@ -152,6 +152,24 @@ export async function deleteThrowawayTable(tableId, { adminToken } = {}) {
   await api(`/api/tables/${tableId}`, { method: 'DELETE', token: adminToken });
 }
 
+/**
+ * Conexión DB para cleanup directo — usa la MISMA DB que el servidor:
+ *   - E2E_DB_PATH definida → esa (entorno DEV aislado, ej. data/test-e2e.db)
+ *   - E2E_DB_PATH NO definida → DB default (PROD: data/rey-de-la-chelada.db)
+ *
+ * Fix FASE 3: antes el cleanup forzaba 'data/test-e2e.db' y en PROD borraba
+ * en una DB vacía (el pedido real quedaba → FK bloqueaba DELETE de mesa).
+ */
+export async function getCleanupDb() {
+  if (!process.env.E2E_DB_PATH) {
+    delete process.env.DB_PATH; // usar default del servidor
+  } else {
+    process.env.DB_PATH = process.env.E2E_DB_PATH;
+  }
+  const { getDb } = await import('../server/db/index.js');
+  return getDb();
+}
+
 // ============================================================
 // Fixtures de pedido — items bar + cocina para KDS separado
 // ============================================================
