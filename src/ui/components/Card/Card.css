@@ -4,11 +4,12 @@
    ============================================================ */
 
 .card {
-  background: var(--surface);
+  background: linear-gradient(180deg, var(--surface) 0%, color-mix(in srgb, var(--surface) 98%, var(--dorado-rey-soft)) 100%);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  transition: all var(--duration-fast) var(--ease-out);
+  transition: all var(--duration-normal) var(--ease-out);
   overflow: hidden;
+  box-shadow: var(--shadow-card);
 }
 
 .card--padded {
@@ -17,7 +18,8 @@
 
 .card--elevated {
   background: var(--surface-elevated);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-card-hover);
+  border-color: color-mix(in srgb, var(--border) 80%, var(--dorado-rey-soft));
 }
 
 .card--clickable {
@@ -28,6 +30,8 @@
 .card--clickable:hover {
   border-color: var(--border-hover);
   background: var(--surface-soft);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
 }
 
 .card--clickable:active {

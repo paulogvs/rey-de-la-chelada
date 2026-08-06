@@ -260,7 +260,16 @@ echo [6/7] Abriendo puerto y arrancando servicio...
 echo.
 
 if not "!DRY_RUN!"=="1" (
-    powershell -Command "New-NetFirewallRule -DisplayName 'Rey de la Chelada' -Direction Inbound -Protocol TCP -LocalPort !PORT! -Action Allow -ErrorAction SilentlyContinue" >nul 2>&1
+    REM Regla de puerto EXPLICITA, idempotente, todos los perfiles (LAN + Tailscale).
+    REM Se elimina primero para evitar duplicados, luego se crea con verificacion real.
+    powershell -Command "Get-NetFirewallRule -DisplayName 'Rey de la Chelada :!PORT!' -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction SilentlyContinue; try { New-NetFirewallRule -DisplayName 'Rey de la Chelada :!PORT!' -Description 'Rey de la Chelada 6-PWA TCP inbound (LAN + Tailscale)' -Direction Inbound -Protocol TCP -LocalPort !PORT! -Action Allow -Profile Any -ErrorAction Stop | Out-Null; Write-Output OK } catch { exit 1 }" >nul 2>&1
+    if !errorlevel! neq 0 (
+        echo   [WARN] No se pudo crear la regla de firewall TCP !PORT!.
+        echo   Reintenta como Administrador o creala manualmente:
+        echo   New-NetFirewallRule -DisplayName "Rey de la Chelada :!PORT!" -Direction Inbound -Protocol TCP -LocalPort !PORT! -Action Allow -Profile Any
+    ) else (
+        echo   [OK] Regla de firewall TCP !PORT! garantizada (perfiles Any)
+    )
 )
 echo   [OK] Firewall: puerto !PORT! abierto
 

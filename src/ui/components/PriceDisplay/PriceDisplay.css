@@ -25,6 +25,7 @@
   font-size: var(--text-2xl);
   font-weight: 700;
   color: var(--dorado-rey);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--dorado-rey) 25%, transparent);
 }
 
 .price-display__toggle {

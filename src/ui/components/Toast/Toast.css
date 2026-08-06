@@ -20,12 +20,14 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   border: 1px solid;
   pointer-events: auto;
   cursor: pointer;
   min-height: var(--touch-min-target);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-modal);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   animation: toast-slide-in 300ms var(--ease-out) forwards;
 }
 

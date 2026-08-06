@@ -7,7 +7,9 @@
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: var(--overlay);
+  background: color-mix(in srgb, var(--overlay) 92%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -26,15 +28,16 @@
 /* ---- Sheet ---- */
 
 .modal-sheet {
-  background: var(--surface);
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: linear-gradient(180deg, var(--surface-elevated) 0%, var(--surface) 100%);
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
   width: 100%;
   max-width: 600px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
   animation: modal-slide-up 300ms var(--ease-out) forwards;
-  box-shadow: var(--shadow-xl);
+  box-shadow: var(--shadow-modal);
+  border-top: 1px solid color-mix(in srgb, var(--dorado-rey) 15%, transparent);
 }
 
 .modal-sheet--fullscreen {

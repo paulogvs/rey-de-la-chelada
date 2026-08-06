@@ -30,6 +30,7 @@
   border-radius: 50%;
   animation: loader-spin 0.7s linear infinite;
   flex-shrink: 0;
+  box-shadow: 0 0 12px -2px color-mix(in srgb, var(--dorado-rey) 30%, transparent);
 }
 
 .loader__label {

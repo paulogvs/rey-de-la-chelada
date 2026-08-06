@@ -147,14 +147,27 @@ REM ==========================================================
 echo [4/4] Reiniciando servicio en puerto !PORT!...
 echo.
 
-REM 4a. Detener proceso en el puerto
+REM 4a. Garantizar regla de firewall explicita (acceso LAN + Tailscale).
+REM Idempotente: elimina duplicados y verifica el resultado real.
+powershell -Command "Get-NetFirewallRule -DisplayName 'Rey de la Chelada :!PORT!' -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction SilentlyContinue; try { New-NetFirewallRule -DisplayName 'Rey de la Chelada :!PORT!' -Description 'Rey de la Chelada 6-PWA TCP inbound (LAN + Tailscale)' -Direction Inbound -Protocol TCP -LocalPort !PORT! -Action Allow -Profile Any -ErrorAction Stop | Out-Null; Write-Output OK } catch { exit 1 }" >nul 2>&1
+if !errorlevel! neq 0 (
+    echo   [AVISO] No se pudo garantizar la regla de firewall TCP !PORT! ^(requiere admin^).
+    echo   Localhost seguira funcionando, pero LAN/Tailscale pueden fallar.
+    echo   Solucion: ejecuta scripts\setup.bat ^(auto-eleva^) o creala como admin:
+    echo   New-NetFirewallRule -DisplayName "Rey de la Chelada :!PORT!" -Direction Inbound -Protocol TCP -LocalPort !PORT! -Action Allow -Profile Any
+) else (
+    echo   [OK] Regla de firewall TCP !PORT! garantizada (perfiles Any)
+)
+echo.
+
+REM 4b. Detener proceso en el puerto
 for /f "tokens=5" %%p in ('netstat -ano ^| findstr :!PORT! ^| findstr LISTENING') do (
     echo   Deteniendo proceso %%p...
     taskkill /f /pid %%p >nul 2>&1
 )
 timeout /t 2 /nobreak >nul
 
-REM 4b. Verificar puerto libre
+REM 4c. Verificar puerto libre
 set "STILL=0"
 for /f "tokens=5" %%p in ('netstat -ano ^| findstr :!PORT! ^| findstr LISTENING') do set "STILL=1"
 if "!STILL!"=="1" (
@@ -165,7 +178,7 @@ if "!STILL!"=="1" (
 )
 echo   [OK] Puerto !PORT! liberado
 
-REM 4c. Relanzar servicio oculto
+REM 4d. Relanzar servicio oculto
 cscript //nologo "!APP_DIR!\scripts\start-hidden.vbs"
 echo   Servicio relanzado (oculto), esperando respuesta...
 

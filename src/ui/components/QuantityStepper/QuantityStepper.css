@@ -10,6 +10,13 @@
   border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+}
+
+.qty-stepper:focus-within {
+  border-color: var(--dorado-rey);
+  box-shadow: 0 0 0 3px var(--dorado-rey-soft);
 }
 
 /* ---- Sizes ---- */

@@ -27,12 +27,16 @@
   font-size: var(--text-base);
   min-height: var(--touch-min-target);
   box-sizing: border-box;
+  transition: border-color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out),
+              background-color var(--duration-fast) var(--ease-out);
 }
 
 .form-input:focus {
   border-color: var(--dorado-rey);
   outline: none;
-  box-shadow: 0 0 0 3px var(--dorado-rey-soft);
+  box-shadow: 0 0 0 3px var(--dorado-rey-soft), 0 2px 8px -4px color-mix(in srgb, var(--dorado-rey) 30%, transparent);
+  background: var(--surface);
 }
 
 .form-input::placeholder {

@@ -4,7 +4,7 @@
    ============================================================ */
 
 .kds-order {
-  background: var(--surface);
+  background: linear-gradient(180deg, var(--surface-elevated) 0%, var(--surface) 100%);
   border: 1px solid var(--border);
   border-left: 4px solid var(--status-pending);
   border-radius: var(--radius-lg);
@@ -12,6 +12,7 @@
   flex-direction: column;
   overflow: hidden;
   transition: all var(--duration-normal) var(--ease-out);
+  box-shadow: var(--shadow-card);
 }
 
 .kds-order--bar {
