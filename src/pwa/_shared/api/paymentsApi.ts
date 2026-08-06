@@ -15,6 +15,8 @@ export interface PaymentPayload {
   reference?: string;
   notes?: string;
   status?: string;
+  /** C4: propina del mismo pago (mismo método). amount+tip = total cobrado. */
+  tip?: number;
 }
 
 export interface ServerPayment {
@@ -23,6 +25,7 @@ export interface ServerPayment {
   method: string;
   amount: number;
   iva_amount: number;
+  tip: number;
   reference: string;
   status: string;
   processed_by: string;

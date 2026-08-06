@@ -14,6 +14,13 @@
  *  payments.status:  pending, completed, failed, refunded
  *  cash_closings:    sin columna status → abierto = closed_at IS NULL
  *  Pedido pagado:    orders.is_paid = 1, status = 'paid'
+ *
+ *  FASE 1 (caja cuadre al centavo):
+ *  - C1: "hoy" = fecha local America/La_Paz (UTC-4) → date-utils.js.
+ *  - C2: solo payments status='completed' cuentan como cobrados.
+ *  - C4: propina en payments.tip → total cobrado = amount + tip.
+ *  - C5: expected_cash = SOLO method='cash'; is_reconciled lo decide el server.
+ *  - A4: processPayment atómico (db.transaction → rollback total).
  * ═══════════════════════════════════════════════════════════
  */
 
@@ -21,6 +28,7 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { localDateStr, localDateExpr } from '../utils/date-utils.js';
 
 const router = Router();
 
@@ -43,72 +51,115 @@ const PAYMENT_STATUS_MAP = {
   reembolsado: 'refunded', refunded: 'refunded',
 };
 
-/** Registra un pago y devuelve { paymentId, fullyPaid, remaining } */
-function processPayment(db, { order_id, method, amount, iva_amount, reference, notes, status, processed_by }) {
+/**
+ * Registra un pago y devuelve { paymentId, fullyPaid, remaining }.
+ *
+ * SEMÁNTICA (C4 — propina):
+ *   - `amount` = monto aplicado al saldo del pedido.
+ *   - `tip`    = propina del mismo pago (mismo método; NO sujeta a IVA).
+ *   - Total cobrado por el pago = amount + tip.
+ *   - El saldo del pedido se cubre con SUM(amount + tip) de payments completed.
+ *   - Retrocompatible: payments sin tip (tip=0) se comportan igual que antes.
+ *
+ * SEMÁNTICA (C2 — estado):
+ *   - Solo payments con status='completed' cuentan como cobrados.
+ *   - failed/refunded se registran pero NO afectan saldo ni is_paid.
+ *
+ * ATOMICIDAD (A4): todo el flujo corre en db.transaction() — si algo
+ * falla a mitad (validación, INSERT, UPDATE) → rollback total, sin pagos
+ * huérfanos ni pedidos parcialmente actualizados.
+ *
+ * @param {object} db — better-sqlite3
+ * @param {{ order_id, method, amount, iva_amount, reference, notes, status, processed_by, tip }} args
+ */
+export function processPayment(db, { order_id, method, amount, iva_amount, reference, notes, status, processed_by, tip }) {
   const canonicalMethod = PAYMENT_METHOD_MAP[method];
   const canonicalStatus = PAYMENT_STATUS_MAP[status || 'completed'];
+  const amountValue = round2(Number(amount) || 0);
+  const tipValue = round2(Math.max(0, Number(tip) || 0));
 
   if (!canonicalMethod) {
     throw new Error(`Método de pago inválido: ${method}`);
   }
 
-  const order = db.prepare('SELECT id, total, iva_amount, status FROM orders WHERE id = ?').get(order_id);
-  if (!order) {
-    throw new Error(`Pedido no encontrado: ${order_id}`);
-  }
-  if (order.status === 'cancelled') {
-    throw new Error('No se puede pagar un pedido cancelado');
-  }
+  const execute = db.transaction(() => {
+    const order = db.prepare('SELECT id, total, iva_amount, status FROM orders WHERE id = ?').get(order_id);
+    if (!order) {
+      throw new Error(`Pedido no encontrado: ${order_id}`);
+    }
+    if (order.status === 'cancelled') {
+      throw new Error('No se puede pagar un pedido cancelado');
+    }
 
-  const paid = db.prepare('SELECT COALESCE(SUM(amount), 0) as total_paid FROM payments WHERE order_id = ?').get(order_id);
-  const remaining = round2((order.total || 0) - paid.total_paid);
+    // C2: solo completed cuenta como cobrado. C4: total cobrado = amount + tip.
+    const paid = db.prepare(`
+      SELECT COALESCE(SUM(amount + tip), 0) as total_paid FROM payments
+      WHERE order_id = ? AND status = 'completed'
+    `).get(order_id);
+    const remaining = round2((order.total || 0) - paid.total_paid);
 
-  if (amount > remaining + 0.001) {
-    throw new Error(`El monto excede el saldo pendiente. Restante: Bs ${remaining.toFixed(2)}`);
-  }
+    // C2/C4: la constraint de saldo SOLO aplica a pagos que cuentan como
+    // cobrados (completed). failed/refunded se registran sin tocar el saldo:
+    // un refund se puede registrar aunque el pedido ya esté paid.
+    if (canonicalStatus === 'completed' && amountValue + tipValue > remaining + 0.001) {
+      throw new Error(`El monto excede el saldo pendiente. Restante: Bs ${remaining.toFixed(2)}`);
+    }
 
-  const paymentId = randomUUID();
-  // SSOT IVA: si el cliente no envía iva_amount, derivar del pedido
-  // (orders.iva_amount) — evita pagos con IVA 0 inconsistentes.
-  const ivaAmount = iva_amount ?? order.iva_amount ?? 0;
-  db.prepare(`
-    INSERT INTO payments (id, order_id, method, amount, iva_amount, reference,
-                          status, processed_by, notes, synced_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    paymentId, order_id, canonicalMethod, amount, ivaAmount, reference || '',
-    canonicalStatus, processed_by, notes || '', new Date().toISOString()
-  );
+    const paymentId = randomUUID();
+    // SSOT IVA: si el cliente no envía iva_amount, derivar del pedido
+    // (orders.iva_amount) — evita pagos con IVA 0 inconsistentes.
+    const ivaAmount = iva_amount ?? order.iva_amount ?? 0;
+    db.prepare(`
+      INSERT INTO payments (id, order_id, method, amount, iva_amount, tip, reference,
+                            status, processed_by, notes, synced_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      paymentId, order_id, canonicalMethod, amountValue, ivaAmount, tipValue, reference || '',
+      canonicalStatus, processed_by, notes || '', new Date().toISOString()
+    );
 
-  const totalPaid = paid.total_paid + amount;
-  const fullyPaid = round2(totalPaid) >= round2(order.total || 0);
+    // El nuevo pago solo aporta al saldo si es completed
+    const isCompleted = canonicalStatus === 'completed';
+    const totalPaid = paid.total_paid + (isCompleted ? amountValue + tipValue : 0);
+    const fullyPaid = isCompleted && round2(totalPaid) >= round2(order.total || 0);
 
-  // Update order payment state
-  db.prepare(`
-    UPDATE orders SET is_paid = ?, payment_method = ?, payment_reference = ?,
-                      paid_at = CASE WHEN ? THEN datetime('now') ELSE paid_at END,
-                      status = CASE WHEN ? THEN 'paid' ELSE status END,
-                      updated_at = datetime('now')
-    WHERE id = ?
-  `).run(fullyPaid ? 1 : 0, canonicalMethod, reference || '', fullyPaid ? 1 : 0, fullyPaid ? 1 : 0, order_id);
+    // Update order payment state
+    db.prepare(`
+      UPDATE orders SET is_paid = ?,
+                        payment_method = CASE WHEN ? THEN ? ELSE payment_method END,
+                        payment_reference = CASE WHEN ? THEN ? ELSE payment_reference END,
+                        paid_at = CASE WHEN ? THEN datetime('now') ELSE paid_at END,
+                        status = CASE WHEN ? THEN 'paid' ELSE status END,
+                        updated_at = datetime('now')
+      WHERE id = ?
+    `).run(
+      fullyPaid ? 1 : 0,
+      isCompleted ? 1 : 0, canonicalMethod,
+      isCompleted ? 1 : 0, reference || '',
+      fullyPaid ? 1 : 0, fullyPaid ? 1 : 0,
+      order_id
+    );
 
-  // If fully paid, free the table (if no other active orders)
-  if (fullyPaid) {
-    const table = db.prepare('SELECT table_id FROM orders WHERE id = ?').get(order_id);
-    if (table && table.table_id) {
-      const activeOrders = db.prepare(
-        "SELECT id FROM orders WHERE table_id = ? AND status NOT IN ('paid','cancelled') AND id != ?"
-      ).get(table.table_id, order_id);
-      if (!activeOrders) {
-        db.prepare("UPDATE tables SET status = 'free', current_order_id = NULL WHERE id = ?").run(table.table_id);
+    // If fully paid, free the table (if no other active orders)
+    if (fullyPaid) {
+      const table = db.prepare('SELECT table_id FROM orders WHERE id = ?').get(order_id);
+      if (table && table.table_id) {
+        const activeOrders = db.prepare(
+          "SELECT id FROM orders WHERE table_id = ? AND status NOT IN ('paid','cancelled') AND id != ?"
+        ).get(table.table_id, order_id);
+        if (!activeOrders) {
+          db.prepare("UPDATE tables SET status = 'free', current_order_id = NULL WHERE id = ?").run(table.table_id);
+        }
       }
     }
-  }
 
-  return { paymentId, fullyPaid, remaining: round2(remaining - amount) };
+    return { paymentId, fullyPaid, remaining: round2(remaining - (isCompleted ? amountValue + tipValue : 0)) };
+  });
+
+  return execute();
 }
 
-function round2(n) {
+export function round2(n) {
   return Math.round(n * 100) / 100;
 }
 
@@ -204,7 +255,7 @@ router.get('/:id', requireAuth, (req, res) => {
 
 router.post('/', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res) => {
   try {
-    const { order_id, amount, method, iva_amount, reference, notes, status } = req.body;
+    const { order_id, amount, method, iva_amount, reference, notes, status, tip } = req.body;
 
     if (!order_id || amount === undefined || !method) {
       return res.status(400).json({
@@ -222,9 +273,18 @@ router.post('/', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res)
       });
     }
 
+    // C4: la propina debe ser un número ≥ 0 (el server la registra aparte)
+    if (tip !== undefined && (typeof tip !== 'number' || Number.isNaN(tip) || tip < 0)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Propina inválida (debe ser un número ≥ 0)',
+        code: 'INVALID_TIP',
+      });
+    }
+
     const db = getDb();
     const result = processPayment(db, {
-      order_id, amount, method, iva_amount, reference, notes, status,
+      order_id, amount, method, iva_amount, reference, notes, status, tip,
       processed_by: req.user.sub,
     });
 
@@ -259,17 +319,24 @@ router.get('/closing/current', requireAuth, requireRole('admin', 'caja'), (req, 
       'SELECT * FROM cash_closings WHERE closed_at IS NULL ORDER BY opened_at DESC LIMIT 1'
     ).get();
 
-    // Today's payments summary
-    const today = new Date().toISOString().split('T')[0];
+    // C1: "hoy" local America/La_Paz (no UTC) — ver server/utils/date-utils.js
+    const today = localDateStr();
+    // C2: solo completed. C4: total cobrado = amount + tip. C5: cash = solo efectivo.
     const summary = db.prepare(`
-      SELECT p.method, COUNT(*) as count, SUM(p.amount) as total
+      SELECT p.method, COUNT(*) as count, SUM(p.amount + p.tip) as total
       FROM payments p
-      WHERE DATE(p.processed_at) = ?
+      WHERE ${localDateExpr('p.processed_at')} = ? AND p.status = 'completed'
       GROUP BY p.method
     `).all(today);
 
     const totalToday = db.prepare(`
-      SELECT SUM(amount) as total FROM payments WHERE DATE(processed_at) = ?
+      SELECT COALESCE(SUM(amount + tip), 0) as total FROM payments
+      WHERE ${localDateExpr('processed_at')} = ? AND status = 'completed'
+    `).get(today);
+
+    const cashToday = db.prepare(`
+      SELECT COALESCE(SUM(amount + tip), 0) as total FROM payments
+      WHERE ${localDateExpr('processed_at')} = ? AND status = 'completed' AND method = 'cash'
     `).get(today);
 
     // Orders summary
@@ -277,7 +344,7 @@ router.get('/closing/current', requireAuth, requireRole('admin', 'caja'), (req, 
       SELECT COUNT(*) as total,
              SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as completed,
              SUM(total) as revenue
-      FROM orders WHERE DATE(created_at) = ?
+      FROM orders WHERE ${localDateExpr('created_at')} = ?
     `).get(today);
 
     res.json({
@@ -287,6 +354,7 @@ router.get('/closing/current', requireAuth, requireRole('admin', 'caja'), (req, 
         date: today,
         payments: summary,
         total: totalToday?.total || 0,
+        cash: cashToday?.total || 0,
         orders: ordersToday,
       },
     });
@@ -310,10 +378,12 @@ router.post('/closing', requireAuth, requireRole('admin', 'caja'), (req, res) =>
       return res.status(409).json({ success: false, error: 'Ya hay un corte de caja abierto', code: 'CLOSING_ALREADY_OPEN' });
     }
 
-    // Calculate expected amount (ventas del día)
-    const today = new Date().toISOString().split('T')[0];
+    // C1: "hoy" local America/La_Paz. C5: expected_cash = SOLO method='cash'
+    // (QR/card/transfer son "ya depositados" — el cajero cuadra únicamente el efectivo).
+    const today = localDateStr();
     const expected = db.prepare(`
-      SELECT SUM(amount) as total FROM payments WHERE DATE(processed_at) = ?
+      SELECT COALESCE(SUM(amount + tip), 0) as total FROM payments
+      WHERE ${localDateExpr('processed_at')} = ? AND status = 'completed' AND method = 'cash'
     `).get(today);
 
     const id = randomUUID();
@@ -361,14 +431,18 @@ router.put('/closing/close', requireAuth, requireRole('admin', 'caja'), (req, re
     }
 
     const closedAt = new Date().toISOString();
-    const difference = round2(actual_cash - open.expected_cash);
+    // C5: difference = actual - expected SOLO efectivo.
+    const difference = round2(Number(actual_cash) - open.expected_cash);
+    // M9: el SERVER decide is_reconciled (el valor del cliente se ignora y se
+    // recalcula): |actual - expected| <= 0.01 → cuadra al centavo.
+    const reconciled = Math.abs(difference) <= 0.01 ? 1 : 0;
 
     db.prepare(`
       UPDATE cash_closings
       SET closed_at = ?, closed_by = ?, actual_cash = ?, cash_difference = ?,
           is_reconciled = ?, notes = ?
       WHERE id = ?
-    `).run(closedAt, req.user.sub, actual_cash, difference, is_reconciled ? 1 : 0, notes || open.notes, open.id);
+    `).run(closedAt, req.user.sub, Number(actual_cash), difference, reconciled, notes || open.notes, open.id);
 
     res.json({
       success: true,
@@ -378,8 +452,9 @@ router.put('/closing/close', requireAuth, requireRole('admin', 'caja'), (req, re
         opened_at: open.opened_at,
         closed_at: closedAt,
         expected: open.expected_cash,
-        actual: actual_cash,
+        actual: Number(actual_cash),
         difference,
+        is_reconciled: reconciled,
       },
     });
   } catch (err) {

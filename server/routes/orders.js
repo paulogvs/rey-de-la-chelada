@@ -560,8 +560,24 @@ router.patch('/:id/status', requireAuth, (req, res) => {
     db.prepare("UPDATE orders SET status = ?, synced_at = ?, updated_at = datetime('now') WHERE id = ?")
       .run(canonical, now, req.params.id);
 
-    // If paid, mark is_paid
+    // C3 (Fase 1 — caja cuadre al centavo): INVARIANTE — un pedido SOLO
+    // puede pasar a 'paid' si hay pago COMPLETO registrado (completed).
+    // El flujo normal: POST /api/payments marca paid automáticamente cuando
+    // SUM(amount + tip) >= total; este PATCH a 'paid' solo es válido si ya
+    // existe ese pago. Sin él → 409 (nunca is_paid=1 sin pago).
     if (canonical === 'paid') {
+      const orderTotal = db.prepare('SELECT total FROM orders WHERE id = ?').get(req.params.id);
+      const paidSum = db.prepare(`
+        SELECT COALESCE(SUM(amount + tip), 0) as total FROM payments
+        WHERE order_id = ? AND status = 'completed'
+      `).get(req.params.id);
+      if ((paidSum?.total || 0) + 0.001 < (orderTotal?.total || 0)) {
+        return res.status(409).json({
+          success: false,
+          error: 'No se puede marcar como pagado: falta registrar el pago completo',
+          code: 'PAYMENT_REQUIRED',
+        });
+      }
       db.prepare("UPDATE orders SET is_paid = 1, paid_at = COALESCE(paid_at, datetime('now')) WHERE id = ?")
         .run(req.params.id);
     }

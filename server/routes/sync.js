@@ -270,6 +270,20 @@ router.post('/push', requireAuth, (req, res) => {
             throw new Error(`Pedido no encontrado: ${order.id}`);
           }
 
+          // C3: INVARIANTE — 'paid' offline solo es válido si el pago completo
+          // ya se registró (create_payment debe ir ANTES en el mismo push, o en
+          // un push previo). Sin pago → error, sin marcar is_paid.
+          if (status === 'paid') {
+            const paidCheck = db.prepare(`
+              SELECT COALESCE(SUM(amount + tip), 0) as total FROM payments
+              WHERE order_id = ? AND status = 'completed'
+            `).get(order.id);
+            const ord = db.prepare('SELECT total FROM orders WHERE id = ?').get(order.id);
+            if ((paidCheck?.total || 0) + 0.001 < (ord?.total || 0)) {
+              throw new Error(`No se puede marcar pagado sin pago completo: ${order.id}`);
+            }
+          }
+
           db.prepare(`
             UPDATE orders SET status = ?, synced_at = ?, updated_at = datetime('now') WHERE id = ?
           `).run(status, new Date().toISOString(), order.id);
@@ -305,16 +319,19 @@ router.post('/push', requireAuth, (req, res) => {
           }
 
           const paymentId = order.id || randomUUID();
+          // C4: tip viaja con el payment (total cobrado = amount + tip).
+          const tipValue = Math.max(0, Number(order.tip) || 0);
           db.prepare(`
-            INSERT INTO payments (id, order_id, method, amount, iva_amount, reference,
+            INSERT INTO payments (id, order_id, method, amount, iva_amount, tip, reference,
                                   status, processed_by, notes, synced_at)
-            VALUES (?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?)
           `).run(
             paymentId,
             orderId,
             method,
             order.amount || 0,
             order.iva_amount || 0,
+            tipValue,
             order.reference || '',
             order.processed_by || req.user.sub,
             order.notes || '',
@@ -322,8 +339,12 @@ router.post('/push', requireAuth, (req, res) => {
           );
 
           // Actualizar estado de pago del pedido
+          // C2: solo completed cuenta; C4: suma con tip.
           const ord = db.prepare('SELECT total FROM orders WHERE id = ?').get(orderId);
-          const totalPaid = db.prepare('SELECT COALESCE(SUM(amount), 0) as paid FROM payments WHERE order_id = ?').get(orderId).paid;
+          const totalPaid = db.prepare(`
+            SELECT COALESCE(SUM(amount + tip), 0) as paid FROM payments
+            WHERE order_id = ? AND status = 'completed'
+          `).get(orderId).paid;
           if (ord && totalPaid >= ord.total) {
             db.prepare(`
               UPDATE orders SET is_paid = 1, paid_at = datetime('now'),

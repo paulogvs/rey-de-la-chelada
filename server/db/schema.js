@@ -11,7 +11,9 @@
  * ═══════════════════════════════════════════════════════════
  */
 
-const SCHEMA_VERSION = 3;
+// v4 (Fase 1 — caja cuadre al centavo): payments.tip REAL NOT NULL DEFAULT 0
+// (propina registrada en el MISMO payment que la recibe; total cobrado = amount + tip).
+const SCHEMA_VERSION = 4;
 
 const CREATE_TABLES = [
   // ── Staff / Users (v2: 3 roles only, no username) ─────
@@ -155,6 +157,7 @@ const CREATE_TABLES = [
     method        TEXT NOT NULL CHECK(method IN ('cash','qr_yape','qr_simple','card','transfer')),
     amount        REAL NOT NULL,
     iva_amount    REAL NOT NULL DEFAULT 0,
+    tip           REAL NOT NULL DEFAULT 0,  -- v4: propina del payment (total cobrado = amount + tip)
     reference     TEXT NOT NULL DEFAULT '',
     status        TEXT NOT NULL DEFAULT 'completed' CHECK(status IN ('pending','completed','failed','refunded')),
     processed_by  TEXT NOT NULL,
@@ -263,12 +266,25 @@ function applySchema(db) {
     for (const sql of CREATE_TABLES) {
       db.exec(sql);
     }
+    // ── Migraciones idempotentes (ALTER TABLE) ──────────────
+    // v4: payments.tip — agrega la columna SOLO si no existe
+    // (CREATE TABLE IF NOT EXISTS no toca tablas existentes).
+    if (!hasColumn(db, 'payments', 'tip')) {
+      db.exec('ALTER TABLE payments ADD COLUMN tip REAL NOT NULL DEFAULT 0');
+      console.log('[DB] Migration v4: added payments.tip');
+    }
     // Record schema version
     db.prepare(`INSERT OR REPLACE INTO schema_version (version) VALUES (?)`).run(SCHEMA_VERSION);
   });
 
   transaction();
   console.log(`[DB] Schema v${SCHEMA_VERSION} applied successfully`);
+}
+
+/** ¿Existe la columna en la tabla? (PRAGMA table_info) */
+function hasColumn(db, table, column) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+  return cols.some(c => c.name === column);
 }
 
 export { applySchema, SCHEMA_VERSION, CREATE_TABLES };

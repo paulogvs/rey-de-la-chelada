@@ -22,7 +22,7 @@ import { QRDisplay } from '@/ui/components/QRDisplay';
 import { Loader } from '@/ui/components/Loader';
 import { useToast } from '@/ui/components/Toast';
 import { apiFetch } from '../_shared/api/apiFetch';
-import { processPayment, type ServerPayment } from '../_shared/api/paymentsApi';
+import { processPayment } from '../_shared/api/paymentsApi';
 import { updateTableStatus } from '../_shared/api/tablesApi';
 import type { Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
@@ -81,19 +81,25 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
   }, [orderId, token, addToast]);
 
   const tipAmount = Math.round((order?.total ?? 0) * (selectedTip / 100) * 100) / 100;
-  const totalWithTip = (order?.total ?? 0) + tipAmount;
+  // C4: la propina NO es monto extra cobrado al cliente — se registra aparte
+  // (columna tip) descontándola del amount del split que la lleva. El cliente
+  // paga el total del pedido; suma(amount + tip) == total siempre.
+  const totalToCollect = order?.total ?? 0;
 
   const cashAmount = splitPayments.filter(s => s.method === 'cash').reduce((sum, s) => sum + s.amount, 0);
-  const cashChange = cashAmount > totalWithTip ? cashAmount - totalWithTip : 0;
+  // Cambio = efectivo entregado − total a cobrar. La propina ya viene incluida
+  // dentro del cobro (se descuenta del amount del split que la lleva), por lo
+  // que no se suma aparte para evitar devolver cambio de más.
+  const cashChange = cashAmount > totalToCollect ? cashAmount - totalToCollect : 0;
 
   const addSplit = useCallback(() => {
-    const remaining = totalWithTip - splitPayments.reduce((s, p) => s + p.amount, 0);
+    const remaining = totalToCollect - splitPayments.reduce((s, p) => s + p.amount, 0);
     if (remaining <= 0) {
       addToast({ type: 'warning', message: 'El total ya está cubierto', duration: 3000 });
       return;
     }
     setSplitPayments(prev => [...prev, { method: 'cash', amount: remaining, reference: '' }]);
-  }, [totalWithTip, splitPayments, addToast]);
+  }, [totalToCollect, splitPayments, addToast]);
 
   const updateSplit = useCallback((index: number, updates: Partial<SplitPayment>) => {
     setSplitPayments(prev => prev.map((sp, i) => (i === index ? { ...sp, ...updates } : sp)));
@@ -104,7 +110,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
   }, []);
 
   const coveredAmount = splitPayments.reduce((sum, sp) => sum + sp.amount, 0);
-  const remaining = Math.max(0, totalWithTip - coveredAmount);
+  const remaining = Math.max(0, totalToCollect - coveredAmount);
 
   // Process payment via API (one POST per split) then clear the table
   const processPaymentNow = useCallback(async () => {
@@ -116,13 +122,29 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
 
     setProcessing(true);
     try {
-      for (const split of splitPayments) {
+      // C4: la propina se descuenta del amount del split que la lleva
+      // (amount + tip = lo que el cliente paga por ese split; suma == total).
+      // Se prefiere un split cash con saldo suficiente; fallback: el mayor.
+      const totalTip = Math.min(tipAmount, order.total);
+      let tipIndex = splitPayments.findIndex(s => s.amount >= totalTip && s.method === 'cash');
+      if (tipIndex < 0) tipIndex = splitPayments.findIndex(s => s.amount >= totalTip);
+      if (tipIndex < 0 && splitPayments.length) {
+        tipIndex = splitPayments.reduce((maxI, s, i) => (s.amount > splitPayments[maxI].amount ? i : maxI), 0);
+      }
+      const effectiveTip = tipIndex >= 0 ? Math.min(totalTip, splitPayments[tipIndex].amount) : 0;
+
+      for (let i = 0; i < splitPayments.length; i++) {
+        const split = splitPayments[i];
         if (split.amount <= 0) continue;
+        const tip = i === tipIndex ? effectiveTip : 0;
+        const amount = Math.round((split.amount - tip) * 100) / 100;
+        if (amount + tip <= 0) continue;
         const result = await processPayment(token, {
           order_id: order.id,
-          amount: split.amount,
+          amount,
           method: split.method,
           reference: split.reference || undefined,
+          tip,
         });
         if (!result.ok) {
           addToast({ type: 'error', message: result.error || 'Error al registrar el pago', duration: 5000 });
@@ -145,7 +167,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
     } finally {
       setProcessing(false);
     }
-  }, [order, remaining, splitPayments, token, table.id, table.number, addToast, onPaymentComplete]);
+  }, [order, remaining, splitPayments, tipAmount, token, table.id, table.number, addToast, onPaymentComplete]);
 
   const methodLabels: Record<PaymentMethod, string> = {
     cash: 'Efectivo',
@@ -346,7 +368,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
           disabled={remaining > 0.01 || processing}
           fullWidth
         >
-          {processing ? 'Procesando...' : `Cobrar Bs. ${totalWithTip.toFixed(2)}`}
+          {processing ? 'Procesando...' : `Cobrar Bs. ${totalToCollect.toFixed(2)}`}
         </Button>
       </div>
 
