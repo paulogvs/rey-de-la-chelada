@@ -20,6 +20,7 @@ import { Badge } from '@/ui/components/Badge';
 import { Loader } from '@/ui/components/Loader';
 import { ToastProvider, useToast } from '@/ui/components/Toast';
 import { appConfig } from '@/core/config';
+import { localDateStr } from '../_shared/utils/localDate';
 import { SummaryView } from './SummaryView';
 import { ClosingView } from './ClosingView';
 import { InvoiceView } from './InvoiceView';
@@ -34,7 +35,8 @@ function CajaApp() {
   const [view, setView] = useState<ViewState>('summary');
   const [refreshTick, setRefreshTick] = useState(0);
 
-  const today = new Date().toISOString().split('T')[0];
+  // C1/2.1: "hoy" = fecha LOCAL America/La_Paz (NUNCA toISOString — corta a las 20:00 local)
+  const today = localDateStr();
   const ivaRate = appConfig.all.taxes.iva.percentage / 100;
 
   // Auth gate: caja endpoints require role 'admin' (no 'caja' role in seed)

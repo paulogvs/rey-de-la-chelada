@@ -15,7 +15,7 @@
 import { Router } from 'express';
 import { getDb } from '../db/index.js';
 import { createPublicOrder, getPublicOrderStatus } from '../services/client-orders.js';
-import { broadcastOrderConfirmed } from '../services/order-broadcaster.js';
+import { broadcastOrderCreated } from '../services/order-broadcaster.js';
 
 const router = Router();
 
@@ -26,12 +26,15 @@ router.post('/', (req, res) => {
     const result = createPublicOrder(db, req.body);
 
     if (!result.success) {
-      return res.status(400).json({ success: false, code: result.code, error: result.error });
+      // 2.6 (A7): mesa ya tiene pedido activo de OTRO session_id → 409
+      const statusCode = result.code === 'TABLE_HAS_ACTIVE_ORDER' ? 409 : 400;
+      return res.status(statusCode).json({ success: false, code: result.code, error: result.error });
     }
 
-    // Notify cocina/bar in real time
+    // Notify cocina/bar in real time — status real 'called' (el mesero
+    // aún debe confirmar; KDS lo filtra hasta 'confirmed').
     try {
-      broadcastOrderConfirmed(result.order);
+      broadcastOrderCreated(result.order);
     } catch {
       // Broadcasting must never break order creation
     }

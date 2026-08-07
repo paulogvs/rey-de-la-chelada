@@ -16,6 +16,7 @@ import { fetchAdminMenuItems } from '../../_shared/api/adminApi';
 import { fetchTables } from '../../_shared/api/tablesApi';
 import { fetchClosings } from '../../_shared/api/adminApi';
 import { fetchDailySales } from '../../_shared/api/reportsApi';
+import { localDateStr } from '../../_shared/utils/localDate';
 
 interface DashboardViewProps {
   token: string;
@@ -50,7 +51,8 @@ export function DashboardView({ token, onToast }: DashboardViewProps) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const day = new Date().toISOString().split('T')[0];
+      // C1/2.1: "hoy" = fecha LOCAL America/La_Paz (NUNCA toISOString — corta a las 20:00 local)
+      const day = localDateStr();
       setToday(day);
 
       const [items, tables, closings, daily] = await Promise.all([

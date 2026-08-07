@@ -2,7 +2,7 @@
 
 > **SSOT — Este archivo GANA sobre cualquier otro.**
 > Creado: 2026-07-29 | Versión: 1.2.0 | Stack: React 19 + Express 5 + SQLite + Multi-PWA
-> Actualizado: 2026-08-05 — Scripts reordenados a scripts/ (v1.4)
+> Actualizado: 2026-08-06 — FASE 2 (contratos de datos: §2b) + scripts a scripts/ (v1.4)
 
 ---
 
@@ -29,6 +29,23 @@
 | Vitest | `tests/unit/`, `tests/integration/` |
 | Playwright | `tests/e2e/` |
 
+## 2b. FASE 2 — CONTRATOS DE DATOS (2026-08-06)
+
+Decisiones SSOT documentadas en código (NO romper en FASE 3):
+
+| Área | Contrato |
+|------|----------|
+| **Fecha local** | `src/core/config/local-date.ts` (client) + `scripts/date-utils.mjs` (Node). `BUSINESS_TIMEZONE='America/La_Paz'` (UTC-4 fijo). NUNCA `toISOString().split('T')[0]` para "hoy" local. |
+| **Precios** | `server/services/order-pricing.js` (`resolveModifierAdjustment`, `recalcOrder`). Precio SIEMPRE del server (`menu_items.price` + ajustes por nombre de opción); el server IGNORA precios del cliente. |
+| **Sync push** | `server/routes/sync.js`: idempotente por UUID cliente (`orders.id`/`payments.id` → `skipped` + `duplicate_*_already_exists`). Errores parciales → HTTP 200, `success:false`, `code:'SYNC_PARTIAL_ERRORS'`. |
+| **PUT /orders/:id** | INCREMENTAL: item con `id` → update; sin `id` → insert; `remove_item_ids` → delete explícito; NO mencionados → se conservan. Pedido `paid`/`cancelled` → `409 ORDER_CLOSED`. |
+| **Pedido activo por mesa** | `server/services/client-orders.js`: máx. 1 pedido activo por mesa. OTRO `session_id` → `409 TABLE_HAS_ACTIVE_ORDER`; MISMO `session_id` → permitido. |
+| **Broadcast KDS** | `server/services/order-broadcaster.js` → `broadcastOrderCreated` emite status REAL (`called` para pedidos del cliente; KDS los filtra hasta `confirmed`). KDS nunca muestra `called` (getKDSOrders). |
+| **Nº de mesas (SSOT)** | `src/core/config/app.config.ts` → `capacity.totalTables` (=10). Server lee `DEFAULT_TABLES` env con fallback al SSOT (ver `server/db/bootstrap.js` + `seed.js`). |
+| **DB** | SQLite (better-sqlite3). NO postgres. `.env` → `DB_PATH` (default `data/rey-de-la-chelada.db`). |
+
+Scripts nuevos FASE 2: `scripts/cleanup-placeholder-data.mjs` (borra items placeholder del menú genérico sin uso; dry-run por defecto, `--yes` para borrar), `scripts/date-utils.mjs`.
+
 ## 3. PROJECT STRUCTURE
 
 ```
@@ -49,7 +66,9 @@ rey-de-la-chelada/
 │   ├── stop.bat            ← detiene el servicio
 │   ├── backup.bat          ← backup diario DB
 │   ├── sync.bat            ← sync con ecosistema FORCH.iA
-│   └── start-hidden.vbs    ← arranque oculto (sin ventana)
+│   ├── start-hidden.vbs    ← arranque oculto (sin ventana)
+│   ├── date-utils.mjs      ← fecha local America/La_Paz (FASE 2, Node)
+│   └── cleanup-placeholder-data.mjs ← limpia menú placeholder genérico (FASE 2)
 ├── src/
 │   ├── core/
 │   │   ├── config/         ← SSOT Config (app.config, pwa-registry, capabilities, security)

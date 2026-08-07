@@ -19,6 +19,7 @@ import type {
   SyncEvent,
 } from '../types';
 import { computeTotals } from '../config/iva';
+import { localDateStr } from '../config/local-date';
 
 class OrderEngine {
   private orders: Map<string, Order> = new Map();
@@ -251,7 +252,8 @@ class OrderEngine {
 
   /** Get today's orders */
   getTodayOrders(): Order[] {
-    const today = new Date().toISOString().split('T')[0];
+    // C1/2.1: "hoy" = fecha LOCAL America/La_Paz (NUNCA toISOString)
+    const today = localDateStr();
     return Array.from(this.orders.values()).filter(o =>
       o.createdAt.startsWith(today)
     );
@@ -405,7 +407,8 @@ class OrderEngine {
 
   /** Get daily sales summary */
   getDailySummary(date?: string) {
-    const day = date || new Date().toISOString().split('T')[0];
+    // C1/2.1: "hoy" = fecha LOCAL America/La_Paz (NUNCA toISOString)
+    const day = date || localDateStr();
     const dayOrders = Array.from(this.orders.values())
       .filter(o => o.createdAt.startsWith(day) && o.isPaid);
 

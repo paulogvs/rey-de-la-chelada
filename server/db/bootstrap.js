@@ -40,6 +40,9 @@ export function ensureBootstrap(db, { log = console.log } = {}) {
     const ADMIN_PIN = process.env.ADMIN_PIN || '0000';
     const MESERO_PIN = process.env.MESERO_PIN || '1111';
     const KDS_PIN = process.env.KDS_PIN || '2222';
+    // ⚠️ M4/2.8: número de mesas. SSOT = src/core/config/app.config.ts
+    // (capacity.totalTables = 10). DEFAULT_TABLES es el override de runtime;
+    // sin env, el valor DEFAULT debe coincidir con el SSOT (10).
     const defaultTables = parseInt(process.env.DEFAULT_TABLES || '10', 10);
 
     ensureStaff(db, { pin: ADMIN_PIN, role: 'admin', display_name: 'Administrador' });

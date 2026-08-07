@@ -12,15 +12,23 @@ import { broadcaster, buildKDSEvent, KDSEventType } from './websocket-broadcaste
 
 /**
  * Emit a `new_order` event to KDS (cocina + bar).
- * Called when a mesero confirms a "called" order.
+ * Called at order CREATION time:
+ *   - pedido público del cliente (clientes PWA) → status REAL 'called'
+ *     (el mesero debe confirmarlo; KDS lo filtra hasta 'confirmed')
+ *   - confirmación del mesero (called → confirmed) → status 'confirmed'
+ *
+ * 2.7 (A5): ANTES el status estaba hardcodeado a 'confirmed' → la KDS
+ * veía como confirmado un pedido que en realidad estaba 'called' y el
+ * flujo de confirmación del mesero se rompía. Ahora se emite el status
+ * REAL del pedido (order.status).
  */
-export function broadcastOrderConfirmed(order) {
+export function broadcastOrderCreated(order) {
   if (!order) return;
   broadcaster.broadcastKDS(buildKDSEvent(KDSEventType.NEW_ORDER, {
     orderId: order.id,
     tableNumber: order.table_number,
     items: order.items,
-    status: 'confirmed',
+    status: order.status,
   }));
 }
 

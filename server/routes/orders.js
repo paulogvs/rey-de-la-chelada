@@ -23,9 +23,10 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
-import { broadcastOrderConfirmed, broadcastOrderStatusChange } from '../services/order-broadcaster.js';
+import { broadcastOrderCreated, broadcastOrderStatusChange } from '../services/order-broadcaster.js';
 import { broadcaster, buildKDSEvent, KDSEventType } from '../services/websocket-broadcaster.js';
 import { computeTotals, round2 } from '../../src/core/config/iva.js';
+import { resolveModifierAdjustment, recalcOrder } from '../services/order-pricing.js';
 
 const router = Router();
 
@@ -58,56 +59,10 @@ const KDS_MODULES = { cocina: 'cocina', bar: 'bar', kds: 'all' };
  *   - total   = grossTotal (lo que paga el cliente)
  *   - subtotal = total / 1.13 (base, sin IVA)
  *   - iva     = total - subtotal
- */
-
-/**
- * Resolve modifier adjustments for an order item from the DB.
  *
- * The mesero/clientes PWAs send modifiers as optionName (+priceAdjustment).
- * To keep server totals authoritative (SSOT), we look the options up by
- * name within the item's modifier groups and re-derive the adjustment.
- *
- * @param {object} db — better-sqlite3 instance
- * @param {string} menuItemId
- * @param {Array} modifiers — [{ groupName?, optionName, priceAdjustment? }]
- * @returns {{ adjustment: number, summary: Array }}
+ * NOTA: resolveModifierAdjustment y recalcOrder viven en
+ * server/services/order-pricing.js (FASE 2 — compartidos con sync.js).
  */
-function resolveModifierAdjustment(db, menuItemId, modifiers) {
-  const raw = Array.isArray(modifiers) ? modifiers : [];
-  if (raw.length === 0) return { adjustment: 0, summary: [] };
-
-  const groups = db.prepare(
-    'SELECT id FROM modifier_groups WHERE menu_item_id = ?'
-  ).all(menuItemId);
-  if (groups.length === 0) return { adjustment: 0, summary: [] };
-
-  const placeholders = groups.map(() => '?').join(',');
-  const options = db.prepare(
-    `SELECT id, name, price_adjustment FROM modifier_options
-     WHERE group_id IN (${placeholders})`
-  ).all(...groups.map(g => g.id));
-
-  let adjustment = 0;
-  const summary = [];
-  for (const m of raw) {
-    const opt = options.find(o => o.name === m.optionName);
-    if (!opt) continue;
-    const adj = Number(opt.price_adjustment || 0);
-    adjustment += adj;
-    summary.push({ groupName: m.groupName || '', optionName: opt.name, priceAdjustment: adj });
-  }
-  return { adjustment: Math.round(adjustment * 100) / 100, summary };
-}
-
-/** Recalcula subtotal/iva/total de un pedido */
-function recalcOrder(db, orderId) {
-  const sum = db.prepare('SELECT COALESCE(SUM(subtotal), 0) as subtotal FROM order_items WHERE order_id = ?').get(orderId);
-  const grossTotal = round2(sum.subtotal || 0);
-  const { subtotal, iva, total } = computeTotals(grossTotal);
-  db.prepare('UPDATE orders SET subtotal = ?, iva_amount = ?, total = ? WHERE id = ?')
-    .run(subtotal, iva, total, orderId);
-  return { subtotal, iva, total };
-}
 
 /** Helper para armar la respuesta de un pedido con items */
 function buildOrder(db, orderId) {
@@ -388,12 +343,28 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
 });
 
 // ============================================================
-// PUT /api/orders/:id — Actualizar pedido (items, notes)
+// PUT /api/orders/:id — Actualizar pedido (items, notes) INCREMENTAL
+//
+// FASE 2 (2.5): ANTES hacía DELETE + INSERT de TODOS los items → lost
+// update si otro agente (KDS cancelando items, otro mesero) tocaba el
+// pedido a la vez. Ahora es INCREMENTAL:
+//
+//   { notes?, items: [{ id?, menu_item_id, quantity, modifiers? }], remove_item_ids?: [] }
+//
+//   - item con `id` existente            → UPDATE (cantidad/modifiers)
+//   - item sin `id` (o id no pertenece)  → INSERT (nuevo)
+//   - remove_item_ids                    → DELETE solo esos
+//   - items NO mencionados               → se CONSERVAN
+//   - el server RECALCULA subtotal/iva/total (SSOT iva.js)
+//
+// Retrocompat: si el cliente manda la lista completa sin ids, los items se
+// insertan como nuevos y NO se elimina nada (la eliminación solo es
+// explícita vía remove_item_ids).
 // ============================================================
 
 router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
   try {
-    const { notes, items } = req.body;
+    const { notes, items, remove_item_ids } = req.body;
     const db = getDb();
 
     const existing = db.prepare('SELECT id, status FROM orders WHERE id = ?').get(req.params.id);
@@ -410,30 +381,65 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
       db.prepare("UPDATE orders SET notes = ? WHERE id = ?").run(notes, req.params.id);
     }
 
-    // Replace items if provided
-    if (items && Array.isArray(items) && items.length > 0) {
-      db.prepare('DELETE FROM order_items WHERE order_id = ?').run(req.params.id);
+    const itemsChanged =
+      (Array.isArray(items) && items.length > 0) ||
+      (Array.isArray(remove_item_ids) && remove_item_ids.length > 0);
 
-      const insertItem = db.prepare(`
-        INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
-                                 unit_price, modifiers_json, subtotal, status, preparation_notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
+    if (itemsChanged) {
+      const runUpdate = db.transaction(() => {
+        const currentIds = db.prepare('SELECT id FROM order_items WHERE order_id = ?')
+          .all(req.params.id).map(r => r.id);
+        const currentIdSet = new Set(currentIds);
 
-      for (const item of items) {
-        const menuItem = db.prepare('SELECT id, name, price FROM menu_items WHERE id = ? AND is_active = 1').get(item.menu_item_id);
-        if (!menuItem) continue;
+        // 1) Eliminación SOLO explícita
+        if (Array.isArray(remove_item_ids) && remove_item_ids.length > 0) {
+          const placeholders = remove_item_ids.map(() => '?').join(',');
+          db.prepare(`DELETE FROM order_items WHERE order_id = ? AND id IN (${placeholders})`)
+            .run(req.params.id, ...remove_item_ids);
+        }
 
-        const quantity = item.quantity || 1;
-        const { adjustment } = resolveModifierAdjustment(db, menuItem.id, item.modifiers);
-        const unitPrice = round2((menuItem.price || 0) + adjustment);
-        const itemSubtotal = round2(unitPrice * quantity);
+        // 2) Upsert incremental por item
+        if (Array.isArray(items) && items.length > 0) {
+          const getMenuItem = db.prepare(
+            'SELECT id, name, price FROM menu_items WHERE id = ? AND is_active = 1'
+          );
+          const updateItem = db.prepare(`
+            UPDATE order_items
+            SET quantity = ?, unit_price = ?, modifiers_json = ?, subtotal = ?, preparation_notes = ?
+            WHERE id = ? AND order_id = ?
+          `);
+          const insertItem = db.prepare(`
+            INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
+                                     unit_price, modifiers_json, subtotal, status, preparation_notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+          `);
 
-        insertItem.run(randomUUID(), req.params.id, menuItem.id, menuItem.name, quantity,
-                       unitPrice, item.modifiers ? JSON.stringify(item.modifiers) : null,
-                       itemSubtotal, 'pending', item.notes || '');
-      }
+          for (const item of items) {
+            const menuItem = getMenuItem.get(item.menu_item_id);
+            if (!menuItem) continue;
 
+            const quantity = item.quantity ?? 1;
+            if (!Number.isFinite(quantity) || quantity < 1) continue;
+
+            const { adjustment, summary } = resolveModifierAdjustment(db, menuItem.id, item.modifiers);
+            const unitPrice = round2((menuItem.price || 0) + adjustment);
+            const itemSubtotal = round2(unitPrice * quantity);
+            const modifiersJson = summary.length > 0 ? JSON.stringify(summary) : null;
+            const notesField = item.notes || '';
+
+            if (item.id && currentIdSet.has(item.id)) {
+              updateItem.run(quantity, unitPrice, modifiersJson, itemSubtotal, notesField, item.id, req.params.id);
+            } else {
+              // sin id, o id que no pertenece a este pedido → nuevo
+              insertItem.run(item.id || randomUUID(), req.params.id, menuItem.id, menuItem.name,
+                             quantity, unitPrice, modifiersJson, itemSubtotal, notesField);
+            }
+          }
+        }
+      });
+      runUpdate();
+
+      // 3) Recalcular siempre que cambió algo (SSOT)
       recalcOrder(db, req.params.id);
     }
 
@@ -507,9 +513,9 @@ router.patch('/:id/confirm', requireAuth, requireRole('admin', 'mesero'), (req, 
     // Mark table as ordered
     db.prepare("UPDATE tables SET status = 'ordered' WHERE id = ?").run(existing.table_id);
 
-    // Broadcast new_order to KDS (cocina + bar)
+    // Broadcast new_order to KDS (cocina + bar) — status real 'confirmed'
     const order = buildOrder(db, req.params.id);
-    broadcastOrderConfirmed(order);
+    broadcastOrderCreated(order);
 
     res.json({ success: true, status: 'confirmed', message: 'Pedido confirmado' });
   } catch (err) {

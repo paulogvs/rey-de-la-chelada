@@ -23,7 +23,6 @@ import { Loader } from '@/ui/components/Loader';
 import { useToast } from '@/ui/components/Toast';
 import { apiFetch } from '../_shared/api/apiFetch';
 import { processPayment } from '../_shared/api/paymentsApi';
-import { updateTableStatus } from '../_shared/api/tablesApi';
 import type { Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
@@ -152,9 +151,10 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
         }
       }
 
-      // Mark table free after payment
-      await updateTableStatus(token, table.id, 'free');
-
+      // A3/2.4: la mesa la libera el SERVIDOR (processPayment) SOLO si no
+      // hay otros pedidos activos. ANTES el cliente forzaba free aquí con
+      // updateTableStatus(..., 'free') — rompía el escenario de 2 pedidos
+      // en la misma mesa. El hook useTables (polling 15s) refresca el estado.
       addToast({
         type: 'success',
         message: `Pago completado — Mesa ${table.number}`,

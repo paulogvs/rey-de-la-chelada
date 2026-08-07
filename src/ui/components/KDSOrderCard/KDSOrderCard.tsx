@@ -105,7 +105,11 @@ export function KDSOrderCard({
             {order.waiterName}
           </div>
           <Badge
-            variant={order.status === 'confirmed' ? 'pending' : order.status === 'preparing' ? 'preparing' : 'ready'}
+            // 2.7 (A5): badge honra el status REAL. 'called' (pedido del
+            // cliente aún sin confirmar) se muestra como 'pending' — NUNCA
+            // como 'ready' (fallback anterior). El filtro KDS (getKDSOrders)
+            // ya excluye 'called', esto es defensivo.
+            variant={order.status === 'called' || order.status === 'confirmed' ? 'pending' : order.status === 'preparing' ? 'preparing' : 'ready'}
             large
           />
         </div>

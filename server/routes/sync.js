@@ -23,6 +23,8 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
+import { computeTotals, round2 } from '../../src/core/config/iva.js';
+import { resolveModifierAdjustment } from '../services/order-pricing.js';
 
 const router = Router();
 
@@ -200,8 +202,63 @@ router.post('/push', requireAuth, (req, res) => {
           // Usamos el id del cliente (UUID) como PK para que
           // create_payment/update_status posteriores sean deterministas.
           const orderId = order.id || randomUUID();
+
+          // ── 2.3 IDEMPOTENCIA: si el pedido ya existe (mismo id UUID) no
+          // lo duplicamos — lo marcamos 'skipped' sin error. La semántica
+          // elegida es dedupe por entity id (orders.id/payments.id son
+          // UUID del cliente = deterministas).
+          const existingOrder = db.prepare('SELECT id FROM orders WHERE id = ?').get(orderId);
+          if (existingOrder) {
+            results.push({
+              client_id: order.client_id || orderId,
+              server_id: orderId,
+              status: 'skipped',
+              reason: 'duplicate_order_id_already_exists',
+            });
+            continue;
+          }
+
           const waiterId = order.waiter_id || req.user.sub;
           const waiterName = order.waiter_name || req.user.displayName || req.user.username;
+
+          // ── 2.2 PRECIOS SERVER-SIDE (SSOT): ignoramos subtotal/iva/total/
+          // unit_price del cliente — recalculamos desde menu_items.price +
+          // modificadores por NOMBRE, igual que POST /api/orders.
+          let grossSubtotal = 0;
+          const orderItems = [];
+          const findMenuItem = db.prepare(
+            'SELECT id, name, price, area FROM menu_items WHERE id = ? AND is_active = 1'
+          );
+          const rawItems = Array.isArray(order.items) ? order.items : [];
+          for (const item of rawItems) {
+            const menuItem = findMenuItem.get(item.menu_item_id);
+            if (!menuItem) {
+              throw new Error(`Item inválido: ${item.menu_item_id}`);
+            }
+            const quantity = Number(item.quantity) ?? 1;
+            if (!Number.isFinite(quantity) || quantity < 1) {
+              throw new Error(`Cantidad inválida: ${item.quantity}`);
+            }
+            const { adjustment, summary } = resolveModifierAdjustment(db, menuItem.id, item.modifiers);
+            const unitPrice = round2((menuItem.price || 0) + adjustment);
+            const itemSubtotal = round2(unitPrice * quantity);
+            grossSubtotal += itemSubtotal;
+            orderItems.push({
+              id: item.id || randomUUID(),
+              menu_item_id: menuItem.id,
+              menu_item_name: menuItem.name,
+              quantity,
+              unit_price: unitPrice,
+              modifiers_json: summary.length > 0 ? JSON.stringify(summary) : null,
+              subtotal: itemSubtotal,
+              status: ITEM_STATUS_MAP[item.status] || 'pending',
+              preparation_notes: item.preparation_notes || item.notes || '',
+            });
+          }
+
+          // Modelo SSOT EXTRACTIVO (iva.js): total = gross (suma de precios
+          // que ya incluyen IVA); subtotal(base) = total/1.13; iva = total - subtotal.
+          const { subtotal, iva, total } = computeTotals(grossSubtotal);
 
           db.prepare(`
             INSERT INTO orders (id, table_id, table_number, waiter_id, waiter_name, status,
@@ -215,36 +272,28 @@ router.post('/push', requireAuth, (req, res) => {
             waiterId,
             waiterName,
             ORDER_STATUS_MAP[order.status] || 'confirmed',
-            order.subtotal || 0,
-            order.iva_amount || 0,
+            subtotal,
+            iva,
             order.discount || 0,
             order.discount_reason || '',
-            order.total || 0,
+            total,
             order.notes || '',
             order.guest_count || 1,
             order.local_id || orderId,
             new Date().toISOString()
           );
 
-          // Insert items
-          if (Array.isArray(order.items)) {
+          // Insert items (precios recalculados — los del cliente se ignoran)
+          if (orderItems.length > 0) {
             const insertItem = db.prepare(`
               INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
                                        unit_price, modifiers_json, subtotal, status, preparation_notes)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
-            for (const item of order.items) {
+            for (const oi of orderItems) {
               insertItem.run(
-                item.id || randomUUID(),
-                orderId,
-                item.menu_item_id,
-                item.menu_item_name || '',
-                item.quantity || 1,
-                item.unit_price || 0,
-                typeof item.modifiers === 'string' ? item.modifiers : JSON.stringify(item.modifiers || []),
-                item.subtotal || 0,
-                ITEM_STATUS_MAP[item.status] || 'pending',
-                item.preparation_notes || item.notes || ''
+                oi.id, orderId, oi.menu_item_id, oi.menu_item_name, oi.quantity,
+                oi.unit_price, oi.modifiers_json, oi.subtotal, oi.status, oi.preparation_notes
               );
             }
           }
@@ -319,6 +368,19 @@ router.post('/push', requireAuth, (req, res) => {
           }
 
           const paymentId = order.id || randomUUID();
+
+          // ── 2.3 IDEMPOTENCIA: mismo id de pago → skipped (no duplicar)
+          const existingPayment = db.prepare('SELECT id FROM payments WHERE id = ?').get(paymentId);
+          if (existingPayment) {
+            results.push({
+              client_id: order.client_id || paymentId,
+              server_id: paymentId,
+              status: 'skipped',
+              reason: 'duplicate_payment_id_already_exists',
+            });
+            continue;
+          }
+
           // C4: tip viaja con el payment (total cobrado = amount + tip).
           const tipValue = Math.max(0, Number(order.tip) || 0);
           db.prepare(`
@@ -368,12 +430,21 @@ router.post('/push', requireAuth, (req, res) => {
       errors: errors.length,
     });
 
+    // ── 2.3 ERRORES HONESTOS: si algo falló, success:false + code
+    // SYNC_PARTIAL_ERRORS + errors[] — el cliente NO borra los items
+    // fallidos de su cola (SyncEngine lanza cuando success === false).
+    // Status HTTP 200 (documentado): el payload lleva la verdad, no el
+    // código HTTP; así el cliente puede diferenciar items buenos (results)
+    // de malos (errors) en el MISMO batch.
+    const hasErrors = errors.length > 0;
+
     res.json({
-      success: true,
+      success: !hasErrors,
       sync_id: sync_id || null,
       timestamp: new Date().toISOString(),
+      ...(hasErrors ? { code: 'SYNC_PARTIAL_ERRORS' } : {}),
       results,
-      errors: errors.length > 0 ? errors : undefined,
+      errors: hasErrors ? errors : undefined,
     });
   } catch (err) {
     console.error('[Sync] Push error:', err.message);

@@ -23,36 +23,50 @@ vi.mock('../../server/services/websocket-broadcaster.js', () => ({
   KDSEventType: { NEW_ORDER: 'new_order', STATUS_CHANGE: 'status_change', ITEM_READY: 'item_ready', ORDER_COMPLETE: 'order_complete' },
 }));
 
-describe('Order Broadcaster — broadcastOrderConfirmed', () => {
+describe('Order Broadcaster — broadcastOrderCreated', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('emits new_order event to KDS when an order is confirmed', async () => {
-    const { broadcastOrderConfirmed } = await import('../../server/services/order-broadcaster.js');
+  it('emits new_order event to KDS when an order is created/confirmed', async () => {
+    const { broadcastOrderCreated } = await import('../../server/services/order-broadcaster.js');
     const order = {
       id: 'ord-1',
       table_number: 5,
       items: [{ id: 'i1', status: 'pending' }],
       status: 'confirmed',
     };
-    broadcastOrderConfirmed(order);
+    broadcastOrderCreated(order);
     expect(broadcastKDSMock).toHaveBeenCalledTimes(1);
     const [event] = broadcastKDSMock.mock.calls[0];
     expect(event.type).toBe('new_order');
     expect(event.orderId).toBe('ord-1');
     expect(event.tableNumber).toBe(5);
+    expect(event.status).toBe('confirmed');
   });
 
-  it('does not notify meseros on confirmation', async () => {
-    const { broadcastOrderConfirmed } = await import('../../server/services/order-broadcaster.js');
-    broadcastOrderConfirmed({ id: 'ord-1', table_number: 1, items: [] });
+  it('emits the REAL order status (called for client-created public orders)', async () => {
+    const { broadcastOrderCreated } = await import('../../server/services/order-broadcaster.js');
+    const order = {
+      id: 'ord-2',
+      table_number: 6,
+      items: [{ id: 'i1', status: 'pending' }],
+      status: 'called',
+    };
+    broadcastOrderCreated(order);
+    const [event] = broadcastKDSMock.mock.calls[0];
+    expect(event.status).toBe('called');
+  });
+
+  it('does not notify meseros on creation', async () => {
+    const { broadcastOrderCreated } = await import('../../server/services/order-broadcaster.js');
+    broadcastOrderCreated({ id: 'ord-1', table_number: 1, items: [] });
     expect(broadcastMeserosMock).not.toHaveBeenCalled();
   });
 
   it('is a no-op when order is null/undefined', async () => {
-    const { broadcastOrderConfirmed } = await import('../../server/services/order-broadcaster.js');
-    expect(() => broadcastOrderConfirmed(null)).not.toThrow();
+    const { broadcastOrderCreated } = await import('../../server/services/order-broadcaster.js');
+    expect(() => broadcastOrderCreated(null)).not.toThrow();
     expect(broadcastKDSMock).not.toHaveBeenCalled();
   });
 });

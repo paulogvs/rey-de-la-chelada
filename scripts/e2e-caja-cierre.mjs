@@ -14,10 +14,12 @@
 
 import { api, makeReporter, ensureThrowawayTable, getCleanupDb } from './e2e-lib.mjs';
 import { tokenFor } from './e2e-session.mjs';
+import { localDateStr as todayLocal } from './date-utils.mjs';
 
 const reporter = makeReporter('caja-cierre');
 const TABLE_NUMBER = 98;
-const today = new Date().toISOString().split('T')[0];
+// C1/2.1: "hoy" = fecha LOCAL America/La_Paz (NUNCA toISOString — corta a las 20:00 local)
+const today = todayLocal();
 
 async function run() {
   console.log('== Flujo 9+10: Caja + Cierre de caja ==');

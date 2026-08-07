@@ -168,6 +168,12 @@ export interface RestaurantConfig {
 
   /** Capacidad del local */
   capacity: {
+    // ⚠️ SSOT del número de mesas (M4/2.8).
+    // `totalTables` es LA fuente de verdad para la capacidad del local.
+    // El server (server/db/bootstrap.js + seed.js) lee DEFAULT_TABLES
+    // (env) con fallback a este valor 10 — ver comentario en cada lugar.
+    // Si cambias el número de mesas del local, cambia AQUÍ y, si el
+    // server debe arrancar con otro número en runtime, usa DEFAULT_TABLES.
     totalTables: number;
     maxGuestsPerTable: number;
   };

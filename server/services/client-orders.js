@@ -114,6 +114,28 @@ export function createPublicOrder(db, input) {
     });
   }
 
+  // ── 2.6 (A7) UN SOLO PEDIDO ACTIVO POR MESA ──────────────────
+  // "El pedido activo es el permiso": un segundo teléfono de la misma
+  // mesa NO puede crear otro pedido mientras exista uno activo
+  // (status NOT IN ('paid','cancelled')). Regla documentada:
+  //   - pedido activo de OTRO session_id → rechazo 409 TABLE_HAS_ACTIVE_ORDER
+  //   - excepción: pedido activo del MISMO session_id (mismo teléfono,
+  //     mismo flujo de tracking/reintento) → se permite
+  // El session_id se guarda en orders.local_id al insertar (abajo).
+  // OJO: corre DESPUÉS de validar items (orden de validación histórico:
+  // INVALID_MENU_ITEM primero — ver tests/unit/client-orders-agotados.test.js).
+  const activeOrder = db.prepare(
+    "SELECT id, local_id FROM orders WHERE table_id = ? AND status NOT IN ('paid','cancelled')"
+  ).get(table.id);
+  if (activeOrder && activeOrder.local_id !== session_id) {
+    return {
+      success: false,
+      code: 'TABLE_HAS_ACTIVE_ORDER',
+      error: 'La mesa ya tiene un pedido activo — espera a que lo atiendan o lo cierren',
+      activeOrderId: activeOrder.id,
+    };
+  }
+
   // Modelo EXTRACTIVO (precio INCLUYE IVA — SSOT iva.js):
   //   - total  = suma de precios del carrito (lo que paga el cliente, ya incluye IVA)
   //   - subtotal = base (sin IVA) = total / 1.13

@@ -145,7 +145,9 @@ export function runSeed(db = getDb()) {
   ensureStaff(db, { pin: MESERO_PIN, role: 'mesero', display_name: 'Mesero' });
   ensureStaff(db, { pin: KDS_PIN, role: 'kds', display_name: 'KDS' });
 
-  ensureTables(db, 10);
+  // ⚠️ M4/2.8: 10 = SSOT src/core/config/app.config.ts (capacity.totalTables).
+  // DEFAULT_TABLES env lo sobreescribe en runtime (ver bootstrap.js).
+  ensureTables(db, parseInt(process.env.DEFAULT_TABLES || '10', 10));
   ensureMenu(db);
 
   return db;
