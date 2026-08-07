@@ -6,6 +6,17 @@
  * The UI is ONLY a renderer — NEVER a calculator.
  * 
  * All sub-engines are exposed here as a unified API.
+ *
+ * ⚠️ LEGACY (FASE 2, 2.8/M6): El SSOT real de producción es el SERVIDOR
+ * (Express + SQLite + API REST). Este módulo cliente es legacy de la fase
+ * inicial:
+ *   - `initializeEngines()` NUNCA se invoca en las PWAs productivas.
+ *   - `tableEngine`/`menuEngine` ya NO alimentan pantallas productivas
+ *     (meseros usa useTables→API; clientes/meseros usan menuApi→API).
+ *   - `orderEngine` sigue VIVO (KDS + useKDSWebSocket + useTableSession),
+ *     pero como caché/estado local alimentado por el servidor, NO como
+ *     fuente de verdad.
+ * Mantener SOLO lo que se usa; eliminar el resto en una refactor futura.
  */
 
 export { default as tableEngine, TableEngine } from './TableEngine';
