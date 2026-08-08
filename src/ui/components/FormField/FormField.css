@@ -23,6 +23,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   color: var(--text);
+  caret-color: var(--dorado-rey);
   font-family: var(--font-body);
   font-size: var(--text-base);
   min-height: var(--touch-min-target);
@@ -32,10 +33,15 @@
               background-color var(--duration-fast) var(--ease-out);
 }
 
+.form-input:hover:not(:disabled):not(:focus) {
+  border-color: var(--border-hover);
+  background: var(--surface-hover);
+}
+
 .form-input:focus {
   border-color: var(--dorado-rey);
   outline: none;
-  box-shadow: 0 0 0 3px var(--dorado-rey-soft), 0 2px 8px -4px color-mix(in srgb, var(--dorado-rey) 30%, transparent);
+  box-shadow: var(--focus-ring);
   background: var(--surface);
 }
 

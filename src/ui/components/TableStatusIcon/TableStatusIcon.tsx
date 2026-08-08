@@ -48,7 +48,7 @@ export function TableStatusIcon({
   return (
     <span
       className={classes}
-      style={{ backgroundColor: config.cssVar }}
+      style={{ backgroundColor: config.cssVar, color: config.cssVar }}
       role="img"
       aria-label={config.label}
       title={config.label}

@@ -29,6 +29,11 @@
   transform: scale(0.97);
 }
 
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -90,7 +95,7 @@
   background: var(--dorado-rey-soft);
   color: var(--dorado-rey);
   border-color: var(--dorado-rey);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--dorado-rey) 20%, transparent);
+  box-shadow: var(--shadow-golden);
 }
 
 .btn--kds {
@@ -126,7 +131,7 @@
 }
 
 .btn--ghost:hover:not(:disabled) {
-  color: var(--text);
+  color: var(--text-strong);
   background: var(--dorado-rey-soft);
 }
 

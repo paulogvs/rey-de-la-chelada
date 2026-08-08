@@ -1,0 +1,50 @@
+/* ============================================================
+   SEGMENTEDCONTROL — Segmented filter control
+   ZERO hardcoded colors — all variables from tokens.json
+   ============================================================ */
+
+.segmented {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.segmented__option {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--touch-min-target);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background-color var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out),
+              transform var(--duration-fast) var(--ease-out);
+}
+
+.segmented__option:hover:not(.segmented__option--active) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.segmented__option:active:not(.segmented__option--active) {
+  transform: scale(0.98);
+}
+
+.segmented__option--active {
+  background: var(--dorado-rey);
+  color: var(--text-inverse);
+  box-shadow: var(--shadow-golden);
+}

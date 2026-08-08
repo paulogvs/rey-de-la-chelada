@@ -1,0 +1,71 @@
+/* ============================================================
+   STATCARD — Metric card for admin/caja dashboards
+   ZERO hardcoded colors — all variables from tokens.json
+   ============================================================ */
+
+.stat-card {
+  min-width: 0;
+}
+
+.stat-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.stat-card__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stat-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--touch-min-target);
+  height: var(--touch-min-target);
+  border-radius: var(--radius-md);
+  background: var(--dorado-rey-soft);
+  color: var(--dorado-rey);
+  font-size: var(--text-lg);
+}
+
+.stat-card__value {
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  color: var(--text-strong);
+  line-height: 1.1;
+}
+
+.stat-card__delta {
+  margin-top: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+.stat-card__delta--up {
+  color: var(--status-confirmed);
+  background: color-mix(in srgb, var(--status-confirmed) 12%, transparent);
+}
+
+.stat-card__delta--down {
+  color: var(--status-cancelled);
+  background: color-mix(in srgb, var(--status-cancelled) 12%, transparent);
+}
+
+.stat-card__delta--neutral {
+  color: var(--text-muted);
+  background: var(--dorado-rey-soft);
+}

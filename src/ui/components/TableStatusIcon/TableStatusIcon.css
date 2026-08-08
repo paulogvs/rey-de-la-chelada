@@ -6,6 +6,7 @@
 .table-status-icon {
   display: inline-block;
   flex-shrink: 0;
+  box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 25%, transparent);
   transition: background-color var(--duration-normal) var(--ease-out);
 }
 

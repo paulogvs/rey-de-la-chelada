@@ -30,11 +30,13 @@
   border-radius: 50%;
   animation: loader-spin 0.7s linear infinite;
   flex-shrink: 0;
-  box-shadow: 0 0 12px -2px color-mix(in srgb, var(--dorado-rey) 30%, transparent);
+  box-shadow: 0 0 12px -2px color-mix(in srgb, var(--dorado-rey) 30%, transparent),
+              0 0 24px -6px color-mix(in srgb, var(--dorado-rey) 20%, transparent);
 }
 
 .loader__label {
   font-size: var(--text-sm);
+  letter-spacing: 0.02em;
 }
 
 @keyframes loader-spin {
