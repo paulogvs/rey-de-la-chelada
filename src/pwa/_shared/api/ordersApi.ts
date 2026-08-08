@@ -46,6 +46,8 @@ export interface ServerOrder {
   created_at: string;
   updated_at: string;
   local_id: string | null;
+  /** S2-C: suma de pagos completed (amount + tip) — SSOT server */
+  paid_amount?: number;
   items?: ServerOrderItem[];
 }
 
@@ -82,6 +84,8 @@ export interface Order {
   createdAt: string;
   updatedAt: string;
   localId: string | null;
+  /** S2-C: suma de pagos completed (amount + tip) — SSOT server */
+  paidAmount: number;
   items: OrderLineItem[];
 }
 
@@ -154,6 +158,7 @@ function normalizeOrder(order: ServerOrder): Order {
     createdAt: order.created_at,
     updatedAt: order.updated_at,
     localId: order.local_id,
+    paidAmount: typeof order.paid_amount === 'number' ? order.paid_amount : 0,
     items: Array.isArray(order.items) ? order.items.map(normalizeItem) : [],
   };
 }
@@ -238,4 +243,66 @@ export async function fetchOrdersByStatus(
   return { ...result, data: { orders: result.data.orders }, orders: result.data.orders.map(normalizeOrder) };
 }
 
-export default { createOrder, submitOrder, confirmOrder, updateOrderStatus, fetchOrdersByStatus };
+/** GET /api/orders/:id — single order (with payments + items) */
+export async function fetchOrderById(
+  token: string,
+  orderId: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<OrderResult> {
+  const result = await apiFetch<{ success: boolean; order?: ServerOrder }>(`/api/orders/${orderId}`, {
+    token,
+    fetchImpl,
+  });
+
+  if (!result.ok || !result.data?.order) {
+    return { ...result, data: null, order: null } as OrderResult;
+  }
+
+  const order = normalizeOrder(result.data.order);
+  return { ...result, data: { order: result.data.order }, order };
+}
+
+/**
+ * GET /api/orders?pending=1 — pedidos activos pendientes de cobro
+ * (called, confirmed, preparing, ready, served). S2-C: la caja los lista
+ * con totals y paid_amount (SSOT server).
+ */
+export async function fetchPendingOrders(
+  token: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<OrdersResult> {
+  const result = await apiFetch<{ success: boolean; orders?: ServerOrder[]; count?: number }>(
+    '/api/orders?pending=1',
+    { token, fetchImpl }
+  );
+
+  if (!result.ok || !result.data?.orders) {
+    return { ...result, data: null, orders: [] } as OrdersResult;
+  }
+
+  return { ...result, data: { orders: result.data.orders }, orders: result.data.orders.map(normalizeOrder) };
+}
+
+/** PATCH /api/orders/:id/deliver — mesero entrega los items listos (S2-B) */
+export async function deliverOrder(
+  token: string,
+  orderId: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<ApiResult<{ success: boolean; status?: string }>> {
+  return apiFetch<{ success: boolean; status?: string }>(`/api/orders/${orderId}/deliver`, {
+    method: 'PATCH',
+    token,
+    fetchImpl,
+  });
+}
+
+export default {
+  createOrder,
+  submitOrder,
+  confirmOrder,
+  updateOrderStatus,
+  fetchOrdersByStatus,
+  fetchOrderById,
+  fetchPendingOrders,
+  deliverOrder,
+};

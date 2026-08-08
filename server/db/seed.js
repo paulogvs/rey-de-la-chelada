@@ -5,11 +5,12 @@
  *  Uso: node server/db/seed.js
  *
  *  Crea si no existen:
- *    - Staff: admin (PIN 0000), mesero (PIN 1111), kds (PIN 2222)
+ *    - Staff: admin (PIN 0000), mesero (PIN 1111), kds (PIN 2222), caja (PIN 3333)
  *    - Mesas 1-10
  *    - Categorías + items de menú de ejemplo
  *
- *  v2: 3 roles only (admin, mesero, kds). Shared PIN per role.
+ *  v2: shared PIN per role.
+ *  v5: + rol 'caja' (S1) — cajero separado del admin, PIN 3333.
  *  Alineado al SSOT: server/db/schema.js
  * ═══════════════════════════════════════════════════════════
  */
@@ -20,7 +21,7 @@ import { pathToFileURL } from 'node:url';
 import { getDb, closeDb } from './index.js';
 
 // ============================================================
-// Staff (v2: 3 roles, shared PIN per role)
+// Staff (shared PIN per role)
 // ============================================================
 
 /**
@@ -140,10 +141,12 @@ export function runSeed(db = getDb()) {
   const ADMIN_PIN = process.env.ADMIN_PIN || '0000';
   const MESERO_PIN = process.env.MESERO_PIN || '1111';
   const KDS_PIN = process.env.KDS_PIN || '2222';
+  const CAJA_PIN = process.env.CAJA_PIN || '3333';
 
   ensureStaff(db, { pin: ADMIN_PIN, role: 'admin', display_name: 'Administrador' });
   ensureStaff(db, { pin: MESERO_PIN, role: 'mesero', display_name: 'Mesero' });
   ensureStaff(db, { pin: KDS_PIN, role: 'kds', display_name: 'KDS' });
+  ensureStaff(db, { pin: CAJA_PIN, role: 'caja', display_name: 'Cajero' });
 
   // ⚠️ M4/2.8: 10 = SSOT src/core/config/app.config.ts (capacity.totalTables).
   // DEFAULT_TABLES env lo sobreescribe en runtime (ver bootstrap.js).

@@ -34,26 +34,32 @@ import { applyDemoPrices } from '../scripts/demo-prices.js';
 export function ensureBootstrap(db, { log = console.log } = {}) {
   const steps = [];
 
-  // ── 1. Staff + mesas (solo si no existen) ────────────────
+  // ── 1. Staff + mesas (idempotente) ──────────────────────
+  // v5 (S1): ensureStaff corre SIEMPRE (es idempotente por rol). Antes solo
+  // corría si staffCount === 0, lo que dejaba DBs existentes SIN el rol 'caja'
+  // creado por la v5. Ahora cada arranque garantiza los 4 roles.
   const staffCount = db.prepare('SELECT COUNT(*) AS n FROM staff').get().n;
+  const ADMIN_PIN = process.env.ADMIN_PIN || '0000';
+  const MESERO_PIN = process.env.MESERO_PIN || '1111';
+  const KDS_PIN = process.env.KDS_PIN || '2222';
+  const CAJA_PIN = process.env.CAJA_PIN || '3333';
+  // ⚠️ M4/2.8: número de mesas. SSOT = src/core/config/app.config.ts
+  // (capacity.totalTables = 10). DEFAULT_TABLES es el override de runtime;
+  // sin env, el valor DEFAULT debe coincidir con el SSOT (10).
+  const defaultTables = parseInt(process.env.DEFAULT_TABLES || '10', 10);
+
+  ensureStaff(db, { pin: ADMIN_PIN, role: 'admin', display_name: 'Administrador' });
+  ensureStaff(db, { pin: MESERO_PIN, role: 'mesero', display_name: 'Mesero' });
+  ensureStaff(db, { pin: KDS_PIN, role: 'kds', display_name: 'KDS' });
+  ensureStaff(db, { pin: CAJA_PIN, role: 'caja', display_name: 'Cajero' });
+  const tables = ensureTables(db, defaultTables);
+
+  const staffRoles = db.prepare('SELECT role FROM staff ORDER BY role').all().map(r => r.role);
   if (staffCount === 0) {
-    const ADMIN_PIN = process.env.ADMIN_PIN || '0000';
-    const MESERO_PIN = process.env.MESERO_PIN || '1111';
-    const KDS_PIN = process.env.KDS_PIN || '2222';
-    // ⚠️ M4/2.8: número de mesas. SSOT = src/core/config/app.config.ts
-    // (capacity.totalTables = 10). DEFAULT_TABLES es el override de runtime;
-    // sin env, el valor DEFAULT debe coincidir con el SSOT (10).
-    const defaultTables = parseInt(process.env.DEFAULT_TABLES || '10', 10);
-
-    ensureStaff(db, { pin: ADMIN_PIN, role: 'admin', display_name: 'Administrador' });
-    ensureStaff(db, { pin: MESERO_PIN, role: 'mesero', display_name: 'Mesero' });
-    ensureStaff(db, { pin: KDS_PIN, role: 'kds', display_name: 'KDS' });
-    const tables = ensureTables(db, defaultTables);
-
-    log(`[Bootstrap] Staff creado (admin ${ADMIN_PIN}, mesero ${MESERO_PIN}, kds ${KDS_PIN}) + ${tables.created} mesas`);
-    steps.push(`staff+tables`);
+    log(`[Bootstrap] Staff creado (admin ${ADMIN_PIN}, mesero ${MESERO_PIN}, kds ${KDS_PIN}, caja ${CAJA_PIN}) + ${tables.created} mesas`);
+    steps.push('staff+tables');
   } else {
-    log(`[Bootstrap] Staff ya existe (${staffCount}) — skip`);
+    log(`[Bootstrap] Staff existente (${staffCount}) — roles asegurados: ${staffRoles.join(', ')}`);
     steps.push('staff-existing');
   }
 

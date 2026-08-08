@@ -2,8 +2,8 @@
  * PWA CAJA — Cash Closing & Financial Dashboard (API-driven)
  *
  * Real API (SSOT = server), NOT in-memory engines:
- *   - Login: PIN → POST /api/auth/login → JWT (role 'admin' required;
- *     no 'caja' role exists in the staff seed — use admin PIN 0000)
+ *   - Login: PIN → POST /api/auth/login → JWT (role 'caja' o 'admin';
+ *     PIN 3333 = Cajero, PIN 0000 = Administrador)
  *   - Daily sales: GET /api/reports/sales/daily?date=YYYY-MM-DD
  *   - Closing: GET /api/payments/closing/current → POST open → PUT close
  *
@@ -14,6 +14,7 @@ import React, { useState, useCallback } from 'react';
 import { bootstrapPwa } from '../_shared/bootstrap';
 import { setCurrentPwaModule } from '../_shared/hooks/useCapability';
 import { useStaffAuth } from '../_shared/hooks/useStaffAuth';
+import { useKDSWebSocket } from '../_shared/hooks/useKDSWebSocket';
 import { LoginScreen } from '../_shared/components/LoginScreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { Badge } from '@/ui/components/Badge';
@@ -24,9 +25,10 @@ import { localDateStr } from '../_shared/utils/localDate';
 import { SummaryView } from './SummaryView';
 import { ClosingView } from './ClosingView';
 import { InvoiceView } from './InvoiceView';
+import { CollectView } from './CollectView';
 import './App.css';
 
-type ViewState = 'summary' | 'close' | 'invoice';
+type ViewState = 'summary' | 'collect' | 'close' | 'invoice';
 
 function CajaApp() {
   const { addToast } = useToast();
@@ -39,8 +41,9 @@ function CajaApp() {
   const today = localDateStr();
   const ivaRate = appConfig.all.taxes.iva.percentage / 100;
 
-  // Auth gate: caja endpoints require role 'admin' (no 'caja' role in seed)
-  const restricted = isAuthenticated && user && user.role !== 'admin';
+  // Auth gate: el módulo Caja admite los roles 'caja' y 'admin'
+  // (S1: el rol caja real entra con PIN 3333; admin conserva acceso).
+  const restricted = isAuthenticated && user && user.role !== 'caja' && user.role !== 'admin';
 
   const handleLogout = useCallback(async () => {
     await logout();
@@ -55,6 +58,22 @@ function CajaApp() {
     handleRefresh();
     addToast({ type: 'success', message: 'Corte de caja actualizado', duration: 3000 });
   }, [handleRefresh, addToast]);
+
+  // S2-D: real-time — la caja se suscribe al broadcaster KDS y refresca la
+  // vista activa cuando cambia el estado de un pedido o se cobra una mesa.
+  useKDSWebSocket({
+    module: 'caja',
+    enabled: !!token,
+    onEvent: () => handleRefresh(),
+  });
+
+  const handlePaid = useCallback(
+    (_orderId: string) => {
+      handleRefresh();
+      addToast({ type: 'success', message: 'Pedido cobrado', duration: 2000 });
+    },
+    [handleRefresh, addToast]
+  );
 
   if (restoring) {
     return (
@@ -79,7 +98,7 @@ function CajaApp() {
       <PwaLayout title="Caja">
         <div className="caja-app">
           <div className="caja-restricted">
-            <p>Acceso restringido — el módulo Caja requiere rol de administrador.</p>
+            <p>Acceso restringido — el módulo Caja requiere rol de cajero o administrador.</p>
             <button className="caja-header__nav-btn" onClick={handleLogout}>
               Volver al inicio de sesión
             </button>
@@ -95,13 +114,14 @@ function CajaApp() {
         <header className="caja-header">
           <h1 className="caja-header__title">Caja</h1>
           <div className="caja-header__nav">
-            {(['summary', 'close', 'invoice'] as ViewState[]).map(v => (
+            {(['summary', 'collect', 'close', 'invoice'] as ViewState[]).map(v => (
               <button
                 key={v}
                 className={`caja-header__nav-btn ${view === v ? 'active' : ''}`}
                 onClick={() => setView(v)}
               >
                 {v === 'summary' && 'Resumen'}
+                {v === 'collect' && 'Cobrar'}
                 {v === 'close' && 'Cierre'}
                 {v === 'invoice' && 'Facturación'}
               </button>
@@ -118,6 +138,10 @@ function CajaApp() {
         <main className="caja-main">
           {view === 'summary' && (
             <SummaryView token={token} today={today} ivaRate={ivaRate} refreshTick={refreshTick} />
+          )}
+
+          {view === 'collect' && (
+            <CollectView token={token} refreshTick={refreshTick} onPaid={handlePaid} />
           )}
 
           {view === 'close' && (

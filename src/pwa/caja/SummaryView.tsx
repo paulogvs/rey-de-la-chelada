@@ -12,6 +12,7 @@ import { Card, CardSkeleton } from '@/ui/components/Card';
 import { Button } from '@/ui/components/Button';
 import { useToast } from '@/ui/components/Toast';
 import { buildDailySalesCsv, downloadCsv, dailyCsvFilename } from '../_shared/utils/csvExport';
+import { METHOD_LABELS, METHOD_ICONS } from '../_shared/utils/paymentMethods';
 
 interface SummaryViewProps {
   token: string;
@@ -19,22 +20,6 @@ interface SummaryViewProps {
   ivaRate: number;
   refreshTick: number;
 }
-
-const METHOD_LABELS: Record<string, string> = {
-  cash: 'Efectivo',
-  qr_yape: 'Yape',
-  qr_simple: 'QR Simple',
-  card: 'Tarjeta',
-  transfer: 'Transferencia',
-};
-
-const METHOD_ICONS: Record<string, string> = {
-  cash: '💵',
-  qr_yape: '📱',
-  qr_simple: '📱',
-  card: '💳',
-  transfer: '🏦',
-};
 
 export function SummaryView({ token, today, ivaRate, refreshTick }: SummaryViewProps) {
   const { addToast } = useToast();

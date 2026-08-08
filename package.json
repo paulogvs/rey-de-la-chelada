@@ -20,7 +20,7 @@
     "start": "node server/index.js",
     "lint": "eslint src/ --ext .ts,.tsx",
     "lint:fix": "eslint src/ --ext .ts,.tsx --fix",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

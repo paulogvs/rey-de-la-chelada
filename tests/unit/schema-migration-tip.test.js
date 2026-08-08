@@ -1,7 +1,9 @@
 /**
- * Schema migration — columna `tip` en payments (C4)
+ * Schema migration — columna `tip` en payments (C4) + rol caja (S1)
  *
- * SCHEMA_VERSION 3 → 4: `ALTER TABLE payments ADD COLUMN tip REAL NOT NULL DEFAULT 0`.
+ * SCHEMA_VERSION 3 → 5: 
+ *  - v4: `ALTER TABLE payments ADD COLUMN tip REAL NOT NULL DEFAULT 0`.
+ *  - v5: staff CHECK acepta 'caja' (recreación de tabla) + cash_closings sin columnas fantasma.
  * La migración debe ser IDEMPOTENTE (correr 2 veces no rompe nada) y debe
  * preservar los payments existentes (tip=0 retrocompatible).
  */
@@ -46,16 +48,16 @@ function seedMiniWorld(db) {
   `).run();
 }
 
-describe('Migración payments.tip (v3 → v4)', () => {
-  it('SCHEMA_VERSION ahora es 4', () => {
-    expect(SCHEMA_VERSION).toBe(4);
+describe('Migración payments.tip (v3 → v5)', () => {
+  it('SCHEMA_VERSION ahora es 5', () => {
+    expect(SCHEMA_VERSION).toBe(5);
   });
 
-  it('DB nueva: applySchema crea payments con columna tip y registra versión 4', () => {
+  it('DB nueva: applySchema crea payments con columna tip y registra versión 5', () => {
     const db = new Database(':memory:');
     applySchema(db);
     expect(hasColumn(db, 'payments', 'tip')).toBe(true);
-    expect(currentVersion(db)).toBe(4);
+    expect(currentVersion(db)).toBe(5);
     db.close();
   });
 
@@ -64,7 +66,7 @@ describe('Migración payments.tip (v3 → v4)', () => {
     applySchema(db);
     applySchema(db);
     expect(hasColumn(db, 'payments', 'tip')).toBe(true);
-    expect(currentVersion(db)).toBe(4);
+    expect(currentVersion(db)).toBe(5);
     // Un INSERT con tip funciona tras la segunda aplicación
     seedMiniWorld(db);
     db.prepare(`
@@ -75,7 +77,7 @@ describe('Migración payments.tip (v3 → v4)', () => {
     db.close();
   });
 
-  it('upgrade desde v3: agrega la columna tip y conserva los payments existentes', () => {
+  it('upgrade desde v3: agrega la columna tip, añade rol caja y conserva los payments existentes', () => {
     const db = new Database(':memory:');
     // Simular una DB en SCHEMA_VERSION 3 (payments SIN tip + un pago viejo).
     // Mundo mínimo v3: schema_version + staff + tables + orders + payments.
@@ -86,7 +88,10 @@ describe('Migración payments.tip (v3 → v4)', () => {
       )`).run();
     db.prepare('INSERT INTO schema_version (version) VALUES (3)').run();
     db.exec(`
-      CREATE TABLE staff (id TEXT PRIMARY KEY, pin_hash TEXT NOT NULL, role TEXT NOT NULL, display_name TEXT NOT NULL);
+      CREATE TABLE staff (
+        id TEXT PRIMARY KEY, pin_hash TEXT NOT NULL, role TEXT NOT NULL, display_name TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1, current_shift TEXT, last_login_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')));
       CREATE TABLE tables (id TEXT PRIMARY KEY, number INTEGER NOT NULL UNIQUE, capacity INTEGER NOT NULL DEFAULT 4);
       CREATE TABLE orders (id TEXT PRIMARY KEY, table_id TEXT NOT NULL, table_number INTEGER NOT NULL,
         waiter_id TEXT NOT NULL, waiter_name TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'draft', total REAL NOT NULL DEFAULT 0);
@@ -101,7 +106,7 @@ describe('Migración payments.tip (v3 → v4)', () => {
     applySchema(db);
 
     expect(hasColumn(db, 'payments', 'tip')).toBe(true);
-    expect(currentVersion(db)).toBe(4);
+    expect(currentVersion(db)).toBe(5);
     // El pago viejo se conserva con tip = 0 (retrocompatible)
     const legacy = db.prepare('SELECT tip FROM payments WHERE id = ?').get('legacy-1');
     expect(legacy.tip).toBe(0);

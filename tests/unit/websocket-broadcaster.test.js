@@ -164,6 +164,32 @@ describe('WebSocketBroadcaster', () => {
     expect(broadcaster.getClientCount('bar')).toBe(1);
   });
 
+  it('resolves /caja connections to the caja module', async () => {
+    vi.resetModules();
+    const mod = await import('../../server/services/websocket-broadcaster.js');
+    const b = mod.default;
+    expect(b._moduleFromUrl('/caja')).toBe('caja');
+    expect(b._moduleFromUrl('/caja/')).toBe('caja');
+    expect(b._moduleFromUrl('/cocina')).toBe('cocina');
+    expect(b._moduleFromUrl('/meseros')).toBe('meseros');
+    expect(b._moduleFromUrl('/other')).toBe('unknown');
+  });
+
+  it('broadcastToModule reaches only the target module (caja included)', async () => {
+    vi.resetModules();
+    const mod = await import('../../server/services/websocket-broadcaster.js');
+    const b = mod.default;
+    const cajaWs = createMockClient(1);
+    const meserosWs = createMockClient(1);
+    b.registerClient(cajaWs, '/caja', 'caja');
+    b.registerClient(meserosWs, '/meseros', 'meseros');
+
+    b.broadcastToModule('caja', { type: 'status_change', orderId: 'x' });
+
+    expect(cajaWs.send).toHaveBeenCalledTimes(1);
+    expect(meserosWs.send).not.toHaveBeenCalled();
+  });
+
   it('treats unknown modules as "unknown" bucket', () => {
     const ws = createMockClient(1);
     broadcaster.registerClient(ws, '/other', 'unknown');

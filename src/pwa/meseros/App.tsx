@@ -20,6 +20,7 @@ import { useKDSWebSocket } from '../_shared/hooks/useKDSWebSocket';
 import { useStaffAuth } from '../_shared/hooks/useStaffAuth';
 import { useTables } from '../_shared/hooks/useTables';
 import { useWaiterCalls } from '../_shared/hooks/useWaiterCalls';
+import { useReadyTables } from './useReadyTables';
 import { LoginScreen } from '../_shared/components/LoginScreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { ToastProvider, useToast } from '@/ui/components/Toast';
@@ -47,6 +48,9 @@ function MeserosApp() {
   // Waiter calls — real API board
   const waiterCalls = useWaiterCalls({ token, pollMs: 10000 });
 
+  // S2-A: mesas con pedido listo para servir (badge "🍴 Listo")
+  const readyTables = useReadyTables();
+
   // Real-time: KDS marks an order complete → notify waiter + refresh tables
   useKDSWebSocket({
     module: 'meseros',
@@ -59,6 +63,8 @@ function MeserosApp() {
           duration: 4000,
         });
       }
+      // S2-A: actualiza el badge de mesas listas
+      readyTables.handleEvent(event);
       // Any order event → refresh table statuses
       tables.wsEvent(event);
     },
@@ -67,7 +73,9 @@ function MeserosApp() {
   const handleTableSelect = useCallback((table: Table) => {
     setSelectedTable(table);
     setView('order-panel');
-  }, []);
+    // Al abrir la mesa el badge deja de tener sentido
+    readyTables.clearTable(table.number);
+  }, [readyTables]);
 
   const handleBackToTables = useCallback(() => {
     setSelectedTable(null);
@@ -179,6 +187,7 @@ function MeserosApp() {
               error={tables.error}
               onTableSelect={handleTableSelect}
               onRefresh={tables.refresh}
+              readyTableNumbers={readyTables.readyTableNumbers}
             />
           )}
 

@@ -164,8 +164,8 @@ export function normalizeServerItem(raw: unknown): OrderLineItem | null {
 // ============================================================
 
 export interface UseKDSWebSocketOptions {
-  /** PWA module for the WS path: /cocina, /bar, /meseros (default: 'cocina') */
-  module?: 'cocina' | 'bar' | 'meseros';
+  /** PWA module for the WS path: /cocina, /bar, /meseros, /caja (default: 'cocina') */
+  module?: 'cocina' | 'bar' | 'meseros' | 'caja';
   /** Override the server base URL (default: window.location) */
   baseUrl?: string;
   /** Initial backoff delay in ms (default 1000) */

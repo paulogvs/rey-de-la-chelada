@@ -30,12 +30,15 @@ export function broadcastOrderCreated(order) {
     items: order.items,
     status: order.status,
   }));
+  // S2-D: la caja también necesita saber que hay un pedido nuevo pendiente.
+  broadcastOrderToCaja(order);
 }
 
 /**
  * Emit a `status_change` event to KDS. If the new state is "ready"
  * and all items of the order are ready, also emits `order_complete`
- * to meseros so they know to pick up the order.
+ * to meseros so they know to pick up the order. La caja recibe
+ * status_change para mantener al día la lista de pendientes (S2-D).
  */
 export function broadcastOrderStatusChange(order, previousStatus) {
   if (!order) return;
@@ -49,20 +52,47 @@ export function broadcastOrderStatusChange(order, previousStatus) {
     status: nextStatus,
   }));
 
+  broadcastOrderToCaja(order);
+
   if (nextStatus === 'ready' && isOrderFullyReady(order)) {
-    broadcaster.broadcastMeseros(buildKDSEvent(KDSEventType.ORDER_COMPLETE, {
-      orderId: order.id,
-      tableNumber: order.table_number,
-      status: 'ready',
-    }));
+    broadcastOrderComplete(order);
   }
+}
+
+/**
+ * Emit `order_complete` to meseros: TODOS los items del pedido están en
+ * estado terminal para la cocina (ready/delivered/cancelled) → listo para
+ * servir. Se usa desde el flujo de status del pedido (broadcastOrderStatusChange)
+ * Y desde el flujo REAL de items (PATCH /:id/items/:id/status) — el KDS
+ * marca item a item y el server decide cuándo el pedido quedó completo.
+ */
+export function broadcastOrderComplete(order) {
+  if (!order) return;
+  broadcaster.broadcastMeseros(buildKDSEvent(KDSEventType.ORDER_COMPLETE, {
+    orderId: order.id,
+    tableNumber: order.table_number,
+    status: 'ready',
+  }));
+}
+
+/**
+ * Emit a lightweight `status_change` to the caja module so the pending
+ * orders list refreshes in real time (S2-D).
+ */
+export function broadcastOrderToCaja(order) {
+  if (!order) return;
+  broadcaster.broadcastToModule('caja', buildKDSEvent(KDSEventType.STATUS_CHANGE, {
+    orderId: order.id,
+    tableNumber: order.table_number,
+    status: order.status,
+  }));
 }
 
 /**
  * True when the order has at least one item AND every item is in a
  * terminal-for-kitchen state (ready / delivered / cancelled).
  */
-function isOrderFullyReady(order) {
+export function isOrderFullyReady(order) {
   if (!order.items || order.items.length === 0) return false;
   return order.items.every((i) =>
     i.status === 'ready' || i.status === 'delivered' || i.status === 'cancelled'

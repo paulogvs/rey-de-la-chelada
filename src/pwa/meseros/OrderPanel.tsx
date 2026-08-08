@@ -20,15 +20,40 @@ import { QuantityStepper } from '@/ui/components/QuantityStepper';
 import { Modal } from '@/ui/components/Modal';
 import { Loader } from '@/ui/components/Loader';
 import { EmptyState } from '@/ui/components/EmptyState';
+import { PriceDisplay } from '@/ui/components/PriceDisplay';
 import { fetchMenuCategories, fetchMenuItems, fetchMenuItemDetail, type MenuItem } from '../_shared/api/menuApi';
-import { createOrder, submitOrder, confirmOrder } from '../_shared/api/ordersApi';
+import { createOrder, submitOrder, confirmOrder, fetchOrderById, deliverOrder, type Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
 import { computeTotals } from '@/core/config/iva';
 
+/** Badge de estado de un item del pedido (S2-B) */
+const ITEM_STATUS_BADGE: Record<string, { variant: 'pending' | 'preparing' | 'ready' | 'paid' | 'cancelled' | 'info'; label: string }> = {
+  pending:   { variant: 'pending',   label: 'Pendiente' },
+  preparing: { variant: 'preparing', label: 'En prep.' },
+  ready:     { variant: 'ready',     label: 'Listo' },
+  delivered: { variant: 'paid',      label: 'Entregado' },
+  cancelled: { variant: 'cancelled', label: 'Cancelado' },
+};
+
+/** Badge de estado del pedido (S2-B) */
+const ORDER_STATUS_BADGE: Record<string, { variant: 'pending' | 'preparing' | 'ready' | 'paid' | 'cancelled' | 'info'; label: string }> = {
+  draft:      { variant: 'info',      label: 'Borrador' },
+  called:     { variant: 'pending',   label: 'Enviado' },
+  confirmed:  { variant: 'pending',   label: 'Confirmado' },
+  preparing:  { variant: 'preparing', label: 'En preparación' },
+  ready:      { variant: 'ready',     label: 'Listo' },
+  served:     { variant: 'paid',      label: 'Servido' },
+  paid:       { variant: 'paid',      label: 'Pagado' },
+  cancelled:  { variant: 'cancelled', label: 'Cancelado' },
+};
+
+const ACTIVE_ORDER_STATUSES = new Set(['called', 'confirmed', 'preparing', 'ready', 'served']);
+
 /** Totales de comanda con modelo SSOT EXTRACTIVO (precio incluye IVA). */
 function orderPanelTotals(cartTotal: number) {
-  return computeTotals(cartTotal);
+  const totals = computeTotals(cartTotal);
+  return { subtotal: totals.subtotal, ivaAmount: totals.iva, total: totals.total };
 }
 
 interface OrderPanelProps {
@@ -75,6 +100,69 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel, onBack }: Or
   const [loadingMenu, setLoadingMenu] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
+
+  // ── S2-B: pedido en curso de la mesa (si hay uno activo) ──
+  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
+  const [loadingActive, setLoadingActive] = useState(false);
+  const [delivering, setDelivering] = useState(false);
+  const [activeOrderTick, setActiveOrderTick] = useState(0);
+
+  // Si la mesa ya tiene currentOrderId, cargar el pedido y mostrar su estado
+  // en lugar de crear uno nuevo (el mesero ve items/listos y puede entregar).
+  useEffect(() => {
+    let disposed = false;
+    const orderId = table.currentOrderId;
+    if (!orderId) {
+      setActiveOrder(null);
+      return undefined;
+    }
+    (async () => {
+      setLoadingActive(true);
+      try {
+        const result = await fetchOrderById(token, orderId);
+        if (disposed) return;
+        if (result.ok && result.order && ACTIVE_ORDER_STATUSES.has(result.order.status)) {
+          setActiveOrder(result.order);
+        } else {
+          setActiveOrder(null);
+        }
+      } catch (err) {
+        console.error('[OrderPanel] active order error:', err);
+        if (!disposed) setActiveOrder(null);
+      } finally {
+        if (!disposed) setLoadingActive(false);
+      }
+    })();
+    return () => { disposed = true; };
+  }, [table.currentOrderId, token, activeOrderTick]);
+
+  // S2-B: entregar los items listos → served → la caja puede cobrar
+  const handleDeliver = useCallback(async () => {
+    if (!activeOrder) return;
+    setDelivering(true);
+    try {
+      const result = await deliverOrder(token, activeOrder.id);
+      if (!result.ok) {
+        addToast({ type: 'error', message: result.error || 'No se pudo marcar el pedido como entregado', duration: 5000 });
+        return;
+      }
+      addToast({
+        type: 'success',
+        message: `Mesa ${table.number} — Pedido entregado ✓`,
+        duration: 3000,
+      });
+      setActiveOrderTick(t => t + 1);
+    } catch (err) {
+      console.error('[OrderPanel] deliver error:', err);
+      addToast({ type: 'error', message: 'Error al marcar el pedido como entregado', duration: 5000 });
+    } finally {
+      setDelivering(false);
+    }
+  }, [activeOrder, token, table.number, addToast]);
+
+  const canDeliver = !!activeOrder &&
+    !['paid', 'cancelled', 'served'].includes(activeOrder.status) &&
+    activeOrder.items.some(i => i.status === 'ready');
 
   // Load menu (public endpoints)
   useEffect(() => {
@@ -221,6 +309,77 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel, onBack }: Or
 
   return (
     <div className="order-panel">
+      {/* ── S2-B: Pedido en curso (mesa con order activo) ── */}
+      {loadingActive && <Loader variant="block" label="Cargando pedido…" />}
+
+      {!loadingActive && activeOrder && (
+        <div className="order-panel__active">
+          <Card className="order-panel__active-summary">
+            <div className="order-panel__active-header">
+              <div>
+                <h3>Pedido en curso — Mesa {table.number}</h3>
+                <p className="order-panel__active-sub">
+                  {activeOrder.items.length} items · {activeOrder.waiterName ? `atendido por ${activeOrder.waiterName}` : ''}
+                </p>
+              </div>
+              <Badge variant={ORDER_STATUS_BADGE[activeOrder.status]?.variant ?? 'info'}>
+                {ORDER_STATUS_BADGE[activeOrder.status]?.label ?? activeOrder.status}
+              </Badge>
+            </div>
+
+            <div className="order-panel__active-items">
+              {activeOrder.items.map(item => {
+                const badge = ITEM_STATUS_BADGE[item.status] || { variant: 'info' as const, label: item.status };
+                return (
+                  <div key={item.id} className="order-panel__active-item">
+                    <span className="order-panel__active-item-qty">{item.quantity}x</span>
+                    <span className="order-panel__active-item-name">{item.menuItemName}</span>
+                    <Badge variant={badge.variant}>{badge.label}</Badge>
+                    <span className="order-panel__active-item-price">Bs. {item.subtotal.toFixed(2)}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <PriceDisplay
+              priceWithIVA={activeOrder.total}
+              showBreakdown
+              className="order-panel__active-total"
+            />
+          </Card>
+
+          <div className="order-panel__actions">
+            <Button variant="secondary" onClick={onBack}>
+              ← Volver a mesas
+            </Button>
+            {canDeliver && (
+              <Button
+                variant="primary"
+                onClick={handleDeliver}
+                loading={delivering}
+                disabled={delivering}
+                fullWidth
+              >
+                {delivering ? 'Entregando…' : '✅ Pedido Entregado'}
+              </Button>
+            )}
+            {!canDeliver && activeOrder.status === 'served' && (
+              <p className="order-panel__active-hint">
+                Pedido servido — listo para el cobro en caja 💰
+              </p>
+            )}
+            {!canDeliver && !['paid', 'cancelled', 'served'].includes(activeOrder.status) && (
+              <p className="order-panel__active-hint">
+                Esperando a que cocina/bar marquen los items como listos 🍽️
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Flujo de creación (sin pedido activo) ── */}
+      {!loadingActive && !activeOrder && (
+      <>
       {/* Category bar */}
       <nav className="order-panel__categories">
         <button
@@ -466,6 +625,8 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel, onBack }: Or
         })}
         label={`Mesa ${table.number} — Comanda`}
       />
+      </>
+      )}
     </div>
   );
 }

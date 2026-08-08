@@ -25,11 +25,14 @@ interface TablesViewProps {
   error: string | null;
   onTableSelect: (table: Table) => void;
   onRefresh: () => void;
+  /** S2-A: números de mesa con pedido listo para servir (badge "🍴 Listo") */
+  readyTableNumbers?: ReadonlySet<number>;
 }
 
-export function TablesView({ tables, loading, error, onTableSelect, onRefresh }: TablesViewProps) {
+export function TablesView({ tables, loading, error, onTableSelect, onRefresh, readyTableNumbers }: TablesViewProps) {
   const freeCount = tables.filter(t => t.status === 'free').length;
   const occupiedCount = tables.length - freeCount;
+  const readyCount = tables.filter(t => readyTableNumbers?.has(t.number)).length;
 
   return (
     <div className="table-grid-wrapper">
@@ -46,6 +49,7 @@ export function TablesView({ tables, loading, error, onTableSelect, onRefresh }:
         </div>
         <span className="table-grid__count">
           {loading ? 'Cargando…' : `${freeCount} libres / ${occupiedCount} ocupadas`}
+          {readyCount > 0 && <span className="table-grid__ready-count"> · {readyCount} listas 🍴</span>}
         </span>
       </div>
 
@@ -57,19 +61,23 @@ export function TablesView({ tables, loading, error, onTableSelect, onRefresh }:
       <div className="table-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))' }}>
         {tables.map(table => {
           const statusStyle = STATUS_VARS[table.status] || STATUS_VARS.free;
+          const isReady = readyTableNumbers?.has(table.number) === true;
           return (
             <button
               key={table.id}
-              className="table-card"
+              className={`table-card${isReady ? ' table-card--ready' : ''}`}
               onClick={() => onTableSelect(table)}
               style={{ borderColor: statusStyle.border }}
-              aria-label={`Mesa ${table.number} — ${statusStyle.label}`}
+              aria-label={`Mesa ${table.number} — ${statusStyle.label}${isReady ? ' — pedido listo para servir' : ''}`}
             >
               <span className="table-card__number">{table.number}</span>
               <span className="table-card__status" style={{ color: statusStyle.border }}>
                 {statusStyle.label}
               </span>
               <span className="table-card__capacity">{table.capacity} pers.</span>
+              {isReady && (
+                <span className="table-card__ready-badge">🍴 Listo</span>
+              )}
             </button>
           );
         })}

@@ -9,7 +9,10 @@ REM ==========================================================
 
 set "SCRIPT_DIR=%~dp0"
 set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
-set "APP_DIR=%SCRIPT_DIR%\.."
+REM Fix S1/T4: backslash final en APP_DIR — sin él, !APP_DIR!data\ se
+REM fusiona como "scripts\..data\" (path inexistente) y el backup nunca
+REM funcionó (escribía [SKIP] siempre). Con "\" final: scripts\..\data\ OK.
+set "APP_DIR=%SCRIPT_DIR%\..\"
 
 set "DB_PATH=!APP_DIR!data\rey-de-la-chelada.db"
 set "BACKUP_DIR=!APP_DIR!backups"

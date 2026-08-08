@@ -29,6 +29,8 @@ import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { localDateStr, localDateExpr } from '../utils/date-utils.js';
+import { logger } from '../utils/logger.js'; // S1/T2: errores de pago/corte al log diario
+import { broadcastOrderToCaja } from '../services/order-broadcaster.js'; // S2-D: caja real-time
 
 const router = Router();
 
@@ -192,7 +194,7 @@ router.get('/', requireAuth, (req, res) => {
     const payments = db.prepare(sql).all(...params);
     res.json({ success: true, payments, count: payments.length });
   } catch (err) {
-    console.error('[Payments] List error:', err.message);
+    logger.error('[Payments] List error:', err.message);
     res.status(500).json({ success: false, error: 'Error al listar pagos', code: 'PAYMENTS_LIST_ERROR' });
   }
 });
@@ -217,7 +219,7 @@ router.get('/closings', requireAuth, requireRole('admin', 'caja'), (req, res) =>
     `).all();
     res.json({ success: true, closings, count: closings.length });
   } catch (err) {
-    console.error('[Payments] Closings history error:', err.message);
+    logger.error('[Payments] Closings history error:', err.message);
     res.status(500).json({ success: false, error: 'Error al obtener historial de cortes', code: 'CLOSINGS_HISTORY_ERROR' });
   }
 });
@@ -244,7 +246,7 @@ router.get('/:id', requireAuth, (req, res) => {
 
     res.json({ success: true, payment });
   } catch (err) {
-    console.error('[Payments] Get error:', err.message);
+    logger.error('[Payments] Get error:', err.message);
     res.status(500).json({ success: false, error: 'Error al obtener pago', code: 'PAYMENT_GET_ERROR' });
   }
 });
@@ -289,6 +291,21 @@ router.post('/', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res)
     });
 
     const payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(result.paymentId);
+
+    // S2-D: la caja refresca su lista de pendientes en tiempo real cuando
+    // se procesa un pago (el pedido pasa a paid → sale de pending).
+    try {
+      const paidOrder = db.prepare(`
+        SELECT o.id, o.status, o.table_id, t.number as table_number
+        FROM orders o
+        LEFT JOIN tables t ON o.table_id = t.id
+        WHERE o.id = ?
+      `).get(order_id);
+      broadcastOrderToCaja(paidOrder);
+    } catch (broadcastErr) {
+      logger.warn('[Payments] Broadcast a caja falló:', broadcastErr.message);
+    }
+
     res.status(201).json({
       success: true,
       payment,
@@ -301,7 +318,7 @@ router.post('/', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res)
     if (known) {
       return res.status(409).json({ success: false, error: err.message, code: 'PAYMENT_CONFLICT' });
     }
-    console.error('[Payments] Create error:', err.message);
+    logger.error('[Payments] Create error:', err.message);
     res.status(500).json({ success: false, error: 'Error al procesar pago', code: 'PAYMENT_CREATE_ERROR' });
   }
 });
@@ -359,7 +376,7 @@ router.get('/closing/current', requireAuth, requireRole('admin', 'caja'), (req, 
       },
     });
   } catch (err) {
-    console.error('[Payments] Closing current error:', err.message);
+    logger.error('[Payments] Closing current error:', err.message);
     res.status(500).json({ success: false, error: 'Error al obtener corte actual', code: 'CLOSING_CURRENT_ERROR' });
   }
 });
@@ -406,7 +423,7 @@ router.post('/closing', requireAuth, requireRole('admin', 'caja'), (req, res) =>
       },
     });
   } catch (err) {
-    console.error('[Payments] Open closing error:', err.message);
+    logger.error('[Payments] Open closing error:', err.message);
     res.status(500).json({ success: false, error: 'Error al iniciar corte', code: 'CLOSING_OPEN_ERROR' });
   }
 });
@@ -458,7 +475,7 @@ router.put('/closing/close', requireAuth, requireRole('admin', 'caja'), (req, re
       },
     });
   } catch (err) {
-    console.error('[Payments] Close closing error:', err.message);
+    logger.error('[Payments] Close closing error:', err.message);
     res.status(500).json({ success: false, error: 'Error al cerrar corte', code: 'CLOSING_CLOSE_ERROR' });
   }
 });

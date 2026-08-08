@@ -65,6 +65,7 @@ class WebSocketBroadcaster {
     if (url.startsWith('/cocina')) return 'cocina';
     if (url.startsWith('/bar')) return 'bar';
     if (url.startsWith('/meseros')) return 'meseros';
+    if (url.startsWith('/caja')) return 'caja';
     return 'unknown';
   }
 

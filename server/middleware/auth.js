@@ -7,10 +7,11 @@
  *  Artículo VII: Secrets Boundary — JWT_SECRET desde .env.
  * ═══════════════════════════════════════════════════════════
  *
- *  Roles del sistema (v2: 3 roles):
+ *  Roles del sistema (v5: 4 roles):
  *    admin  → Acceso total
  *    mesero → Mesas, pedidos, pagos, waiter calls
  *    kds    → KDS cocina+barra unificado
+ *    caja   → Corte de caja, pagos y reportes (NO administración)
  */
 
 import jwt from 'jsonwebtoken';
@@ -19,7 +20,15 @@ import jwt from 'jsonwebtoken';
 // Config
 // ============================================================
 
+// T5 (S1): JWT_SECRET real. Fail loud — si no hay secret en env, avisamos
+// en consola en vez de seguir en silencio con el fallback de desarrollo.
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-do-not-use-in-production';
+if (!process.env.JWT_SECRET) {
+  console.warn(
+    '[Auth] ⚠️ JWT_SECRET NO configurado — usando fallback de DESARROLLO. ' +
+    'Configura JWT_SECRET en .env (ver .env.example) antes de producción.'
+  );
+}
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 const PIN_LENGTH = parseInt(process.env.MESERO_PIN_LENGTH || '4', 10);
 
@@ -203,7 +212,7 @@ const MODULE_ROLES = {
   cocina:    ['kds', 'admin'],
   bar:       ['kds', 'admin'],
   meseros:   ['mesero', 'admin'],
-  caja:      ['admin'],
+  caja:      ['caja', 'admin'],   // v5: el rol caja entra a la PWA caja
   admin:     ['admin'],
 };
 

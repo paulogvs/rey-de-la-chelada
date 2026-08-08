@@ -1,0 +1,194 @@
+/* ============================================================
+   CAJA — CollectView (S2-C): pedidos pendientes de cobro
+   ZERO hardcoded colors — all variables from tokens.json
+   ============================================================ */
+
+.caja-collect {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.caja-collect__summary {
+  padding: var(--space-5);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.caja-collect__summary-label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.caja-collect__summary-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  color: var(--verde-esmeralda);
+  line-height: 1;
+}
+
+.caja-collect__error {
+  padding: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--status-cancelled);
+}
+
+.caja-collect__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.caja-collect__order {
+  overflow: hidden;
+}
+
+.caja-collect__order-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-4);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  color: var(--text);
+  text-align: left;
+  min-height: var(--touch-primary-action);
+}
+
+.caja-collect__order-head:hover {
+  background: var(--surface-soft);
+}
+
+.caja-collect__order-table {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text-strong);
+  min-width: 84px;
+}
+
+.caja-collect__order-items {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.caja-collect__order-amount {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--verde-esmeralda);
+  min-width: 96px;
+  text-align: right;
+}
+
+.caja-collect__order-caret {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  min-width: 16px;
+}
+
+.caja-collect__order-detail {
+  padding: var(--space-4);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background: var(--surface-soft);
+}
+
+.caja-collect__order-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.caja-collect__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.caja-collect__item-qty {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  min-width: 28px;
+}
+
+.caja-collect__item-name {
+  color: var(--text);
+  flex: 1;
+}
+
+.caja-collect__item-price {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.caja-collect__order-total {
+  border-top: 1px dashed var(--border);
+  padding-top: var(--space-3);
+}
+
+.caja-collect__paid-hint {
+  font-size: var(--text-sm);
+  color: var(--status-pending);
+  font-family: var(--font-mono);
+}
+
+.caja-collect__pay {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.caja-collect__pay-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.caja-collect__pay-field label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.caja-collect__pay-method {
+  min-height: var(--touch-min-target);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+}
+
+.caja-collect__tip-options {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 480px) {
+  .caja-collect__order-items {
+    display: none;
+  }
+}

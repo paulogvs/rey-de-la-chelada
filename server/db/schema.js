@@ -13,14 +13,16 @@
 
 // v4 (Fase 1 — caja cuadre al centavo): payments.tip REAL NOT NULL DEFAULT 0
 // (propina registrada en el MISMO payment que la recibe; total cobrado = amount + tip).
-const SCHEMA_VERSION = 4;
+// v5 (S1): rol 'caja' REAL en staff (CHECK acepta 'caja') + cash_closings sin
+// columnas fantasma (total_sales/total_iva/total_orders/sales_by_method nunca escritas).
+const SCHEMA_VERSION = 5;
 
 const CREATE_TABLES = [
-  // ── Staff / Users (v2: 3 roles only, no username) ─────
+  // ── Staff / Users (v5: 4 roles — admin, mesero, kds, caja) ─────
   `CREATE TABLE IF NOT EXISTS staff (
     id          TEXT PRIMARY KEY,
     pin_hash    TEXT NOT NULL,
-    role        TEXT NOT NULL CHECK(role IN ('admin','mesero','kds')),
+    role        TEXT NOT NULL CHECK(role IN ('admin','mesero','kds','caja')),
     display_name TEXT NOT NULL,
     is_active   INTEGER NOT NULL DEFAULT 1,
     current_shift TEXT,
@@ -169,6 +171,8 @@ const CREATE_TABLES = [
   )`,
 
   // ── Cash Closing (Corte de Caja) ──────────────────────
+  // v5: SIN columnas fantasma (total_sales/total_iva/total_orders/sales_by_method
+  // nunca fueron escritas — los reportes reales viven en /api/reports/sales/daily).
   `CREATE TABLE IF NOT EXISTS cash_closings (
     id              TEXT PRIMARY KEY,
     closing_date    TEXT NOT NULL,
@@ -176,10 +180,6 @@ const CREATE_TABLES = [
     closed_at       TEXT,
     opened_by       TEXT NOT NULL,
     closed_by       TEXT,
-    total_sales     REAL NOT NULL DEFAULT 0,
-    total_iva       REAL NOT NULL DEFAULT 0,
-    total_orders    INTEGER NOT NULL DEFAULT 0,
-    sales_by_method TEXT,  -- JSON object
     expected_cash   REAL NOT NULL DEFAULT 0,
     actual_cash     REAL NOT NULL DEFAULT 0,
     cash_difference REAL NOT NULL DEFAULT 0,
@@ -261,24 +261,87 @@ function applySchema(db) {
     return;
   }
 
-  // Create all tables
-  const transaction = db.transaction(() => {
-    for (const sql of CREATE_TABLES) {
-      db.exec(sql);
-    }
-    // ── Migraciones idempotentes (ALTER TABLE) ──────────────
-    // v4: payments.tip — agrega la columna SOLO si no existe
-    // (CREATE TABLE IF NOT EXISTS no toca tablas existentes).
-    if (!hasColumn(db, 'payments', 'tip')) {
-      db.exec('ALTER TABLE payments ADD COLUMN tip REAL NOT NULL DEFAULT 0');
-      console.log('[DB] Migration v4: added payments.tip');
-    }
-    // Record schema version
-    db.prepare(`INSERT OR REPLACE INTO schema_version (version) VALUES (?)`).run(SCHEMA_VERSION);
-  });
+  // ── v5: la recreación de tablas (staff/cash_closings) requiere FK OFF ─────
+  // SQLite NO permite cambiar un CHECK con ALTER TABLE. La técnica es:
+  //  1. foreign_keys=OFF ANTES de la transacción (dentro de una transacción
+  //     el pragma es no-op).
+  //  2. Recrear la tabla con el DDL nuevo, copiar datos, DROP, RENAME.
+  //  3. foreign_keys=ON tras el COMMIT — las FKs de payments/orders apuntan
+  //     a `staff` POR NOMBRE → re-apuntan automáticamente a la tabla nueva.
+  // La tabla es pequeña (3-4 filas) y no hay FKs entrantes con ON DELETE
+  // CASCADE — el PRAGMA foreign_key_check al final lo verifica.
+  db.pragma('foreign_keys = OFF');
+  try {
+    const transaction = db.transaction(() => {
+      for (const sql of CREATE_TABLES) {
+        db.exec(sql);
+      }
+      // ── Migraciones idempotentes ──────────────────────────
+      // v4: payments.tip — agrega la columna SOLO si no existe
+      // (CREATE TABLE IF NOT EXISTS no toca tablas existentes).
+      if (!hasColumn(db, 'payments', 'tip')) {
+        db.exec('ALTER TABLE payments ADD COLUMN tip REAL NOT NULL DEFAULT 0');
+        console.log('[DB] Migration v4: added payments.tip');
+      }
+      // v5a: staff con rol 'caja' — recrear SOLO si el CHECK viejo no lo acepta
+      if (!staffAcceptsCajaRole(db)) {
+        recreateTable(db, {
+          table: 'staff',
+          newSql: CREATE_TABLES[0], // DDL nuevo (CHECK con 'caja')
+          copyColumns: ['id', 'pin_hash', 'role', 'display_name', 'is_active', 'current_shift', 'last_login_at', 'created_at', 'updated_at'],
+        });
+        console.log('[DB] Migration v5a: staff CHECK actualizado para rol caja');
+      }
+      // v5b: cash_closings sin columnas fantasma (nunca escritas)
+      if (hasColumn(db, 'cash_closings', 'total_sales')) {
+        recreateTable(db, {
+          table: 'cash_closings',
+          newSql: CREATE_TABLES.find(t => t.includes('cash_closings')),
+          copyColumns: ['id', 'closing_date', 'opened_at', 'closed_at', 'opened_by', 'closed_by',
+                        'expected_cash', 'actual_cash', 'cash_difference', 'is_reconciled', 'notes', 'created_at'],
+        });
+        console.log('[DB] Migration v5b: cash_closings sin columnas fantasma');
+      }
+      // Record schema version
+      db.prepare(`INSERT OR REPLACE INTO schema_version (version) VALUES (?)`).run(SCHEMA_VERSION);
+    });
 
-  transaction();
+    transaction();
+
+    // Post-migración: verificar integridad referencial (fail loud)
+    const fkViolations = db.prepare('PRAGMA foreign_key_check').all();
+    if (fkViolations.length > 0) {
+      console.error('[DB] ⚠️ foreign_key_check detectó violaciones tras la migración:', fkViolations);
+    }
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
   console.log(`[DB] Schema v${SCHEMA_VERSION} applied successfully`);
+}
+
+/** ¿El CHECK de staff ya acepta el rol 'caja'? (vía sqlite_master.sql) */
+function staffAcceptsCajaRole(db) {
+  const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'staff'`).get();
+  return !!row && !!row.sql && row.sql.includes("'caja'");
+}
+
+/**
+ * Recrea una tabla con DDL nuevo preservando los datos (técnica v5).
+ * PRECAUCIÓN: llamar SOLO con foreign_keys=OFF (ver applySchema).
+ * Dentro de la MISMA transacción del applySchema.
+ */
+function recreateTable(db, { table, newSql, copyColumns }) {
+  const tempTable = `${table}_v${SCHEMA_VERSION}`;
+  const ddl = newSql
+    .replace('CREATE TABLE IF NOT EXISTS', 'CREATE TABLE')
+    .replace(table, tempTable);
+  const cols = copyColumns.join(', ');
+  db.exec(`
+    ${ddl};
+    INSERT INTO ${tempTable} (${cols}) SELECT ${cols} FROM ${table};
+    DROP TABLE ${table};
+    ALTER TABLE ${tempTable} RENAME TO ${table};
+  `);
 }
 
 /** ¿Existe la columna en la tabla? (PRAGMA table_info) */

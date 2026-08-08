@@ -7,9 +7,10 @@
  * seed script was manual-only. Bootstrap guarantees a usable DB on
  * first boot: staff (admin/mesero/kds) + tables + real menu + prices.
  *
- * Verifies:
- *  - empty DB → staff(3) + tables(10) + categories(8) + items(49) + prices
- *  - idempotent: second run duplicates nothing
+ * Verifica:
+ *  - empty DB → staff(4: admin/mesero/kds/caja) + tables(10) + categories(8) + items(49) + prices
+ *  - idempotente: second run duplicates nothing
+ *  - S1/v5: DB con staff existente → ensureBootstrap asegura el rol caja sin duplicar
  *  - does NOT overwrite admin-set prices on existing DB
  */
 
@@ -29,10 +30,10 @@ describe('ensureBootstrap', () => {
     const db = makeDb();
     const result = ensureBootstrap(db);
 
-    // Staff: 3 roles with shared PINs
-    expect(db.prepare('SELECT COUNT(*) AS n FROM staff').get().n).toBe(3);
+    // Staff: 4 roles with shared PINs (v5: + caja)
+    expect(db.prepare('SELECT COUNT(*) AS n FROM staff').get().n).toBe(4);
     const roles = db.prepare('SELECT role FROM staff ORDER BY role').all().map(r => r.role);
-    expect(roles).toEqual(['admin', 'kds', 'mesero']);
+    expect(roles).toEqual(['admin', 'caja', 'kds', 'mesero']);
 
     // Tables: 10
     expect(db.prepare('SELECT COUNT(*) AS n FROM tables').get().n).toBe(10);
@@ -56,11 +57,32 @@ describe('ensureBootstrap', () => {
     const second = ensureBootstrap(db);
 
     expect(second.seeded).toBe(false);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM staff').get().n).toBe(3);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM staff').get().n).toBe(4);
     expect(db.prepare('SELECT COUNT(*) AS n FROM tables').get().n).toBe(10);
     expect(db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n).toBe(8);
     expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(49);
     expect(db.prepare('SELECT COUNT(*) AS n FROM modifier_groups').get().n).toBeGreaterThan(0);
+    db.close();
+  });
+
+  it('S1/v5: DB con staff existente SIN caja → asegura el rol caja sin duplicar los demás', () => {
+    const db = makeDb();
+    // Simular DB existente con 3 roles (v4) — sin caja
+    db.prepare(`
+      INSERT INTO staff (id, pin_hash, role, display_name)
+      VALUES ('a1', 'h', 'admin', 'Administrador')
+    `).run();
+    db.prepare(`
+      INSERT INTO staff (id, pin_hash, role, display_name)
+      VALUES ('m1', 'h', 'mesero', 'Mesero')
+    `).run();
+
+    ensureBootstrap(db);
+
+    const roles = db.prepare('SELECT role FROM staff ORDER BY role').all().map(r => r.role);
+    expect(roles).toEqual(['admin', 'caja', 'kds', 'mesero']);
+    // No duplica los existentes
+    expect(db.prepare("SELECT COUNT(*) AS n FROM staff WHERE role = 'admin'").get().n).toBe(1);
     db.close();
   });
 

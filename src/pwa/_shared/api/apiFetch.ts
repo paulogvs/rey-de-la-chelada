@@ -86,7 +86,7 @@ export async function apiFetch<T>(
 
 export interface StaffUser {
   id: string;
-  role: 'admin' | 'mesero' | 'kds';
+  role: 'admin' | 'mesero' | 'kds' | 'caja';
   displayName: string;
 }
 

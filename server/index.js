@@ -39,6 +39,9 @@ import { requireAuth, optionalAuth } from './middleware/auth.js';
 import { getDb } from './db/index.js';
 import { ensureBootstrap } from './db/bootstrap.js';
 
+// ── Logger (S1/T2): archivo con rotación diaria + consola ─
+import { logger } from './utils/logger.js';
+
 // ── WebSocket Broadcaster (SSOT) ──────────────────────────
 import { broadcaster, buildKDSEvent, KDSEventType } from './services/websocket-broadcaster.js';
 // Re-export so route handlers can import from a single place
@@ -65,17 +68,24 @@ const DIST_DIR = path.join(__dirname, '..', 'dist');
 let db;
 try {
   db = getDb();
-  console.log('[DB] Database connected and schema applied');
+  logger.info('[DB] Database connected and schema applied');
   // Auto-seed idempotente: garantiza staff + mesas + menú + precios
   // en el primer arranque (fix: PROD arrancaba con staff vacío).
   try {
     ensureBootstrap(db);
   } catch (bootstrapErr) {
-    console.error('[Bootstrap] Error en auto-seed:', bootstrapErr.message);
+    logger.error('[Bootstrap] Error en auto-seed:', bootstrapErr.message);
   }
 } catch (err) {
-  console.error('[DB] Failed to initialize database:', err.message);
+  logger.error('[DB] Failed to initialize database:', err.message);
   // Non-blocking — app can still run in dev mode
+}
+
+// Rotación de logs: borra logs > 7 días al arrancar (S1/T2)
+try {
+  logger.prune();
+} catch (pruneErr) {
+  logger.warn('[Logger] prune falló:', pruneErr.message);
 }
 
 // ============================================================
@@ -157,13 +167,25 @@ for (const pwa of PWA_ROUTES) {
 // API Routes
 // ============================================================
 
-// Health check (público)
+// Health check (público) — S1/T3: incluye SELECT 1 de la DB (watchdog lo usa)
 app.get('/health', (req, res) => {
+  let dbStatus = 'disconnected';
+  let dbError = null;
+  if (db) {
+    try {
+      db.prepare('SELECT 1').get();
+      dbStatus = 'connected';
+    } catch (err) {
+      dbStatus = 'error';
+      dbError = err.message;
+    }
+  }
   res.json({
-    status: 'ok',
+    status: dbStatus === 'error' ? 'degraded' : 'ok',
     app: 'Rey de la Chelada',
     version: '1.0.0',
-    database: db ? 'connected' : 'disconnected',
+    database: dbStatus,
+    ...(dbError && { databaseError: dbError }),
     pwAs: PWA_ROUTES.map(p => p.path),
     uptime: process.uptime(),
   });
@@ -236,7 +258,7 @@ wss.on('connection', (ws, req) => {
       }));
     }
   } catch (err) {
-    console.warn(`[KDS] Initial send failed: ${err.message}`);
+    logger.warn(`[KDS] Initial send failed: ${err.message}`);
   }
 
   ws.on('close', () => {
@@ -245,7 +267,7 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('error', (err) => {
-    console.error(`[KDS] ${module} error:`, err.message);
+    logger.error(`[KDS] ${module} error:`, err.message);
     broadcaster.unregisterClient(ws);
   });
 });
@@ -266,7 +288,7 @@ app.use((req, res) => {
 
 // Error handler global
 app.use((err, req, res, _next) => {
-  console.error('[Server] Error:', err);
+  logger.error('[Server] Error:', err);
 
   // Errores conocidos
   if (err.type === 'entity.parse.failed') {

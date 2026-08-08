@@ -25,19 +25,20 @@ vi.mock('bcryptjs', () => ({
 import { generateToken, verifyToken, canAccessModule } from '../../server/middleware/auth.js';
 
 describe('Auth v2 — Role System', () => {
-  it('should have 3 valid roles', () => {
-    const validRoles = ['admin', 'mesero', 'kds'];
-    expect(validRoles).toHaveLength(3);
+  it('should have 4 valid roles (v5: + caja)', () => {
+    const validRoles = ['admin', 'mesero', 'kds', 'caja'];
+    expect(validRoles).toHaveLength(4);
     expect(validRoles).toContain('admin');
     expect(validRoles).toContain('mesero');
     expect(validRoles).toContain('kds');
+    expect(validRoles).toContain('caja');
   });
 
-  it('should NOT have old roles', () => {
-    const validRoles = ['admin', 'mesero', 'kds'];
+  it('should NOT have old legacy roles', () => {
+    const validRoles = ['admin', 'mesero', 'kds', 'caja'];
     expect(validRoles).not.toContain('cocina');
     expect(validRoles).not.toContain('bartender');
-    expect(validRoles).not.toContain('caja');
+    expect(validRoles).not.toContain('garzon');
   });
 });
 
@@ -56,6 +57,12 @@ describe('Auth v2 — Module Access', () => {
     expect(canAccessModule('admin', 'meseros')).toBe(true);
     expect(canAccessModule('admin', 'caja')).toBe(true);
     expect(canAccessModule('admin', 'admin')).toBe(true);
+  });
+
+  it('should allow caja to access caja module (v5)', () => {
+    expect(canAccessModule('caja', 'caja')).toBe(true);
+    expect(canAccessModule('caja', 'admin')).toBe(false);
+    expect(canAccessModule('caja', 'meseros')).toBe(false);
   });
 
   it('should NOT allow mesero to access cocina', () => {

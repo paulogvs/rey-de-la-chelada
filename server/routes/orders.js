@@ -23,7 +23,8 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
-import { broadcastOrderCreated, broadcastOrderStatusChange } from '../services/order-broadcaster.js';
+import { logger } from '../utils/logger.js'; // S1/T2: errores de pedidos al log diario
+import { broadcastOrderCreated, broadcastOrderStatusChange, broadcastOrderComplete, isOrderFullyReady } from '../services/order-broadcaster.js';
 import { broadcaster, buildKDSEvent, KDSEventType } from '../services/websocket-broadcaster.js';
 import { computeTotals, round2 } from '../../src/core/config/iva.js';
 import { resolveModifierAdjustment, recalcOrder } from '../services/order-pricing.js';
@@ -95,10 +96,14 @@ function buildOrder(db, orderId) {
 router.get('/', requireAuth, (req, res) => {
   try {
     const db = getDb();
-    const { status, table_id, date_from, date_to, limit } = req.query;
+    const { status, table_id, date_from, date_to, limit, pending } = req.query;
 
     let sql = `
-      SELECT o.*, t.number as table_number, s.display_name as waiter_name_resolved
+      SELECT o.*, t.number as table_number, s.display_name as waiter_name_resolved,
+             COALESCE((
+               SELECT SUM(p.amount + p.tip) FROM payments p
+               WHERE p.order_id = o.id AND p.status = 'completed'
+             ), 0) as paid_amount
       FROM orders o
       LEFT JOIN tables t ON o.table_id = t.id
       LEFT JOIN staff s ON o.waiter_id = s.id
@@ -106,8 +111,16 @@ router.get('/', requireAuth, (req, res) => {
     `;
     const params = [];
 
-    if (status) {
-      const statuses = status.split(',').map(s => ORDER_STATUS_MAP[s.trim()] || s.trim());
+    // S2-C: ?pending=1 → pedidos que la caja debe cobrar (activos en el
+    // flujo, sin draft ni paid/cancelled). Aditivo — no rompe el resto.
+    let statuses = null;
+    if (pending === '1') {
+      statuses = ['called', 'confirmed', 'preparing', 'ready', 'served'];
+    } else if (status) {
+      statuses = status.split(',').map(s => ORDER_STATUS_MAP[s.trim()] || s.trim());
+    }
+
+    if (statuses) {
       sql += ` AND o.status IN (${statuses.map(() => '?').join(',')})`;
       params.push(...statuses);
     }
@@ -138,7 +151,7 @@ router.get('/', requireAuth, (req, res) => {
 
     res.json({ success: true, orders, count: orders.length });
   } catch (err) {
-    console.error('[Orders] List error:', err.message);
+    logger.error('[Orders] List error:', err.message);
     res.status(500).json({ success: false, error: 'Error al listar pedidos', code: 'ORDERS_LIST_ERROR' });
   }
 });
@@ -213,7 +226,7 @@ router.get('/kds/:module', requireAuth, requireRole('admin', 'kds'), (req, res) 
 
     res.json({ success: true, module, orders });
   } catch (err) {
-    console.error('[Orders] KDS error:', err.message);
+    logger.error('[Orders] KDS error:', err.message);
     res.status(500).json({ success: false, error: 'Error al obtener KDS', code: 'KDS_ERROR' });
   }
 });
@@ -233,7 +246,7 @@ router.get('/:id', requireAuth, (req, res) => {
 
     res.json({ success: true, order });
   } catch (err) {
-    console.error('[Orders] Get error:', err.message);
+    logger.error('[Orders] Get error:', err.message);
     res.status(500).json({ success: false, error: 'Error al obtener pedido', code: 'ORDER_GET_ERROR' });
   }
 });
@@ -337,7 +350,7 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
     const order = buildOrder(db, orderId);
     res.status(201).json({ success: true, order });
   } catch (err) {
-    console.error('[Orders] Create error:', err.message);
+    logger.error('[Orders] Create error:', err.message);
     res.status(500).json({ success: false, error: 'Error al crear pedido', code: 'ORDER_CREATE_ERROR' });
   }
 });
@@ -446,7 +459,7 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
     const updated = buildOrder(db, req.params.id);
     res.json({ success: true, order: updated });
   } catch (err) {
-    console.error('[Orders] Update error:', err.message);
+    logger.error('[Orders] Update error:', err.message);
     res.status(500).json({ success: false, error: 'Error al actualizar pedido', code: 'ORDER_UPDATE_ERROR' });
   }
 });
@@ -477,7 +490,7 @@ router.patch('/:id/submit', requireAuth, (req, res) => {
 
     res.json({ success: true, status: 'called', message: 'Pedido enviado al mesero' });
   } catch (err) {
-    console.error('[Orders] Submit error:', err.message);
+    logger.error('[Orders] Submit error:', err.message);
     res.status(500).json({ success: false, error: 'Error al enviar pedido', code: 'ORDER_SUBMIT_ERROR' });
   }
 });
@@ -519,7 +532,7 @@ router.patch('/:id/confirm', requireAuth, requireRole('admin', 'mesero'), (req, 
 
     res.json({ success: true, status: 'confirmed', message: 'Pedido confirmado' });
   } catch (err) {
-    console.error('[Orders] Confirm error:', err.message);
+    logger.error('[Orders] Confirm error:', err.message);
     res.status(500).json({ success: false, error: 'Error al confirmar pedido', code: 'ORDER_CONFIRM_ERROR' });
   }
 });
@@ -607,7 +620,7 @@ router.patch('/:id/status', requireAuth, (req, res) => {
 
     res.json({ success: true, status: canonical, message: `Pedido ${canonical}` });
   } catch (err) {
-    console.error('[Orders] Status error:', err.message);
+    logger.error('[Orders] Status error:', err.message);
     res.status(500).json({ success: false, error: 'Error al cambiar estado', code: 'ORDER_STATUS_ERROR' });
   }
 });
@@ -662,7 +675,7 @@ router.post('/:id/items', requireAuth, requireRole('admin', 'mesero'), (req, res
 
     res.status(201).json({ success: true, message: 'Item agregado al pedido' });
   } catch (err) {
-    console.error('[Orders] Add item error:', err.message);
+    logger.error('[Orders] Add item error:', err.message);
     res.status(500).json({ success: false, error: 'Error al agregar item', code: 'ORDER_ADD_ITEM_ERROR' });
   }
 });
@@ -721,6 +734,14 @@ router.patch('/:id/items/:itemId/status', requireAuth, requireRole('admin', 'kds
         status: 'ready',
         items: [itemPayload],
       }));
+
+      // S2-A: si este era el último item en quedar listo, el pedido está
+      // completo para servir → avisar al mesero (order_complete). El KDS
+      // marca item a item y NUNCA llama PATCH /:id/status 'ready', así que
+      // este es el único punto donde el pedido real emite order_complete.
+      if (isOrderFullyReady(orderForWs)) {
+        broadcastOrderComplete(orderForWs);
+      }
     } else {
       broadcaster.broadcastKDS(buildKDSEvent(KDSEventType.STATUS_CHANGE, {
         orderId: req.params.id,
@@ -733,7 +754,7 @@ router.patch('/:id/items/:itemId/status', requireAuth, requireRole('admin', 'kds
 
     res.json({ success: true, itemId: req.params.itemId, status: canonical });
   } catch (err) {
-    console.error('[Orders] Item status error:', err.message);
+    logger.error('[Orders] Item status error:', err.message);
     res.status(500).json({ success: false, error: 'Error al cambiar estado del item', code: 'ORDER_ITEM_STATUS_ERROR' });
   }
 });
@@ -755,8 +776,72 @@ router.delete('/:id/items/:itemId', requireAuth, requireRole('admin', 'mesero'),
 
     res.json({ success: true, message: 'Item eliminado del pedido' });
   } catch (err) {
-    console.error('[Orders] Remove item error:', err.message);
+    logger.error('[Orders] Remove item error:', err.message);
     res.status(500).json({ success: false, error: 'Error al eliminar item', code: 'ORDER_REMOVE_ITEM_ERROR' });
+  }
+});
+
+// ============================================================
+// PATCH /api/orders/:id/deliver — mesero entrega los items listos
+//
+// S2-B (Gap 4): el mesero NO podía marcar entregado (PATCH items/status
+// es admin|kds → 403). Esta ruta dedicada (admin|mesero):
+//   1. Exige que el pedido NO esté cerrado (paid/cancelled/served).
+//   2. Exige al menos un item en 'ready' (no se entrega lo que no está).
+//   3. Marca TODOS los items 'ready' → 'delivered'.
+//   4. Si no quedan items activos → pedido 'served' (lista para cobro).
+//   5. Broadcast status_change (KDS + caja) para refrescar pantallas.
+// ============================================================
+
+router.patch('/:id/deliver', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
+  try {
+    const db = getDb();
+    const existing = db.prepare('SELECT id, status, table_id FROM orders WHERE id = ?').get(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Pedido no encontrado', code: 'ORDER_NOT_FOUND' });
+    }
+
+    if (['paid', 'cancelled', 'served'].includes(existing.status)) {
+      return res.status(409).json({
+        success: false,
+        error: `El pedido ya fue servido o cerrado (estado: ${existing.status})`,
+        code: 'ORDER_CLOSED',
+        current: existing.status,
+      });
+    }
+
+    const readyCount = db.prepare(
+      "SELECT COUNT(*) as n FROM order_items WHERE order_id = ? AND status = 'ready'"
+    ).get(req.params.id);
+    if (Number(readyCount.n) === 0) {
+      return res.status(409).json({
+        success: false,
+        error: 'No hay items listos para entregar',
+        code: 'NO_READY_ITEMS',
+      });
+    }
+
+    // Marcar los items listos como entregados
+    db.prepare("UPDATE order_items SET status = 'delivered' WHERE order_id = ? AND status = 'ready'")
+      .run(req.params.id);
+
+    // ¿Quedan items activos? Si no → pedido served (mismo criterio que el
+    // endpoint KDS de items, SSOT).
+    const remaining = db.prepare(
+      "SELECT COUNT(*) as n FROM order_items WHERE order_id = ? AND status NOT IN ('delivered','cancelled')"
+    ).get(req.params.id);
+    if (Number(remaining.n) === 0) {
+      db.prepare("UPDATE orders SET status = 'served', updated_at = datetime('now') WHERE id = ? AND status NOT IN ('paid','cancelled')")
+        .run(req.params.id);
+    }
+
+    const orderForWs = buildOrder(db, req.params.id);
+    broadcastOrderStatusChange(orderForWs, existing.status);
+
+    res.json({ success: true, status: orderForWs.status, message: 'Pedido marcado como entregado' });
+  } catch (err) {
+    logger.error('[Orders] Deliver error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al marcar pedido entregado', code: 'ORDER_DELIVER_ERROR' });
   }
 });
 
