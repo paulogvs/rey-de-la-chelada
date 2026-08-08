@@ -291,7 +291,7 @@ export const DEFAULT_CONFIG: RestaurantConfig = {
 
 import { computeTotals, extractIvaAmount, priceWithoutIva as ivaPriceWithoutIva } from './iva';
 
-class AppConfig {
+export class AppConfig {
   private config: RestaurantConfig;
 
   constructor(initial?: Partial<RestaurantConfig>) {
@@ -379,7 +379,7 @@ class AppConfig {
   }
 
   /** Merge deep simple */
-  private _mergeDeep<T extends Record<string, unknown>>(base: T, override: Partial<T>): T {
+  private _mergeDeep<T extends object>(base: T, override: Partial<T>): T {
     const result = { ...base };
     for (const key of Object.keys(override) as (keyof T)[]) {
       const val = override[key];

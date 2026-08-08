@@ -8,7 +8,7 @@
 import React, { type ReactNode } from 'react';
 import './Badge.css';
 
-export type BadgeVariant = 'pending' | 'preparing' | 'ready' | 'cancelled' | 'paid' | 'info' | 'warning';
+export type BadgeVariant = 'pending' | 'preparing' | 'ready' | 'cancelled' | 'paid' | 'info' | 'warning' | 'success';
 
 export interface BadgeProps {
   variant?: BadgeVariant;
@@ -28,6 +28,7 @@ const VARIANT_LABELS: Record<BadgeVariant, string> = {
   paid: 'Pagado',
   info: 'Info',
   warning: 'Advertencia',
+  success: 'Éxito',
 };
 
 export function Badge({

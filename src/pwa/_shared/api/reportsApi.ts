@@ -60,7 +60,7 @@ export async function fetchDailySales(
     return { ...result, data: null, daily: null } as DailySalesResult;
   }
 
-  const s = result.data.summary ?? {};
+  const s = result.data.summary ?? ({} as NonNullable<ServerDailyReport['summary']>);
   const byMethod: Record<string, number> = {};
   for (const p of result.data.by_payment_method ?? []) {
     byMethod[p.method] = p.total;
@@ -85,7 +85,7 @@ export async function fetchDailySales(
     hourly: result.data.hourly ?? [],
   };
 
-  return { ...result, daily };
+  return { ...result, daily } as DailySalesResult;
 }
 
 export default { fetchDailySales, fetchClosingCurrent, openClosing, closeClosing };

@@ -15,7 +15,7 @@ interface PwaLayoutProps {
   title?: string;
 }
 
-export function PwaLayout({ children, title }: PwaLayoutProps) {
+export function PwaLayout({ children, title: _title }: PwaLayoutProps) {
   return (
     <div className="pwa-root" data-pwa-root>
       <main className="pwa-main">

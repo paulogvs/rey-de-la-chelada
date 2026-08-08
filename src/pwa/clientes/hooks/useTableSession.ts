@@ -70,15 +70,6 @@ function persistSession(tableNumber: number, sessionId: string): void {
   }
 }
 
-/** Clear persisted session */
-function clearPersistedSession(): void {
-  try {
-    localStorage.removeItem(SESSION_STORAGE_KEY);
-  } catch {
-    // ignore
-  }
-}
-
 /** Get persisted session */
 function getPersistedSession(): PersistedSession | null {
   try {

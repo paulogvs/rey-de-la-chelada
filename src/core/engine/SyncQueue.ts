@@ -41,6 +41,8 @@ export interface SyncQueueEvent {
   item?: SyncQueueItem;
   processed?: number;
   failed?: number;
+  /** Resultado por item del último flush (evento 'flushed') — ver header del módulo */
+  results?: Array<{ item: SyncQueueItem; ok: boolean; error?: string }>;
   count?: number;
   error?: string;
 }

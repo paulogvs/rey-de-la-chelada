@@ -78,7 +78,6 @@ export function generateTicket(
 ): Uint8Array {
   const cpl = config.paperSize === '58mm' ? 32 : config.characterPerLine;
   const business = appConfig.all.business;
-  const currency = appConfig.all.currency;
   const taxConfig = appConfig.all.taxes;
 
   const repeat = (char: string, count: number) => char.repeat(count);

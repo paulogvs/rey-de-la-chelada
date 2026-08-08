@@ -182,7 +182,9 @@ function MeserosApp() {
         <main className="meseros-main">
           {view === 'tables' && (
             <TablesView
-              tables={tables.tables}
+              // tablesApi.Table es un subconjunto estructural de core Table (sin
+              // createdAt/updatedAt, que el server no expone en GET /api/tables).
+              tables={tables.tables as Table[]}
               loading={tables.loading}
               error={tables.error}
               onTableSelect={handleTableSelect}

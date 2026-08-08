@@ -17,7 +17,7 @@
  * ═══════════════════════════════════════════════════════════
  */
 
-import { appConfig, type PwaModuleId } from './app.config';
+import { appConfig } from './app.config';
 
 // ============================================================
 // QR TOKEN — Para el módulo clientes
@@ -64,7 +64,7 @@ export interface ClientSession {
 //  - Agrega verificación de que el cliente está en la red local
 // ============================================================
 
-class SecurityEngine {
+export class SecurityEngine {
   private activeSessions: Map<string, ClientSession> = new Map();
 
   // ==========================================================
@@ -184,7 +184,7 @@ class SecurityEngine {
   // HELPERS PRIVADOS
   // ==========================================================
 
-  private _renewSession(oldSession: ClientSession, tableNumber: number): { valid: boolean; reason?: string } {
+  private _renewSession(oldSession: ClientSession, _tableNumber: number): { valid: boolean; reason?: string } {
     const config = appConfig.all.clientModule;
     const expiresAt = new Date(Date.now() + config.qrTokenDurationMinutes * 60 * 1000);
 

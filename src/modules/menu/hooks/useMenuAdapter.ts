@@ -11,7 +11,7 @@
 import { useState, useCallback } from 'react';
 import { menuEngine } from '@/core/engine';
 import { appConfig } from '@/core/config';
-import type { MenuCategory, MenuItem, ModifierGroup, ModifierOption } from '@/core/types';
+import type { MenuCategory, MenuItem, ModifierGroup, ModifierOption, ModifierType } from '@/core/types';
 
 export interface ImportResult {
   success: boolean;
@@ -35,6 +35,23 @@ export interface MenuImportRow {
   modifiers?: string;
   /** Preparation time in minutes */
   preparationTime?: number;
+}
+
+/** Forma de un grupo de modificadores importado (JSON parseado del row) */
+interface ImportedModifierGroup {
+  name?: string;
+  type?: string;
+  required?: boolean;
+  min?: number;
+  max?: number;
+  options?: ImportedModifierOption[];
+}
+
+/** Forma de una opción de modificador importada (JSON parseado del row) */
+interface ImportedModifierOption {
+  name?: string;
+  priceAdjustment?: number;
+  isDefault?: boolean;
 }
 
 /**
@@ -96,15 +113,15 @@ export function useMenuAdapter() {
               // Try JSON first
               const parsed = JSON.parse(row.modifiers);
               if (Array.isArray(parsed)) {
-                parsed.forEach((g: any, gi: number) => {
+                (parsed as ImportedModifierGroup[]).forEach((g, gi) => {
                   modifierGroups.push({
                     id: `mod-group-${index}-${gi}`,
                     name: g.name || `Grupo ${gi + 1}`,
-                    type: g.type || 'select',
+                    type: (g.type as ModifierType) || 'select',
                     required: g.required || false,
                     min: g.min || (g.required ? 1 : 0),
                     max: g.max || 1,
-                    options: (g.options || []).map((o: any, oi: number) => ({
+                    options: (g.options ?? []).map((o, oi) => ({
                       id: `mod-opt-${index}-${gi}-${oi}`,
                       name: o.name || `Opción ${oi + 1}`,
                       priceAdjustment: o.priceAdjustment || 0,
@@ -159,6 +176,7 @@ export function useMenuAdapter() {
             name: row.name,
             description: row.description || '',
             price: Math.round(row.price * 100) / 100,
+            currency: appConfig.all.currency.code,
             ivaPercentage: ivaPct,
             imageUrl: null,
             isActive: true,

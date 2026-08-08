@@ -32,7 +32,7 @@ export async function initializeEngines(): Promise<void> {
   try {
     const { loadSeedToEngine } = await import('@/core/data/data-loader');
     loadSeedToEngine();
-  } catch (e) {
+  } catch {
     console.warn('[Engine] Seed data load skipped (will load from DB in production)');
   }
   console.log('[Engine] All engines initialized');

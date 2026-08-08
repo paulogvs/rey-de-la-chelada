@@ -7,7 +7,7 @@
  * Menú items, categories, modifiers, pricing with IVA.
  */
 
-import type { MenuItem, MenuCategory, ModifierGroup, ModifierOption } from '../types';
+import type { MenuItem, MenuCategory, ModifierOption } from '../types';
 
 class MenuEngine {
   private categories: Map<string, MenuCategory> = new Map();

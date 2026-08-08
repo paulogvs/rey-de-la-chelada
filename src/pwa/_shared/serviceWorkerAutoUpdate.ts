@@ -12,11 +12,18 @@
  * Puro e inyectable para poder testearlo sin navegador (TDD).
  */
 
-export interface SwRegistrationLike {
-  waiting: Worker | null;
-  installing: Worker | null;
+/** Forma mínima de un ServiceWorker (compatible con el DOM real y con mocks de test) */
+export interface SwWorkerLike {
+  postMessage: (message: unknown) => void;
+  state?: string;
   addEventListener: (type: string, listener: () => void) => void;
-  update: () => Promise<void>;
+}
+
+export interface SwRegistrationLike {
+  waiting: SwWorkerLike | null;
+  installing: SwWorkerLike | null;
+  addEventListener: (type: string, listener: () => void) => void;
+  update: () => Promise<unknown>;
 }
 
 export interface ServiceWorkerNavigatorLike {

@@ -41,6 +41,12 @@ export function PriceDisplay({
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [selectedTip, setSelectedTip] = useState<number>(0);
 
+  const classes = [
+    'price-display',
+    large ? 'price-display--large' : '',
+    className,
+  ].filter(Boolean).join(' ');
+
   // Null price: show placeholder
   if (priceWithIVA == null) {
     return (
@@ -58,12 +64,6 @@ export function PriceDisplay({
   const totalWithTip = Math.round((priceWithIVA + tipAmount) * 100) / 100;
 
   const tipPresets = config.tipping.presetPercentages;
-
-  const classes = [
-    'price-display',
-    large ? 'price-display--large' : '',
-    className,
-  ].filter(Boolean).join(' ');
 
   return (
     <div className={classes}>

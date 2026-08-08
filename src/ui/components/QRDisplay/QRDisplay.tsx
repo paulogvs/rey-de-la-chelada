@@ -8,9 +8,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './QRDisplay.css';
 
-// We use the qrcode package (qrcode library installed in dependencies)
-declare const QRCode: any;
-
 export interface QRDisplayProps {
   /** Data to encode in QR */
   data: string;

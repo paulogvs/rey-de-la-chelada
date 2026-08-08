@@ -61,10 +61,10 @@ export async function fetchTables(
   });
 
   if (!result.ok || !result.data?.tables) {
-    return { ...result, tables: [] };
+    return { ...result, tables: [] } as TablesResult;
   }
 
-  return { ...result, tables: result.data.tables.map(normalizeTable) };
+  return { ...result, tables: result.data.tables.map(normalizeTable) } as TablesResult;
 }
 
 export interface TableResult extends ApiResult<{ table: Table }> {

@@ -86,7 +86,7 @@ interface DetailGroup {
   options: DetailModifier[];
 }
 
-export function OrderPanel({ table, token, onOrderPlaced, onCancel, onBack }: OrderPanelProps) {
+export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, onBack }: OrderPanelProps) {
   const { addToast } = useToast();
   const [categories, setCategories] = useState<{ id: string; name: string; emoji: string }[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -223,11 +223,6 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel, onBack }: Or
 
   const addToCart = useCallback(() => {
     if (!itemDetail) return;
-    const mods = itemModifiers.map(m => ({
-      id: m.id,
-      name: m.name,
-      priceAdjustment: m.priceAdjustment ?? 0,
-    }));
     setCart(prev => {
       const existing = prev.find(ci =>
         ci.menuItem.id === itemDetail.id &&

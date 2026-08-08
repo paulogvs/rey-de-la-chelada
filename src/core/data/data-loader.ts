@@ -66,7 +66,10 @@ export function loadSeedData(): { categories: MenuCategory[]; items: MenuItem[] 
   let categorySort = 0;
 
   for (const areaKey of areas) {
-    const area = seedData.restobar.menu[areaKey];
+    // El JSON semilla tiene formas heterogéneas (con/sin subtitulo, precio vs precios…):
+    // se tipa contra SeedCategory/SeedItem (todos los campos opcionales) para poder
+    // acceder a cualquier campo sin romper la carga.
+    const area = seedData.restobar.menu[areaKey] as { categorias: SeedCategory[] } | undefined;
     if (!area) continue;
 
     for (const cat of area.categorias) {

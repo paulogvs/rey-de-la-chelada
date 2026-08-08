@@ -6,6 +6,8 @@ interface LoaderProps {
   label?: string;
   /** block: centrado con padding; compact: inline pequeño */
   variant?: 'default' | 'block' | 'compact';
+  /** Atajo para variant="block" (compat con call sites existentes) */
+  block?: boolean;
   className?: string;
 }
 
@@ -13,8 +15,9 @@ interface LoaderProps {
  * Loader — spinner compartido (SSOT) para estados de carga.
  * Reemplaza los textos "Cargando…" planos en todas las PWAs.
  */
-export function Loader({ label = 'Cargando…', variant = 'default', className }: LoaderProps) {
-  const cls = ['loader', variant !== 'default' && `loader--${variant}`, className]
+export function Loader({ label = 'Cargando…', variant = 'default', block = false, className }: LoaderProps) {
+  const effectiveVariant = block ? 'block' : variant;
+  const cls = ['loader', effectiveVariant !== 'default' && `loader--${effectiveVariant}`, className]
     .filter(Boolean)
     .join(' ');
 

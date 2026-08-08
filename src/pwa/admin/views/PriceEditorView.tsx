@@ -116,7 +116,7 @@ export function PriceEditorView({ token, onToast }: PriceEditorViewProps) {
           aria-label="Buscar item"
         />
         <select
-          variant="constrained" className="form-input--mono"
+          className="form-input--mono"
           value={categoryId}
           onChange={e => setCategoryId(e.target.value)}
           aria-label="Filtrar por categoría"

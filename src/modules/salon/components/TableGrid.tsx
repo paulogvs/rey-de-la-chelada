@@ -66,7 +66,7 @@ function TableCard({ table, onSelect }: TableCardProps) {
 // TABLE GRID
 // ============================================================
 
-interface TableGridProps {
+export interface TableGridProps {
   onTableSelect?: (table: Table) => void;
   columns?: number;
   filterSection?: string;
@@ -190,7 +190,7 @@ export function TableGrid({
 // TABLE LIST (Alternate view — for smaller screens)
 // ============================================================
 
-interface TableListProps {
+export interface TableListProps {
   onTableSelect?: (table: Table) => void;
   filterStatus?: string;
 }
