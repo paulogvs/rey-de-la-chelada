@@ -232,7 +232,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
             <Button
               key={pct}
               variant={selectedTip === pct ? 'primary' : 'secondary'}
-              size="sm"
+              size="md"
               onClick={() => setSelectedTip(pct)}
             >
               {pct === 0 ? 'Sin propina' : `${pct}%`}
@@ -241,7 +241,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
           {config.tipping.allowCustom && (
             <Button
               variant={![0, 5, 10, 15].includes(selectedTip) && selectedTip > 0 ? 'primary' : 'secondary'}
-              size="sm"
+              size="md"
               onClick={() => {
                 const val = prompt('Propina personalizada (Bs.):');
                 if (val) {
@@ -266,7 +266,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
       <Card className="payment-panel__splits">
         <div className="payment-panel__splits-header">
           <h4>Forma de pago</h4>
-          <Button variant="ghost" size="sm" onClick={addSplit} disabled={remaining <= 0}>
+          <Button variant="ghost" size="md" onClick={addSplit} disabled={remaining <= 0}>
             + Dividir pago
           </Button>
         </div>

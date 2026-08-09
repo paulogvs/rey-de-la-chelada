@@ -25,6 +25,7 @@ import { LoginScreen } from '../_shared/components/LoginScreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { ToastProvider, useToast } from '@/ui/components/Toast';
 import { Loader } from '@/ui/components/Loader';
+import { IconButton } from '@/ui/components/IconButton';
 import type { Table } from '@/core/types';
 import { TablesView } from './TablesView';
 import { OrderPanel } from './OrderPanel';
@@ -146,9 +147,14 @@ function MeserosApp() {
         <header className="meseros-header">
           <div className="meseros-header__left">
             {view !== 'tables' && (
-              <button className="meseros-header__back" onClick={handleBackToTables}>
-                ← Volver
-              </button>
+              <IconButton
+                label="Volver a mesas"
+                variant="ghost"
+                className="meseros-header__back"
+                onClick={handleBackToTables}
+              >
+                ←
+              </IconButton>
             )}
             <h1 className="meseros-header__title">
               {view === 'tables' && 'Mesas'}
@@ -159,16 +165,17 @@ function MeserosApp() {
           </div>
           <div className="meseros-header__right">
             {view === 'tables' && (
-              <button
+              <IconButton
+                label="Llamadas de clientes"
+                variant="ghost"
                 className="meseros-header__calls"
                 onClick={() => setView('waiter-calls')}
-                aria-label="Llamadas de clientes"
               >
                 🔔
                 {waiterCalls.pendingCount > 0 && (
                   <span className="meseros-header__calls-badge">{waiterCalls.pendingCount}</span>
                 )}
-              </button>
+              </IconButton>
             )}
             {user && (
               <button className="meseros-header__logout" onClick={handleLogout} title="Cerrar sesión">
