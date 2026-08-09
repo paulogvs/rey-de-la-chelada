@@ -101,7 +101,8 @@ function AdminApp() {
         {/* Sidebar */}
         <nav className="admin-sidebar">
           <div className="admin-sidebar__header">
-            <h2>⚙️ Admin</h2>
+            <h2>👑 Admin</h2>
+            <p className="admin-sidebar__subtitle">Rey de la Chelada</p>
           </div>
           <div className="admin-sidebar__nav">
             {NAV_ITEMS.map(item => (
@@ -128,7 +129,14 @@ function AdminApp() {
         <main className="admin-main">
           <header className="admin-topbar">
             <h1>{NAV_ITEMS.find(i => i.id === view)?.label}</h1>
-            <Badge variant="info">Admin</Badge>
+            <div className="admin-topbar__actions">
+              <Badge variant="info">Admin</Badge>
+              {user && (
+                <button className="admin-topbar__logout" onClick={handleLogout} title="Cerrar sesión">
+                  ⏻ Salir
+                </button>
+              )}
+            </div>
           </header>
 
           {view === 'dashboard' && <DashboardView token={token} onToast={handleToast} />}
