@@ -1,4 +1,5 @@
-/* LoginScreen — PIN keypad (zero hardcoded colors, CSS vars only) */
+/* LoginScreen — PIN keypad (zero hardcoded colors, CSS vars only)
+   Amber & Glass (Fase 3c): glow dorado, card glass, focus-visible. */
 
 .login-screen {
   min-height: 100dvh;
@@ -8,24 +9,28 @@
   justify-content: center;
   gap: var(--space-6);
   padding: var(--space-4);
-  background: var(--bg);
+  background:
+    var(--accent-glow),
+    var(--bg);
 }
 
 .login-screen__card {
   width: 100%;
   max-width: 340px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border, var(--border));
+  border-radius: var(--radius-2xl, var(--radius-lg));
   padding: var(--space-6) var(--space-5);
   text-align: center;
+  box-shadow: var(--shadow-lg, var(--shadow-md));
 }
 
 .login-screen__title {
-  font-size: 1.5rem;
+  font-size: var(--text-hero, 1.5rem);
   font-weight: 700;
   color: var(--text-strong);
   margin: 0 0 var(--space-1);
+  letter-spacing: 0.01em;
 }
 
 .login-screen__subtitle {
@@ -76,13 +81,23 @@
 .login-screen__key {
   min-height: var(--touch-min-target);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--surface-soft);
   color: var(--text-strong);
   font-size: 1.4rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.05s ease;
+  transition: background 0.15s var(--ease-in), transform 0.05s var(--ease-in), box-shadow 0.15s var(--ease-in);
+}
+
+.login-screen__key:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-hover);
+}
+
+.login-screen__key:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .login-screen__key:active {
@@ -99,10 +114,17 @@
   background: var(--dorado-rey);
   border-color: var(--dorado-rey);
   color: var(--on-accent);
+  box-shadow: var(--shadow-golden, none);
+}
+
+.login-screen__key--ok:hover:not(:disabled) {
+  background: var(--dorado-rey-hover);
+  border-color: var(--dorado-rey-hover);
 }
 
 .login-screen__key--ok:disabled {
   background: var(--surface-soft);
   border-color: var(--border);
   color: var(--text-muted);
+  box-shadow: none;
 }
