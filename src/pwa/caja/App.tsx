@@ -19,6 +19,7 @@ import { LoginScreen } from '../_shared/components/LoginScreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { Badge } from '@/ui/components/Badge';
 import { Loader } from '@/ui/components/Loader';
+import { SegmentedControl, type SegmentedOption } from '@/ui/components/SegmentedControl';
 import { ToastProvider, useToast } from '@/ui/components/Toast';
 import { appConfig } from '@/core/config';
 import { localDateStr } from '../_shared/utils/localDate';
@@ -29,6 +30,13 @@ import { CollectView } from './CollectView';
 import './App.css';
 
 type ViewState = 'summary' | 'collect' | 'close' | 'invoice';
+
+const VIEW_OPTIONS: SegmentedOption[] = [
+  { value: 'summary', label: 'Resumen' },
+  { value: 'collect', label: 'Cobrar' },
+  { value: 'close', label: 'Cierre' },
+  { value: 'invoice', label: 'Facturación' },
+];
 
 function CajaApp() {
   const { addToast } = useToast();
@@ -113,21 +121,13 @@ function CajaApp() {
       <div className="caja-app">
         <header className="caja-header">
           <h1 className="caja-header__title">Caja</h1>
-          <div className="caja-header__nav">
-            {(['summary', 'collect', 'close', 'invoice'] as ViewState[]).map(v => (
-              <button
-                key={v}
-                className={`caja-header__nav-btn ${view === v ? 'active' : ''}`}
-                onClick={() => setView(v)}
-              >
-                {v === 'summary' && 'Resumen'}
-                {v === 'collect' && 'Cobrar'}
-                {v === 'close' && 'Cierre'}
-                {v === 'invoice' && 'Facturación'}
-              </button>
-            ))}
-          </div>
-          <Badge variant="info" large>{today}</Badge>
+          <SegmentedControl
+            className="caja-header__nav"
+            options={VIEW_OPTIONS}
+            value={view}
+            onChange={v => setView(v as ViewState)}
+          />
+          <Badge variant="info" large className="caja-header__date">{today}</Badge>
           {user && (
             <button className="caja-header__logout" onClick={handleLogout} title="Cerrar sesión">
               {user.displayName} · Salir

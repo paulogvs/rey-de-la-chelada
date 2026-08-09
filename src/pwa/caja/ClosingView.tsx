@@ -19,6 +19,7 @@ import {
 import { Card } from '@/ui/components/Card';
 import { Loader } from '@/ui/components/Loader';
 import { Button } from '@/ui/components/Button';
+import { StatCard } from '@/ui/components/StatCard';
 import { FormField } from '@/ui/components/FormField';
 import { useToast } from '@/ui/components/Toast';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
@@ -192,34 +193,40 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
 
       <Card className="caja-close__history">
         <h3>Resumen de hoy</h3>
-        <div className="caja-close__history-list">
-          <div className="caja-close__history-item">
-            <span>Total ventas</span>
-            <span className="caja-close__history-value">Bs. {(daily?.totalSales ?? 0).toFixed(2)}</span>
-          </div>
-          <div className="caja-close__history-item">
-            <span>IVA total</span>
-            <span className="caja-close__history-value">Bs. {(daily?.totalIva ?? 0).toFixed(2)}</span>
-          </div>
-          <div className="caja-close__history-item">
-            <span>Total pedidos</span>
-            <span className="caja-close__history-value">{daily?.totalOrders ?? 0}</span>
-          </div>
-          <div className="caja-close__history-item">
-            <span>Ventas efectivo</span>
-            <span className="caja-close__history-value">Bs. {(byMethod['cash'] ?? 0).toFixed(2)}</span>
-          </div>
-          <div className="caja-close__history-item">
-            <span>Ventas QR</span>
-            <span className="caja-close__history-value">Bs. {qrTotal.toFixed(2)}</span>
-          </div>
-          <div className="caja-close__history-item">
-            <span>Ventas tarjeta</span>
-            <span className="caja-close__history-value">Bs. {(byMethod['card'] ?? 0).toFixed(2)}</span>
-          </div>
-          <div className="caja-close__history-item">
-            <span>Ventas transferencia</span>
-            <span className="caja-close__history-value">Bs. {(byMethod['transfer'] ?? 0).toFixed(2)}</span>
+        <div className="caja-close__stats">
+          <StatCard
+            label="Total ventas"
+            value={<span className="caja-stat caja-stat--gross">Bs. {(daily?.totalSales ?? 0).toFixed(2)}</span>}
+          />
+          <StatCard
+            label="IVA total"
+            value={<span className="caja-stat caja-stat--iva">Bs. {(daily?.totalIva ?? 0).toFixed(2)}</span>}
+          />
+          <StatCard
+            label="Pedidos"
+            value={<span className="caja-stat caja-stat--orders">{daily?.totalOrders ?? 0}</span>}
+          />
+        </div>
+
+        <div className="caja-close__breakdown">
+          <h4>Por método de pago</h4>
+          <div className="caja-close__history-list">
+            <div className="caja-close__history-item">
+              <span>Ventas efectivo</span>
+              <span className="caja-close__history-value">Bs. {(byMethod['cash'] ?? 0).toFixed(2)}</span>
+            </div>
+            <div className="caja-close__history-item">
+              <span>Ventas QR</span>
+              <span className="caja-close__history-value">Bs. {qrTotal.toFixed(2)}</span>
+            </div>
+            <div className="caja-close__history-item">
+              <span>Ventas tarjeta</span>
+              <span className="caja-close__history-value">Bs. {(byMethod['card'] ?? 0).toFixed(2)}</span>
+            </div>
+            <div className="caja-close__history-item">
+              <span>Ventas transferencia</span>
+              <span className="caja-close__history-value">Bs. {(byMethod['transfer'] ?? 0).toFixed(2)}</span>
+            </div>
           </div>
         </div>
       </Card>
