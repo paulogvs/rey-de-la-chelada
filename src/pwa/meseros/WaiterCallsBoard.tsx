@@ -62,10 +62,10 @@ export function WaiterCallsBoard({
             </span>
           </div>
           <div className="waiter-calls__call-actions">
-            <Button variant="primary" size="sm" onClick={() => onAccept(call.id)}>
+            <Button variant="primary" size="md" onClick={() => onAccept(call.id)}>
               Atender
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => onCancel(call.id)}>
+            <Button variant="ghost" size="md" onClick={() => onCancel(call.id)}>
               Cancelar
             </Button>
           </div>
@@ -85,7 +85,7 @@ export function WaiterCallsBoard({
               </div>
               {call.status === 'accepted' && (
                 <div className="waiter-calls__call-actions">
-                  <Button variant="secondary" size="sm" onClick={() => onComplete(call.id)}>
+                  <Button variant="secondary" size="md" onClick={() => onComplete(call.id)}>
                     Marcar lista
                   </Button>
                 </div>

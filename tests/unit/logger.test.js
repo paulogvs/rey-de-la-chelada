@@ -32,8 +32,8 @@ afterEach(() => {
 });
 
 function todayLogFile() {
-  // SSOT: MISMA fecha local America/La_Paz que usa el logger (bonus de
-  // auditoría — antes usaba UTC vía toISOString y flakeaba al amanecer).
+  // SSOT: MISMA fecha local America/La_Paz que usa el logger — NUNCA
+  // toISOString() (UTC). Antes flakeaba al amanecer con la fecha del sistema.
   const day = localDateStr();
   return path.join(tempLogDir, `app-${day}.log`);
 }

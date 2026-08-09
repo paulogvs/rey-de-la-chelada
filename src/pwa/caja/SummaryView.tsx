@@ -10,6 +10,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { fetchDailySales, type DailySales } from '../_shared/api/reportsApi';
 import { Card, CardSkeleton } from '@/ui/components/Card';
 import { Button } from '@/ui/components/Button';
+import { StatCard } from '@/ui/components/StatCard';
 import { useToast } from '@/ui/components/Toast';
 import { buildDailySalesCsv, downloadCsv, dailyCsvFilename } from '../_shared/utils/csvExport';
 import { METHOD_LABELS, METHOD_ICONS } from '../_shared/utils/paymentMethods';
@@ -94,46 +95,31 @@ export function SummaryView({ token, today, ivaRate, refreshTick }: SummaryViewP
         </Button>
       </div>
       <div className="caja-summary__grid">
-        <Card status="paid" className="caja-metric">
-          <div className="caja-metric__label">Ventas del día</div>
-          <div className="caja-metric__value caja-metric__value--gross">
-            Bs. {totalSales.toFixed(2)}
-          </div>
-          <div className="caja-metric__detail">
-            <span>{summary.totalOrders} pedidos</span>
-            <span>{summary.completedOrders} pagados</span>
-          </div>
-        </Card>
+        <StatCard
+          label="Ventas del día"
+          value={<span className="caja-stat caja-stat--gross">Bs. {totalSales.toFixed(2)}</span>}
+          delta={`${summary.totalOrders} pedidos · ${summary.completedOrders} pagados`}
+          icon="💰"
+        />
 
-        <Card className="caja-metric">
-          <div className="caja-metric__label">Ticket promedio</div>
-          <div className="caja-metric__value">
-            Bs. {summary.averageTicket.toFixed(2)}
-          </div>
-          <div className="caja-metric__detail">
-            <span>Venta bruta: Bs. {summary.grossRevenue.toFixed(2)}</span>
-          </div>
-        </Card>
+        <StatCard
+          label="Ticket promedio"
+          value={<span className="caja-stat">Bs. {summary.averageTicket.toFixed(2)}</span>}
+          delta={`Venta bruta: Bs. ${summary.grossRevenue.toFixed(2)}`}
+        />
 
-        <Card className="caja-metric">
-          <div className="caja-metric__label">IVA {Math.round(ivaRate * 100)}%</div>
-          <div className="caja-metric__value caja-metric__value--iva">
-            Bs. {summary.totalIva.toFixed(2)}
-          </div>
-          <div className="caja-metric__detail">
-            <span>Base imponible: Bs. {summary.baseRevenue.toFixed(2)}</span>
-          </div>
-        </Card>
+        <StatCard
+          label={`IVA ${Math.round(ivaRate * 100)}%`}
+          value={<span className="caja-stat caja-stat--iva">Bs. {summary.totalIva.toFixed(2)}</span>}
+          delta={`Base imponible: Bs. ${summary.baseRevenue.toFixed(2)}`}
+        />
 
-        <Card className="caja-metric">
-          <div className="caja-metric__label">Pedidos</div>
-          <div className="caja-metric__value caja-metric__value--orders">
-            {summary.totalOrders}
-          </div>
-          <div className="caja-metric__detail">
-            <span>{summary.cancelledOrders} cancelados</span>
-          </div>
-        </Card>
+        <StatCard
+          label="Pedidos"
+          value={<span className="caja-stat caja-stat--orders">{summary.totalOrders}</span>}
+          delta={`${summary.cancelledOrders} cancelados`}
+          icon="🧾"
+        />
       </div>
 
       <Card className="caja-methods">

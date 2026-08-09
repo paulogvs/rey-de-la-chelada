@@ -460,7 +460,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                     min={1}
                     max={50}
                     onChange={(q) => updateQuantity(index, q)}
-                    size="sm"
+                    size="md"
                   />
                   <span className="order-panel__cart-item-total">
                     Bs. {lineTotal.toFixed(2)}

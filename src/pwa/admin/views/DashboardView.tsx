@@ -10,7 +10,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { Card } from '@/ui/components/Card';
-import { Badge } from '@/ui/components/Badge';
+import { StatCard } from '@/ui/components/StatCard';
 import { Loader } from '@/ui/components/Loader';
 import { fetchAdminMenuItems } from '../../_shared/api/adminApi';
 import { fetchTables } from '../../_shared/api/tablesApi';
@@ -105,33 +105,41 @@ export function DashboardView({ token, onToast }: DashboardViewProps) {
       ) : (
         <>
           <div className="admin-dashboard__grid">
-            <Card status={stats.nullPriceCount > 0 ? 'pending' : 'paid'} className="admin-stat">
-              <div className="admin-stat__label">Items del menú</div>
-              <div className="admin-stat__value">{stats.itemCount}</div>
-              <div className="admin-stat__sub">
-                {stats.nullPriceCount > 0
-                  ? <Badge variant="pending">{stats.nullPriceCount} SIN PRECIO</Badge>
-                  : <Badge variant="paid">Todos con precio</Badge>}
-              </div>
-            </Card>
+            <StatCard
+              className={stats.nullPriceCount > 0 ? 'admin-stat admin-stat--alert' : 'admin-stat admin-stat--items'}
+              label="Items del menú"
+              value={stats.itemCount}
+              delta={stats.nullPriceCount > 0
+                ? `${stats.nullPriceCount} sin precio`
+                : 'Todos con precio'}
+              deltaTone={stats.nullPriceCount > 0 ? 'down' : 'up'}
+              icon="📊"
+            />
 
-            <Card className="admin-stat">
-              <div className="admin-stat__label">Precios cargados</div>
-              <div className="admin-stat__value">{pctPriced}%</div>
-              <div className="admin-stat__sub">del menú</div>
-            </Card>
+            <StatCard
+              className="admin-stat"
+              label="Precios cargados"
+              value={`${pctPriced}%`}
+              delta="del menú"
+              icon="🏷️"
+            />
 
-            <Card className="admin-stat">
-              <div className="admin-stat__label">Mesas</div>
-              <div className="admin-stat__value">{stats.tableCount}</div>
-              <div className="admin-stat__sub">{stats.freeTables} libres</div>
-            </Card>
+            <StatCard
+              className="admin-stat"
+              label="Mesas"
+              value={stats.tableCount}
+              delta={`${stats.freeTables} libres`}
+              icon="🪑"
+            />
 
-            <Card className="admin-stat">
-              <div className="admin-stat__label">Ventas {today}</div>
-              <div className="admin-stat__value">Bs. {stats.revenueToday.toFixed(2)}</div>
-              <div className="admin-stat__sub">{stats.closingsToday} corte(s) hoy</div>
-            </Card>
+            <StatCard
+              className="admin-stat admin-stat--revenue"
+              label={`Ventas ${today}`}
+              value={`Bs. ${stats.revenueToday.toFixed(2)}`}
+              delta={`${stats.closingsToday} corte(s) hoy`}
+              deltaTone={stats.revenueToday > 0 ? 'up' : 'neutral'}
+              icon="💰"
+            />
           </div>
 
           <Card className="admin-section">

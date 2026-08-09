@@ -44,9 +44,10 @@ function ensureLogDir() {
 }
 
 /**
- * Nombre de archivo del día (YYYY-MM-DD LOCAL America/La_Paz).
- * Antes usaba la fecha local del SISTEMA (flaky: los tests esperaban UTC
- * vía toISOString — ver bonus de auditoría). Ahora SSOT con date-utils.mjs.
+ * Nombre de archivo del día (YYYY-MM-DD local del negocio — America/La_Paz).
+ * SSOT: scripts/date-utils.mjs — NUNCA toISOString()/fecha local del sistema.
+ * Antes usaba la fecha local del SISTEMA (flaky: los tests esperaban UTC vía
+ * toISOString). El contrato de fecha (AGENTS.md §2b) prohíbe UTC para "hoy".
  */
 function todayFileName() {
   return `app-${localDateStr()}.log`;

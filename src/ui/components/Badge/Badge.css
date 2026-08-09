@@ -14,10 +14,12 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  font-feature-settings: var(--font-feature-settings);
   line-height: 1.4;
   white-space: nowrap;
   border: 1px solid transparent;
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 6%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 6%, transparent),
+              0 2px 8px -4px color-mix(in srgb, var(--overlay) 40%, transparent);
 }
 
 .badge--large {
@@ -77,6 +79,7 @@
   height: 8px;
   border-radius: 50%;
   background: currentColor;
+  box-shadow: 0 0 8px color-mix(in srgb, currentColor 50%, transparent);
   animation: badge-dot-pulse 2s ease-in-out infinite;
 }
 

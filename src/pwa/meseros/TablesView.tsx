@@ -58,7 +58,7 @@ export function TablesView({ tables, loading, error, onTableSelect, onRefresh, r
       )}
 
       {/* Table Grid */}
-      <div className="table-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))' }}>
+      <div className="table-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(112px, 1fr))' }}>
         {tables.map(table => {
           const statusStyle = STATUS_VARS[table.status] || STATUS_VARS.free;
           const isReady = readyTableNumbers?.has(table.number) === true;

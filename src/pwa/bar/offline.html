@@ -5,15 +5,71 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bar · Sin conexión</title>
   <style>
-    body { font-family: Inter, sans-serif; background: #1A0F0A; color: #F4E8C1; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
-    h1 { font-family: 'Playfair Display', serif; color: #E08B27; font-size: 2.5rem; }
-    p { color: rgba(244,232,193,0.5); font-size: 1.25rem; }
+    body {
+      font-family: Inter, sans-serif;
+      background: #1A0F0A;
+      background-image: radial-gradient(120% 80% at 50% 0%, rgba(224,139,39,0.14), transparent 70%);
+      color: #F4E8C1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+      padding: 24px;
+    }
+    .offline-card { max-width: 360px; }
+    .offline-crown {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 88px;
+      height: 88px;
+      margin: 0 auto 20px;
+      border-radius: 50%;
+      border: 1px solid #E08B27;
+      box-shadow: 0 0 0 6px rgba(224,139,39,0.15), 0 0 28px #E08B27;
+      font-size: 2.4rem;
+      line-height: 1;
+    }
+    h1 {
+      font-family: 'Playfair Display', serif;
+      color: #E08B27;
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0 0 12px;
+      letter-spacing: 0.02em;
+      text-shadow: 0 0 24px #E08B27;
+    }
+    p {
+      color: rgba(244,232,193,0.5);
+      font-size: 1.05rem;
+      line-height: 1.6;
+      margin: 0 0 20px;
+    }
+    .offline-dot {
+      width: 10px;
+      height: 10px;
+      margin: 0 auto;
+      border-radius: 50%;
+      background: #E08B27;
+      animation: offline-pulse 1.8s ease-in-out infinite;
+    }
+    @keyframes offline-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.7); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .offline-dot { animation: none; }
+    }
   </style>
 </head>
 <body>
-  <div>
-    <h1>🍺 Barra</h1>
+  <div class="offline-card">
+    <div class="offline-crown">🍺</div>
+    <h1>Barra</h1>
     <p>Sin conexión — reconectando...</p>
+    <div class="offline-dot" aria-hidden="true"></div>
   </div>
 </body>
 </html>

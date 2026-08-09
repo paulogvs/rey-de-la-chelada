@@ -1,167 +1,223 @@
 /* ============================================================
    PWA CAJA — Cash Closing & Financial Dashboard
-   ZERO hardcoded colors — all variables from tokens.json
+   AMBER & GLASS — FASE 3d (premium redesign)
+   ZERO hardcoded colors — variables de tokens.css + color-mix().
+   Texto: --text-strong / --text-inverse.
+   Touch: primarios 56px+, mín 48px (WCAG 2.2).
    ============================================================ */
 
 .caja-app {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 60px);
-  background: var(--bg);
+  min-height: calc(100dvh - 60px);
+  background-color: var(--bg);
+  background-image: var(--accent-glow);
+  background-repeat: no-repeat;
+  background-position: 50% 0%;
+  background-size: 100% 360px;
   color: var(--text);
 }
 
-/* ---- Header ---- */
+/* ============================================================
+   HEADER — glass sticky + gradient + glow
+   ============================================================ */
 
 .caja-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-floating);
   display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--dorado-rey-soft) 45%, var(--surface)) 0%, var(--surface) 100%);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
   flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  padding: calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--space-5) var(--space-4);
+  background: var(--header-gradient);
+  border-bottom: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  box-shadow: 0 10px 32px -20px color-mix(in srgb, var(--overlay) 60%, transparent);
+  flex-shrink: 0;
+}
+
+.caja-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--accent-glow);
+  pointer-events: none;
+  z-index: -1;
 }
 
 .caja-header__title {
   font-family: var(--font-display);
-  font-size: var(--text-2xl);
-  color: var(--verde-esmeralda);
+  font-size: var(--text-hero);
+  font-weight: 700;
+  color: var(--text-strong);
   margin: 0;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  font-feature-settings: var(--font-feature-settings);
+  text-shadow: 0 2px 28px color-mix(in srgb, var(--dorado-rey) 26%, transparent);
 }
+
+.caja-header__date {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.caja-header__logout {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  min-height: var(--touch-min-target);
+  transition: color var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out),
+              background-color var(--duration-fast) var(--ease-out);
+}
+
+.caja-header__logout:hover {
+  color: var(--status-cancelled);
+  border-color: color-mix(in srgb, var(--status-cancelled) 35%, transparent);
+  background: color-mix(in srgb, var(--status-cancelled) 8%, transparent);
+}
+
+/* ---- Nav: segmented control en su propia fila ---- */
 
 .caja-header__nav {
-  display: flex;
-  gap: var(--space-1);
+  order: 3;
+  flex-basis: 100%;
+  max-width: 760px;
+  margin: var(--space-2) auto 0;
+  border-color: var(--glass-border);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
+/* Pills (pantalla restringida) */
 .caja-header__nav-btn {
-  padding: var(--space-1) var(--space-3);
-  background: transparent;
-  border: 1px solid var(--border);
+  padding: var(--space-2) var(--space-4);
+  background: color-mix(in srgb, var(--surface-elevated) 55%, transparent);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
   color: var(--text-muted);
   font-size: var(--text-sm);
   cursor: pointer;
-  min-height: 32px;
+  min-height: var(--touch-min-target);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   transition: all var(--duration-fast) var(--ease-out);
 }
 
-.caja-header__nav-btn.active {
-  background: var(--verde-esmeralda);
-  color: var(--text-inverse);
-  border-color: var(--verde-esmeralda);
-  font-weight: 600;
+.caja-header__nav-btn:hover {
+  border-color: var(--dorado-rey);
+  color: var(--text-strong);
+  background: var(--surface-hover);
 }
 
-.caja-header__nav-btn:hover:not(.active) {
-  border-color: var(--verde-esmeralda);
-  color: var(--verde-esmeralda);
+.caja-header__nav-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
-/* ---- Main ---- */
+.caja-restricted {
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* ============================================================
+   MAIN
+   ============================================================ */
 
 .caja-main {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-4);
-  max-width: 1000px;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--space-5);
+  max-width: 1240px;
   margin: 0 auto;
   width: 100%;
 }
 
-/* ---- Summary View ---- */
+/* ============================================================
+   SUMMARY — métricas (StatCard) + ventas por método
+   ============================================================ */
+
+.caja-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
 
 .caja-summary__toolbar {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
 }
 
 .caja-summary__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--space-4);
-  margin-bottom: var(--space-4);
 }
 
-.caja-metric {
-  padding: var(--space-5);
-}
-
-.caja-metric__label {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: var(--space-2);
-}
-
-.caja-metric__value {
-  font-family: var(--font-mono);
-  font-size: var(--text-3xl);
-  font-weight: 800;
-  color: var(--text-strong);
-  line-height: 1;
-  margin-bottom: var(--space-2);
-}
-
-.caja-metric__value--gross {
-  color: var(--verde-esmeralda);
-}
-
-.caja-metric__value--iva {
-  color: var(--status-pending);
-}
-
-.caja-metric__value--orders {
-  color: var(--dorado-rey);
-}
-
-.caja-metric__detail {
-  display: flex;
-  gap: var(--space-3);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
+.caja-empty {
+  padding: var(--space-6);
   color: var(--text-muted);
 }
 
-/* ---- Sales by method ---- */
+/* Acentos de valores en StatCard */
+.caja-stat--gross { color: var(--verde-esmeralda); }
+.caja-stat--iva   { color: var(--status-pending); }
+.caja-stat--orders { color: var(--dorado-rey); }
 
 .caja-methods {
   padding: var(--space-5);
+  border-top: 3px solid var(--dorado-rey);
+  box-shadow: var(--shadow-card), 0 0 32px -16px color-mix(in srgb, var(--dorado-rey) 30%, transparent);
 }
 
 .caja-methods h3 {
   font-family: var(--font-display);
   font-size: var(--text-lg);
-  margin: 0 0 var(--space-4);
+  margin: 0 0 var(--space-5);
   color: var(--text-strong);
 }
 
 .caja-methods__list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .caja-methods__item {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .caja-methods__label {
-  width: 140px;
+  width: 160px;
   font-size: var(--text-sm);
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
 .caja-methods__bar {
   flex: 1;
-  height: 24px;
+  height: 26px;
   background: var(--surface-soft);
   border-radius: var(--radius-full);
   overflow: hidden;
@@ -169,27 +225,41 @@
 
 .caja-methods__bar-fill {
   height: 100%;
-  background: var(--verde-esmeralda);
+  background: linear-gradient(90deg, var(--dorado-rey-hover) 0%, var(--dorado-rey) 100%);
   border-radius: var(--radius-full);
+  box-shadow: 0 0 18px -4px color-mix(in srgb, var(--dorado-rey) 60%, transparent);
   transition: width var(--duration-normal) var(--ease-out);
   min-width: 4px;
 }
 
 .caja-methods__amount {
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  width: 120px;
+  font-size: var(--text-base);
+  font-weight: 700;
+  width: 130px;
   text-align: right;
   flex-shrink: 0;
+  color: var(--text-strong);
 }
 
-/* ---- Cash Closing ---- */
+.caja-methods__empty {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+  padding: var(--space-4);
+  border: 1px dashed color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--radius-lg);
+}
+
+/* ============================================================
+   CLOSING — corte de caja
+   ============================================================ */
 
 .caja-close {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
 }
 
 .caja-close__card,
@@ -197,19 +267,24 @@
   padding: var(--space-5);
 }
 
+.caja-close__card {
+  border-top: 3px solid var(--dorado-rey);
+  box-shadow: var(--shadow-card), 0 0 32px -16px color-mix(in srgb, var(--dorado-rey) 35%, transparent);
+}
+
 .caja-close__card h3,
 .caja-close__history h3 {
   font-family: var(--font-display);
-  font-size: var(--text-lg);
-  margin: 0 0 var(--space-4);
+  font-size: var(--text-xl);
+  margin: 0 0 var(--space-5);
   color: var(--text-strong);
 }
 
 .caja-close__fields {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
+  gap: var(--space-5);
+  margin-bottom: var(--space-5);
 }
 
 .caja-close__field {
@@ -223,24 +298,25 @@
   color: var(--text-muted);
 }
 
-
 .caja-close__value {
   font-family: var(--font-mono);
-  font-size: var(--text-xl);
+  font-size: var(--text-2xl);
   font-weight: 700;
   color: var(--text-strong);
-  padding: var(--space-2) 0;
+  padding: var(--space-1) 0;
 }
 
 .caja-close__diff {
   font-family: var(--font-mono);
-  font-size: var(--text-xl);
+  font-size: var(--text-4xl);
   font-weight: 800;
-  padding: var(--space-2) 0;
+  line-height: 1.1;
+  padding: var(--space-1) 0;
 }
 
 .caja-close__diff.positive {
   color: var(--status-confirmed);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--status-confirmed) 30%, transparent);
 }
 
 .caja-close__diff.negative {
@@ -248,7 +324,7 @@
 }
 
 .caja-close__textarea {
-  padding: var(--space-2);
+  padding: var(--space-3);
   background: var(--surface-soft);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -256,6 +332,24 @@
   font-family: var(--font-body);
   font-size: var(--text-sm);
   resize: vertical;
+  min-height: var(--touch-min-target);
+  transition: border-color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.caja-close__textarea:focus {
+  outline: none;
+  border-color: var(--dorado-rey);
+  box-shadow: var(--focus-ring);
+}
+
+.caja-close__hint {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--status-pending) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-pending) 22%, transparent);
+  border-radius: var(--radius-md);
 }
 
 .caja-close__actions {
@@ -264,41 +358,67 @@
   flex-direction: column;
 }
 
-/* ---- Close history ---- */
+/* Métricas del resumen (StatCard) */
+.caja-close__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.caja-close__breakdown h4 {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 var(--space-3);
+}
 
 .caja-close__history-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .caja-close__history-item {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
   font-size: var(--text-sm);
-  padding-bottom: var(--space-2);
+  padding: var(--space-2) 0;
   border-bottom: 1px solid var(--border);
+}
+
+.caja-close__history-item:last-child {
+  border-bottom: none;
 }
 
 .caja-close__history-value {
   font-family: var(--font-mono);
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--text-strong);
 }
 
-/* ---- Invoice ---- */
+/* ============================================================
+   INVOICE — factura / recibo
+   ============================================================ */
 
 .caja-invoice {
-  max-width: 600px;
+  max-width: 680px;
   margin: 0 auto;
 }
 
 .caja-invoice__card {
-  padding: var(--space-5);
+  padding: var(--space-6);
+  border-top: 3px solid var(--dorado-rey);
+  box-shadow: var(--shadow-card), 0 0 32px -16px color-mix(in srgb, var(--dorado-rey) 30%, transparent);
 }
 
 .caja-invoice__card h3 {
   font-family: var(--font-display);
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
   margin: 0 0 var(--space-2);
   color: var(--text-strong);
 }
@@ -306,14 +426,14 @@
 .caja-invoice__info {
   font-size: var(--text-sm);
   color: var(--text-muted);
-  margin-bottom: var(--space-4);
+  margin: 0 0 var(--space-5);
 }
 
 .caja-invoice__fields {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
 }
 
 .caja-invoice__field {
@@ -327,9 +447,11 @@
   color: var(--text-muted);
 }
 
-
 .caja-invoice__actions {
-  margin-bottom: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
 }
 
 /* ---- SFE Info ---- */
@@ -351,6 +473,7 @@
 .caja-invoice__sfe-row {
   display: flex;
   justify-content: space-between;
+  gap: var(--space-3);
   font-size: var(--text-sm);
   padding: var(--space-1) 0;
   color: var(--text-muted);
@@ -361,27 +484,37 @@
   color: var(--text);
 }
 
-/* ---- Empty ---- */
+/* ============================================================
+   RESPONSIVE — desktop/tablet-first
+   ============================================================ */
 
-
-/* ---- Responsive ---- */
-
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .caja-close {
     grid-template-columns: 1fr;
   }
+}
 
+@media (max-width: 768px) {
   .caja-summary__grid {
     grid-template-columns: 1fr 1fr;
   }
 
   .caja-methods__label {
-    width: 100px;
+    width: 110px;
+  }
+
+  .caja-header {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
   }
 }
 
 @media (max-width: 480px) {
   .caja-summary__grid {
     grid-template-columns: 1fr;
+  }
+
+  .caja-methods__label {
+    width: 100px;
   }
 }

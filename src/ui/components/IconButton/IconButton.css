@@ -1,0 +1,89 @@
+/* ============================================================
+   ICONBUTTON — Square icon button (≥48px)
+   ZERO hardcoded colors — all variables from tokens.json
+   ============================================================ */
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+  transition: background-color var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out),
+              transform var(--duration-fast) var(--ease-out);
+}
+
+.icon-btn--md {
+  width: var(--touch-primary-action);
+  height: var(--touch-primary-action);
+  min-width: var(--touch-min-target);
+  min-height: var(--touch-min-target);
+  font-size: var(--text-lg);
+}
+
+.icon-btn--lg {
+  width: var(--touch-kds-button);
+  height: var(--touch-kds-button);
+  min-width: var(--touch-kds-button);
+  min-height: var(--touch-kds-button);
+  font-size: var(--text-2xl);
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-hover);
+}
+
+.icon-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.icon-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.icon-btn--accent {
+  background: linear-gradient(180deg, var(--dorado-rey) 0%, var(--dorado-rey-hover) 100%);
+  color: var(--madera-oscura);
+  border-color: var(--dorado-rey);
+  box-shadow: var(--shadow-golden);
+}
+
+.icon-btn--accent:hover:not(:disabled) {
+  box-shadow: var(--shadow-golden-strong);
+}
+
+.icon-btn--danger {
+  color: var(--status-cancelled);
+  border-color: color-mix(in srgb, var(--status-cancelled) 40%, transparent);
+}
+
+.icon-btn--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--status-cancelled) 12%, transparent);
+  border-color: var(--status-cancelled);
+}
+
+.icon-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.icon-btn--ghost:hover:not(:disabled) {
+  background: var(--dorado-rey-soft);
+  color: var(--dorado-rey);
+}

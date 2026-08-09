@@ -42,3 +42,18 @@ export { KDSBoard } from './KDSBoard/KDSBoard';
 export type { KDSBoardProps } from './KDSBoard/KDSBoard';
 export { filterItemsByModule } from './KDSBoard/filter';
 export type { KDSModule } from './KDSBoard/filter';
+
+export { NavBar } from './NavBar/NavBar';
+export type { NavBarProps } from './NavBar/NavBar';
+
+export { AppHeader } from './AppHeader/AppHeader';
+export type { AppHeaderProps } from './AppHeader/AppHeader';
+
+export { StatCard } from './StatCard/StatCard';
+export type { StatCardProps } from './StatCard/StatCard';
+
+export { SegmentedControl } from './SegmentedControl/SegmentedControl';
+export type { SegmentedControlProps, SegmentedOption } from './SegmentedControl/SegmentedControl';
+
+export { IconButton } from './IconButton/IconButton';
+export type { IconButtonProps } from './IconButton/IconButton';

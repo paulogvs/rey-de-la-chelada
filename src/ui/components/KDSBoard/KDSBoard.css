@@ -8,7 +8,8 @@
 .kds-screen {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100vh; /* fallback */
+  height: 100dvh;
   background: var(--kds-bg);
   color: var(--kds-text);
   overflow: hidden;
@@ -21,9 +22,11 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--space-3) var(--space-4);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--dorado-rey-soft) 45%, var(--surface)) 0%, var(--surface) 100%);
+  background: var(--header-gradient);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
   border-bottom: 2px solid var(--dorado-rey);
-  z-index: 10;
+  z-index: var(--z-floating);
   flex-shrink: 0;
 }
 
@@ -50,14 +53,16 @@
   background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  min-width: var(--touch-min-target);
-  min-height: var(--touch-min-target);
+  min-width: var(--touch-kds-button);
+  min-height: var(--touch-kds-button);
   font-size: var(--text-lg);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--duration-fast) var(--ease-out);
+  transition: background-color var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out),
+              transform var(--duration-fast) var(--ease-out);
 }
 
 .kds-header__audio-btn.active {
@@ -67,6 +72,16 @@
 
 .kds-header__audio-btn:hover {
   border-color: var(--dorado-rey);
+  background: var(--surface-hover);
+}
+
+.kds-header__audio-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.kds-header__audio-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 /* ---- Orders Grid ---- */

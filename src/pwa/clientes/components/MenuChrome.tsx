@@ -34,17 +34,20 @@ export function CategoryButton({
  * Full-width hero banner above the header.
  * Hides itself if the image is missing (404 / network error).
  * The path is data served by the Express /menu-photos mount.
+ * Envuelto en un contenedor para el gradiente dorado + textura.
  */
 export function MenuBanner() {
   const [imgError, setImgError] = useState(false);
   if (imgError) return null;
   return (
-    <img
-      src="/menu-photos/micheladas/header-micheladas.png"
-      alt="Rey de la Chelada"
-      className="clientes-banner"
-      onError={() => setImgError(true)}
-    />
+    <div className="clientes-banner" aria-hidden="true">
+      <img
+        src="/menu-photos/micheladas/header-micheladas.png"
+        alt="Rey de la Chelada"
+        className="clientes-banner__img"
+        onError={() => setImgError(true)}
+      />
+    </div>
   );
 }
 
@@ -107,16 +110,18 @@ export function CustomerActions({
     return (
       <footer className="clientes-actions">
         <button
-          className="clientes-actions__btn clientes-actions__btn--call animate-fade-in-up"
+          className="clientes-actions__btn clientes-actions__btn--call"
           onClick={onCallWaiter}
         >
+          <span className="clientes-actions__btn--icon" aria-hidden="true">🔔</span>
           Llamar Mesero
         </button>
         {canRequestBill && (
           <button
-            className="clientes-actions__btn clientes-actions__btn--bill animate-fade-in-up"
+            className="clientes-actions__btn clientes-actions__btn--bill"
             onClick={onRequestBill}
           >
+            <span className="clientes-actions__btn--icon" aria-hidden="true">🧾</span>
             Pedir Cuenta
           </button>
         )}

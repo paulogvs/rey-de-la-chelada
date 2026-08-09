@@ -7,12 +7,20 @@
   position: fixed;
   top: var(--space-4);
   right: var(--space-4);
-  z-index: 1000;
+  z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   max-width: 400px;
   pointer-events: none;
+}
+
+/* Safe-area superior (notch / isla dinámica) */
+@media (min-width: 0px) {
+  .toast-container {
+    top: calc(var(--space-4) + env(safe-area-inset-top, 0px));
+    right: calc(var(--space-4) + env(safe-area-inset-right, 0px));
+  }
 }
 
 .toast {
@@ -22,41 +30,43 @@
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-lg);
   border: 1px solid;
+  border-left-width: 4px;
   pointer-events: auto;
   cursor: pointer;
   min-height: var(--touch-min-target);
   box-shadow: var(--shadow-modal);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  animation: toast-slide-in 300ms var(--ease-out) forwards;
+  background: var(--glass-bg-strong);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  animation: toast-slide-in var(--duration-normal) var(--ease-out) forwards;
 }
 
 .toast--exit {
-  animation: toast-slide-out 300ms var(--ease-in-out) forwards !important;
+  animation: toast-slide-out var(--duration-normal) var(--ease-in-out) forwards !important;
 }
 
 /* ---- Types ---- */
 
 .toast--success {
-  background: color-mix(in srgb, var(--status-delivered) 15%, transparent);
+  background: color-mix(in srgb, var(--status-delivered) 15%, var(--glass-bg-strong));
   border-color: var(--status-confirmed);
   color: var(--status-confirmed);
 }
 
 .toast--error {
-  background: color-mix(in srgb, var(--status-cancelled) 15%, transparent);
+  background: color-mix(in srgb, var(--status-cancelled) 15%, var(--glass-bg-strong));
   border-color: var(--status-cancelled);
   color: var(--status-cancelled);
 }
 
 .toast--warning {
-  background: color-mix(in srgb, var(--kds-warning) 15%, transparent);
+  background: color-mix(in srgb, var(--kds-warning) 15%, var(--glass-bg-strong));
   border-color: var(--kds-warning);
   color: var(--kds-warning);
 }
 
 .toast--info {
-  background: var(--dorado-rey-soft);
+  background: color-mix(in srgb, var(--dorado-rey-soft) 45%, var(--glass-bg-strong));
   border-color: var(--dorado-rey);
   color: var(--dorado-rey);
 }

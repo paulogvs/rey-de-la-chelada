@@ -83,7 +83,7 @@ export function OrderTrackingPage({ order, error, polling, onReset }: OrderTrack
 
   // Active tracking screen
   return (
-    <div className="tracking-page">
+    <div className="tracking-page" data-status={order.status}>
       <header className="tracking-header">
         <div className="tracking-header__table">
           <span className="tracking-header__label">Mesa</span>
@@ -97,7 +97,7 @@ export function OrderTrackingPage({ order, error, polling, onReset }: OrderTrack
         )}
       </header>
 
-      <section className="tracking-status" aria-live="polite">
+      <section className="tracking-status" key={order.status} aria-live="polite">
         <div className="tracking-status__icon" aria-hidden="true">
           {order.status === 'ready' ? '🍺' : order.status === 'served' ? '😋' : '⏳'}
         </div>

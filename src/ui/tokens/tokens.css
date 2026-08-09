@@ -80,7 +80,8 @@ body {
   font-size: var(--text-base);
   color: var(--text);
   background-color: var(--bg);
-  min-height: 100vh;
+  min-height: 100vh; /* fallback */
+  min-height: 100dvh;
 }
 
 code, pre, .mono {
@@ -162,3 +163,45 @@ a,
 .text-center { text-align: center; }
 .text-muted  { color: var(--text-muted); }
 .text-strong { color: var(--text-strong); }
+
+/* ============================================================
+   AMBER & GLASS — tokens premium (Fase 1 del rediseño)
+   Derivados de tokens existentes vía color-mix — zero hex.
+   theme.js sigue siendo el SSOT de paletas; estos añaden
+   capas, gradientes y utilidades sin tocar colores base.
+   ============================================================ */
+
+:root {
+  /* ---- Z-index scale (reemplaza valores sueltos en componentes) ---- */
+  --z-bg: 0;
+  --z-content: 10;
+  --z-floating: 20;
+  --z-overlay: 30;
+  --z-cursor: 50;
+  --z-toast: 100;
+
+  /* ---- Gradientes unificados (elimina la duplicación ×4 en headers) ---- */
+  --header-gradient: linear-gradient(180deg,
+    color-mix(in srgb, var(--dorado-rey-soft) 45%, var(--surface)) 0%,
+    var(--surface) 100%);
+  --accent-glow: radial-gradient(120% 80% at 50% 0%,
+    color-mix(in srgb, var(--dorado-rey-soft) 28%, transparent) 0%,
+    transparent 70%);
+
+  /* ---- Glass strong (navs fijos, toasts, bottom bars) ---- */
+  --glass-bg-strong: color-mix(in srgb, var(--surface) 82%, transparent);
+  --glass-blur-strong: blur(24px) saturate(180%);
+
+  /* ---- Focus ring formalizado ---- */
+  --focus-ring: 0 0 0 3px var(--dorado-rey-soft);
+
+  /* ---- Easing de entrada (faltaba) ---- */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* ---- Typography responsive ---- */
+  --text-hero: clamp(2.25rem, 5vw, 3rem);
+  --font-feature-settings: "cv01", "ss03";
+
+  /* ---- Surface hover (elevación light premium, sin saturar) ---- */
+  --surface-hover: color-mix(in srgb, var(--surface-elevated) 55%, var(--surface));
+}

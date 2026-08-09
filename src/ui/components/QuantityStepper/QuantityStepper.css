@@ -16,7 +16,7 @@
 
 .qty-stepper:focus-within {
   border-color: var(--dorado-rey);
-  box-shadow: 0 0 0 3px var(--dorado-rey-soft);
+  box-shadow: var(--focus-ring);
 }
 
 /* ---- Sizes ---- */
@@ -58,7 +58,8 @@
 }
 
 .qty-stepper__btn:hover:not(:disabled) {
-  background: var(--dorado-rey-soft);
+  background: var(--surface-hover);
+  color: var(--dorado-rey);
 }
 
 .qty-stepper__btn:disabled {

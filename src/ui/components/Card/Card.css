@@ -29,9 +29,14 @@
 
 .card--clickable:hover {
   border-color: var(--border-hover);
-  background: var(--surface-soft);
+  background: var(--surface-hover);
   box-shadow: var(--shadow-card-hover);
   transform: translateY(-2px);
+}
+
+.card--clickable:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-card), var(--focus-ring);
 }
 
 .card--clickable:active {

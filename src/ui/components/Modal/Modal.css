@@ -6,14 +6,14 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: var(--z-overlay);
   background: color-mix(in srgb, var(--overlay) 92%, transparent);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  animation: modal-overlay-in 200ms var(--ease-out) forwards;
+  animation: modal-overlay-in var(--duration-fast) var(--ease-out) forwards;
 }
 
 .modal-overlay--fullscreen {
@@ -28,23 +28,30 @@
 /* ---- Sheet ---- */
 
 .modal-sheet {
-  background: linear-gradient(180deg, var(--surface-elevated) 0%, var(--surface) 100%);
+  background: var(--glass-bg-strong);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
   border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
   width: 100%;
   max-width: 600px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  animation: modal-slide-up 300ms var(--ease-out) forwards;
+  animation: modal-slide-up var(--duration-normal) var(--ease-out) forwards;
   box-shadow: var(--shadow-modal);
+  border: 1px solid var(--glass-border);
+  border-bottom: none;
   border-top: 1px solid color-mix(in srgb, var(--dorado-rey) 15%, transparent);
 }
 
 .modal-sheet--fullscreen {
   border-radius: 0;
   max-width: none;
-  max-height: 100vh;
-  height: 100vh;
+  max-height: 100vh; /* fallback navegadores sin dvh */
+  max-height: 100dvh;
+  height: 100vh; /* fallback */
+  height: 100dvh;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 @keyframes modal-slide-up {
@@ -95,11 +102,24 @@
   font-size: var(--text-lg);
   min-width: var(--touch-min-target);
   min-height: var(--touch-min-target);
+  transition: background-color var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out);
 }
 
 .modal-close:hover {
-  border-color: var(--dorado-rey);
+  border-color: var(--border-hover);
+  background: var(--surface-hover);
   color: var(--dorado-rey);
+}
+
+.modal-close:active {
+  transform: scale(0.94);
+}
+
+.modal-close:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 /* ---- Body ---- */

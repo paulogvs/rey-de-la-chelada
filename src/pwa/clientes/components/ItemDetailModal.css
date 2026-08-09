@@ -1,49 +1,64 @@
 /**
  * PWA CLIENTES — ItemDetailModal styles
- * Token-based only — no hardcoded colors.
+ * AMBER & GLASS — FASE 3a
+ * Token-based only — no hardcoded colors (color-mix + vars).
  */
 
-/* ---- Detail Modal ---- */
+/* ---- Detail Modal: bottom sheet glass ---- */
 
 .clientes-detail-overlay {
   position: fixed;
   inset: 0;
-  z-index: 50;
-  background: var(--overlay-strong);
+  z-index: var(--z-overlay);
+  background: color-mix(in srgb, var(--overlay-strong) 88%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  padding: var(--space-4);
-  animation: fadeIn 200ms var(--ease-out);
+  padding: 0;
+  animation: detailFadeIn var(--duration-fast) var(--duration-ease-out);
 }
 
 .clientes-detail {
-  background: var(--surface);
-  border-radius: var(--radius-xl);
-  max-width: 500px;
+  background: var(--glass-bg-strong);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+  border: 1px solid var(--glass-border);
+  border-bottom: none;
+  border-top: 1px solid color-mix(in srgb, var(--dorado-rey) 16%, transparent);
+  max-width: 640px;
   width: 100%;
-  max-height: 85vh;
+  max-height: 88dvh;
   overflow-y: auto;
-  padding: var(--space-6);
+  padding: var(--space-6) var(--space-5) calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
   position: relative;
-  animation: slideUp 300ms var(--ease-out);
+  animation: detailSlideUp var(--duration-normal) var(--duration-ease-out);
+  box-shadow: var(--shadow-modal), 0 -8px 40px -16px color-mix(in srgb, var(--dorado-rey) 28%, transparent);
 }
 
 .clientes-detail__close {
   position: absolute;
-  top: var(--space-3);
-  right: var(--space-3);
+  top: var(--space-4);
+  right: var(--space-4);
   background: var(--surface-elevated);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text);
   cursor: pointer;
   font-size: var(--text-lg);
+  min-width: var(--touch-min-target);
+  min-height: var(--touch-min-target);
+  transition: border-color var(--duration-fast) var(--duration-ease-out),
+              color var(--duration-fast) var(--duration-ease-out),
+              transform var(--duration-fast) var(--duration-ease-out);
+  z-index: var(--z-content);
 }
 
 .clientes-detail__close:hover {
@@ -51,12 +66,23 @@
   color: var(--dorado-rey);
 }
 
+.clientes-detail__close:active {
+  transform: scale(0.94);
+}
+
+.clientes-detail__close:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .clientes-detail__image {
   width: 100%;
-  height: 200px;
+  height: 220px;
   object-fit: cover;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   margin-bottom: var(--space-4);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-card);
 }
 
 .clientes-detail__image--placeholder {
@@ -64,16 +90,20 @@
   align-items: center;
   justify-content: center;
   font-family: var(--font-display);
-  font-size: 4rem;
+  font-size: var(--text-5xl);
   background: var(--surface-soft);
   color: var(--text-muted);
+  border: 1px solid var(--border);
 }
 
 .clientes-detail__name {
   font-family: var(--font-display);
-  font-size: var(--text-2xl);
+  font-size: var(--text-3xl);
+  font-weight: 700;
   color: var(--text-strong);
   margin: 0 0 var(--space-2);
+  letter-spacing: 0.01em;
+  font-feature-settings: var(--font-feature-settings);
 }
 
 .clientes-detail__desc {
@@ -89,6 +119,7 @@
   font-weight: 700;
   color: var(--dorado-rey);
   margin-bottom: var(--space-3);
+  text-shadow: 0 0 20px color-mix(in srgb, var(--dorado-rey) 30%, transparent);
 }
 
 .clientes-detail__tags {
@@ -127,27 +158,39 @@
   gap: var(--space-2);
 }
 
+/* Stepper grande (touch target 56px) */
 .clientes-detail__mod-option {
-  padding: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  min-height: var(--touch-primary-action);
   background: var(--surface-soft);
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
   font-size: var(--text-sm);
+  font-weight: 500;
   color: var(--text);
   font-family: var(--font-body);
-  min-height: 44px;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color var(--duration-fast) var(--duration-ease-out),
+              border-color var(--duration-fast) var(--duration-ease-out),
+              color var(--duration-fast) var(--duration-ease-out),
+              box-shadow var(--duration-fast) var(--duration-ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.clientes-detail__mod-option:hover {
+  border-color: var(--border-hover);
 }
 
 .clientes-detail__mod-option.selected {
-  background: var(--dorado-rey);
-  border-color: var(--dorado-rey);
-  color: var(--on-accent);
+  background: linear-gradient(180deg, var(--dorado-rey) 0%, var(--dorado-rey-hover) 100%);
+  border-color: color-mix(in srgb, var(--dorado-rey-hover) 80%, transparent);
+  color: var(--madera-oscura);
+  font-weight: 700;
+  box-shadow: var(--shadow-golden);
 }
 
 .clientes-detail__mod-option.selected .clientes-detail__mod-price {
-  color: var(--on-accent);
+  color: var(--madera-oscura);
 }
 
 .clientes-detail__mod-price {
@@ -159,29 +202,49 @@
 
 .clientes-detail__add-btn {
   width: 100%;
-  min-height: 52px; /* touch target */
+  min-height: var(--touch-primary-action);
   border: none;
   border-radius: var(--radius-md);
-  background: var(--dorado-rey);
-  color: var(--on-accent);
+  background: linear-gradient(180deg, var(--dorado-rey) 0%, var(--dorado-rey-hover) 100%);
+  color: var(--madera-oscura);
   font-family: var(--font-body);
   font-size: var(--text-lg);
   font-weight: 700;
-  margin-top: var(--space-5);
+  margin-top: var(--space-6);
   cursor: pointer;
-  transition: transform 0.15s ease, opacity 0.15s ease;
+  box-shadow: var(--shadow-golden-strong);
+  transition: transform var(--duration-fast) var(--duration-ease-out),
+              opacity var(--duration-fast) var(--duration-ease-out),
+              box-shadow var(--duration-fast) var(--duration-ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.clientes-detail__add-btn:hover {
+  box-shadow: var(--shadow-golden-strong), 0 8px 24px -8px color-mix(in srgb, var(--dorado-rey) 50%, transparent);
 }
 
 .clientes-detail__add-btn:active {
   transform: scale(0.98);
 }
 
-@keyframes fadeIn {
+.clientes-detail__add-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+@keyframes detailFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-@keyframes slideUp {
-  from { transform: translateY(40px); opacity: 0; }
+@keyframes detailSlideUp {
+  from { transform: translateY(64px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clientes-detail-overlay,
+  .clientes-detail {
+    animation: none;
+  }
 }
