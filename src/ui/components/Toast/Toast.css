@@ -15,6 +15,14 @@
   pointer-events: none;
 }
 
+/* Safe-area superior (notch / isla dinámica) */
+@media (min-width: 0px) {
+  .toast-container {
+    top: calc(var(--space-4) + env(safe-area-inset-top, 0px));
+    right: calc(var(--space-4) + env(safe-area-inset-right, 0px));
+  }
+}
+
 .toast {
   display: flex;
   align-items: center;

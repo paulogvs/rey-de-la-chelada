@@ -46,6 +46,11 @@
   border-color: var(--border-hover);
 }
 
+.navbar__back:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .navbar__back:active {
   transform: scale(0.94);
 }

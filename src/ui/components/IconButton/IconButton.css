@@ -42,6 +42,11 @@
   border-color: var(--border-hover);
 }
 
+.icon-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .icon-btn:active:not(:disabled) {
   transform: scale(0.94);
 }
