@@ -15,6 +15,10 @@
 import { describe, it, expect } from 'vitest';
 import { localDateStr as clientLocalDateStr, BUSINESS_TIMEZONE as CLIENT_TZ } from '../../src/pwa/_shared/utils/localDate';
 import { localDateStr as coreLocalDateStr } from '../../src/core/config/local-date';
+import {
+  localDateTimeStr,
+  localTimeStr,
+} from '../../src/core/config/local-date';
 
 describe('localDateStr (cliente) — "hoy" local America/La_Paz', () => {
   it('23:30 UTC = 19:30 local → mismo día (2026-08-06)', () => {
@@ -49,5 +53,38 @@ describe('localDateStr (core) — helper compartido del engine', () => {
   it('mismo comportamiento que el helper del cliente', () => {
     expect(coreLocalDateStr(new Date('2026-08-06T23:30:00Z'))).toBe('2026-08-06');
     expect(coreLocalDateStr(new Date('2026-08-07T01:30:00Z'))).toBe('2026-08-06');
+  });
+});
+
+describe('localDateTimeStr / localTimeStr (core) — P1-1: fecha-hora y hora local America/La_Paz', () => {
+  it('localDateTimeStr: 2026-08-09T20:30:00Z → 09/08/2026 16:30 (La Paz = UTC-4)', () => {
+    expect(localDateTimeStr(new Date('2026-08-09T20:30:00Z'))).toBe('09/08/2026 16:30');
+  });
+
+  it('localDateTimeStr: cruce de día — 2026-08-10T00:30:00Z → 09/08/2026 20:30', () => {
+    expect(localDateTimeStr(new Date('2026-08-10T00:30:00Z'))).toBe('09/08/2026 20:30');
+  });
+
+  it('localDateTimeStr: medianoche local — 2026-08-09T04:05:00Z → 09/08/2026 00:05', () => {
+    expect(localDateTimeStr(new Date('2026-08-09T04:05:00Z'))).toBe('09/08/2026 00:05');
+  });
+
+  it('localTimeStr: 2026-08-09T20:30:00Z → 16:30', () => {
+    expect(localTimeStr(new Date('2026-08-09T20:30:00Z'))).toBe('16:30');
+  });
+
+  it('localTimeStr: 2026-08-09T16:05:00Z → 12:05', () => {
+    expect(localTimeStr(new Date('2026-08-09T16:05:00Z'))).toBe('12:05');
+  });
+
+  it('localDateTimeStr sin argumento = ahora local (consistencia con localDateStr)', () => {
+    const now = new Date();
+    const expected = new Intl.DateTimeFormat('en-US', {
+      timeZone: CLIENT_TZ,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(now);
+    const get = (t: string) => expected.find(p => p.type === t)?.value;
+    expect(localDateTimeStr()).toBe(`${get('day')}/${get('month')}/${get('year')} ${get('hour')}:${get('minute')}`);
   });
 });

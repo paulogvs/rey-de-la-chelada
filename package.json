@@ -11,6 +11,9 @@
   },
   "homepage": "https://github.com/paulogvs/rey-de-la-chelada",
   "type": "module",
+  "engines": {
+    "node": ">=22.9.0"
+  },
   "scripts": {
     "dev": "vite",
     "dev:server": "node server/index.js",
@@ -25,14 +28,11 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:build": "npm run build && vitest run tests/build-output.test.js",
+    "verify:pwas": "node scripts/verify-pwas.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
     "validate": "npm run typecheck && npm run lint && npm run test && npm run build",
-    "pm2:start": "pm2 start ecosystem.config.js --env production",
-    "pm2:stop": "pm2 stop rey-de-la-chelada",
-    "pm2:restart": "pm2 restart rey-de-la-chelada",
-    "pm2:logs": "pm2 logs rey-de-la-chelada",
-    "pm2:monit": "pm2 monit",
     "setup": "scripts\\setup.bat",
     "update": "scripts\\update.bat",
     "backup": "scripts\\backup.bat"
@@ -46,7 +46,7 @@
     "dexie": "^4.0.0",
     "dexie-react-hooks": "^4.4.0",
     "esc-pos-printer": "^1.0.11",
-    "express": "5.0.1",
+    "express": "^5.2.1",
     "express-rate-limit": "^8.6.1",
     "helmet": "^8.0.0",
     "idb": "^8.0.0",

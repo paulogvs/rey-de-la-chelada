@@ -31,11 +31,11 @@ export const apiLimiter = rateLimit({
 
 /**
  * Stricter limiter for auth endpoints
- * 5 attempts per minute per IP
+ * 10 attempts per minute per IP (P2-5: subido de 5; override vía env)
  */
 export const authLimiter = rateLimit({
   windowMs: 60 * 1000,  // 1 minute
-  max: Number(process.env.AUTH_RATE_LIMIT_MAX) || 5,
+  max: Number(process.env.AUTH_RATE_LIMIT_MAX) || 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

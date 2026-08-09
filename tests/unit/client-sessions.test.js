@@ -64,6 +64,20 @@ describe('createClientSession', () => {
     expect(new Date(row.expires_at).getTime()).toBeGreaterThan(Date.now());
   });
 
+  it('generates a UUID-formatted session id (audit fix P0-1)', () => {
+    const result = createClientSession(db, 1, 180);
+    expect(result.sessionId).toMatch(/^sess_[0-9a-f-]{36}$/);
+
+    // Dos sesiones creadas seguidas son SIEMPRE distintas (randomUUID)
+    const second = createClientSession(db, 1, 180);
+    expect(second.sessionId).not.toBe(result.sessionId);
+    // Las sesiones expiradas de la mesa se reutilizan/purgan aparte; aquí
+    // simplemente verificamos que conviven sin colisión de id.
+    const rows = db.prepare('SELECT session_id FROM client_sessions').all();
+    const ids = rows.map(r => r.session_id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
   it('rejects unknown table', () => {
     const result = createClientSession(db, 99, 180);
     expect(result.success).toBe(false);

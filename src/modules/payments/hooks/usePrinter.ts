@@ -13,6 +13,7 @@
 import { useState, useCallback } from 'react';
 import { appConfig } from '@/core/config';
 import type { Order, Payment } from '@/core/types';
+import { localDateTimeStr } from '@/core/config/local-date';
 
 export type PaperSize = '58mm' | '80mm';
 export type PrinterConnection = 'usb' | 'network' | 'bluetooth';
@@ -109,7 +110,7 @@ export function generateTicket(
   ticket += ESCPOS.ALIGN_LEFT;
   ticket += ESCPOS.BOLD_ON;
   ticket += `Mesa: ${order.tableNumber}      Pedido: ${order.id.slice(-8)}\n`;
-  ticket += `Fecha: ${new Date(order.createdAt).toLocaleString('es-BO')}\n`;
+  ticket += `Fecha: ${localDateTimeStr(new Date(order.createdAt))}\n`;
   ticket += `Mesero: ${order.waiterName}\n`;
   ticket += ESCPOS.BOLD_OFF;
   ticket += line();

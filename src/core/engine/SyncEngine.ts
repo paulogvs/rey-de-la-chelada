@@ -257,14 +257,31 @@ export class SyncEngine {
 
   /** Envía la cola pendiente al servidor (POST /api/sync/push) */
   async flush(): Promise<SyncFlushResult> {
-    const result = await this.queue.flush(this.transport.bind(this));
-    this.emit({ type: 'queue-flushed', processed: result.processed, failed: result.failed });
+    // P2-1: la cola procesa hasta FLUSH_BATCH_SIZE por llamada. Iteramos
+    // hasta que un pase devuelva 0 procesados (cola vacía, todo en backoff
+    // o abandonado) → NINGÚN item pendiente viable queda sin enviar.
+    const results: SyncFlushResult['results'] = [];
+    let processed = 0;
+    let failed = 0;
+
+    let batch = await this.queue.flush(this.transport.bind(this));
+    processed += batch.processed;
+    failed += batch.failed;
+    results.push(...batch.results);
+    while (batch.processed > 0) {
+      batch = await this.queue.flush(this.transport.bind(this));
+      processed += batch.processed;
+      failed += batch.failed;
+      results.push(...batch.results);
+    }
+
+    this.emit({ type: 'queue-flushed', processed, failed });
 
     // Programar reintento con backoff máximo de los items fallidos
-    if (result.failed > 0 && this.online) {
-      this.scheduleRetry(result);
+    if (failed > 0 && this.online) {
+      this.scheduleRetry({ processed, failed, results });
     }
-    return result;
+    return { processed, failed, results };
   }
 
   /** Vacía la cola (útil para logout/limpieza manual) */

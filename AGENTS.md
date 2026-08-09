@@ -42,6 +42,7 @@ Decisiones SSOT documentadas en código (NO romper en FASE 3):
 | **Pedido activo por mesa** | `server/services/client-orders.js`: máx. 1 pedido activo por mesa. OTRO `session_id` → `409 TABLE_HAS_ACTIVE_ORDER`; MISMO `session_id` → permitido. |
 | **Broadcast KDS** | `server/services/order-broadcaster.js` → `broadcastOrderCreated` emite status REAL (`called` para pedidos del cliente; KDS los filtra hasta `confirmed`). KDS nunca muestra `called` (getKDSOrders). |
 | **Nº de mesas (SSOT)** | `src/core/config/app.config.ts` → `capacity.totalTables` (=10). Server lee `DEFAULT_TABLES` env con fallback al SSOT (ver `server/db/bootstrap.js` + `seed.js`). |
+| **DEFAULT_TABLES (.env)** | `DEFAULT_TABLES` en `.env` debe coincidir con `capacity.totalTables` del SSOT (10). GET /api/tables expone `capacity.totalTables` real (= nº de filas en `tables`); si `.env` difiere del SSOT, el seed lo sobreescribe y el cliente puede ver mesas de más/menos. |
 | **DB** | SQLite (better-sqlite3). NO postgres. `.env` → `DB_PATH` (default `data/rey-de-la-chelada.db`). |
 
 Scripts nuevos FASE 2: `scripts/cleanup-placeholder-data.mjs` (borra items placeholder del menú genérico sin uso; dry-run por defecto, `--yes` para borrar), `scripts/date-utils.mjs`.

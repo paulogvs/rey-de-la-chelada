@@ -19,6 +19,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { localDateStr } from '../../scripts/date-utils.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,11 +43,13 @@ function ensureLogDir() {
   }
 }
 
-/** Nombre de archivo del día (YYYY-MM-DD local del sistema) */
+/**
+ * Nombre de archivo del día (YYYY-MM-DD LOCAL America/La_Paz).
+ * Antes usaba la fecha local del SISTEMA (flaky: los tests esperaban UTC
+ * vía toISOString — ver bonus de auditoría). Ahora SSOT con date-utils.mjs.
+ */
 function todayFileName() {
-  const d = new Date();
-  const pad = n => String(n).padStart(2, '0');
-  return `app-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.log`;
+  return `app-${localDateStr()}.log`;
 }
 
 function stringifyArg(arg) {

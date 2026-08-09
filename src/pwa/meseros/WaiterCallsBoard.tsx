@@ -12,6 +12,7 @@ import { Badge } from '@/ui/components/Badge';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { Loader } from '@/ui/components/Loader';
 import type { WaiterCall } from '../_shared/api/waiterCallsApi';
+import { localTimeStr } from '../_shared/utils/localDate';
 
 interface WaiterCallsBoardProps {
   calls: WaiterCall[];
@@ -57,7 +58,7 @@ export function WaiterCallsBoard({
               {call.callType === 'request_bill' ? 'Pide la cuenta' : 'Llama al mesero'}
             </Badge>
             <span className="waiter-calls__call-time">
-              {new Date(call.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {localTimeStr(new Date(call.createdAt))}
             </span>
           </div>
           <div className="waiter-calls__call-actions">

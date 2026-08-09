@@ -65,6 +65,12 @@ export type SyncTransport = (
 /** Máximo de intentos antes de dejar el item en cola */
 export const MAX_RETRY_ATTEMPTS = 3;
 
+/** Máximo de items a procesar por llamada a flush() (P2-1: batch) */
+export const FLUSH_BATCH_SIZE = 50;
+
+/** Edad (ms) a partir de la cual un item ABANDONADO se puede purgar (7 días) */
+export const ABANDONED_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
 /** Base del backoff exponencial (ms) */
 export const BACKOFF_BASE_MS = 1000;
 
@@ -159,22 +165,54 @@ export class SyncQueue {
   }
 
   /**
-   * Envía los items pendientes vía transport.
+   * Purgar items ABANDONADOS (P2-1).
+   *
+   * Un item se considera abandonado cuando agotó sus reintentos
+   * (attempts >= MAX_RETRY_ATTEMPTS) Y lleva más de maxAgeMs en cola
+   * (timestamp < now - maxAgeMs). NUNCA borra items vivos pendientes
+   * (con reintentos restantes o recientes).
+   *
+   * @param maxAgeMs — antigüedad mínima para purgar (default: 7 días)
+   * @param now — instante de referencia (inyectable para tests)
+   * @returns cuántos items se eliminaron
+   */
+  async pruneAbandoned(
+    maxAgeMs: number = ABANDONED_MAX_AGE_MS,
+    now: number = Date.now(),
+  ): Promise<number> {
+    const cutoff = now - maxAgeMs;
+    const abandoned = await this.db.queue
+      .where('attempts')
+      .aboveOrEqual(MAX_RETRY_ATTEMPTS)
+      .filter(item => item.timestamp < cutoff)
+      .toArray();
+    if (abandoned.length === 0) return 0;
+    await this.db.queue.bulkDelete(abandoned.map(i => i.id as number));
+    this.emit({ type: 'cleared', count: abandoned.length });
+    return abandoned.length;
+  }
+
+  /**
+   * Envía un lote (máx. FLUSH_BATCH_SIZE) de items pendientes vía transport.
    *
    * - Éxito: el item se elimina de la cola.
    * - Falla: attempts++, se registra lastError y el item se conserva
    *   (hasta MAX_RETRY_ATTEMPTS, después se abandona).
+   *
+   * El caller debe invocar flush() en loop hasta que processed === 0
+   * para garantizar que NINGÚN item pendiente quede sin enviar.
    */
   async flush(
     transport: SyncTransport,
     now: number = Date.now(),
   ): Promise<SyncFlushResult> {
     const pending = await this.getPending();
+    const batch = pending.slice(0, FLUSH_BATCH_SIZE);
     const results: SyncFlushResult['results'] = [];
     let processed = 0;
     let failed = 0;
 
-    for (const item of pending) {
+    for (const item of batch) {
       // Agotó reintentos — abandonar sin volver a intentar
       if (item.attempts >= MAX_RETRY_ATTEMPTS) {
         continue;

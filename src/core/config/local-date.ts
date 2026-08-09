@@ -36,4 +36,41 @@ export function localDateStr(date: Date = new Date()): string {
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
+/**
+ * Fecha + hora local 'DD/MM/YYYY HH:mm' de America/La_Paz (P1-1).
+ * Fijo al timeZone del negocio — NO depende del locale del navegador.
+ * @param date — fecha a convertir (default: ahora)
+ * @returns string 'DD/MM/YYYY HH:mm' local del negocio
+ */
+export function localDateTimeStr(date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: BUSINESS_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: string) => (parts.find(p => p.type === type) || {}).value;
+  return `${get('day')}/${get('month')}/${get('year')} ${get('hour')}:${get('minute')}`;
+}
+
+/**
+ * Hora local 'HH:mm' de America/La_Paz (P1-1).
+ * Fijo al timeZone del negocio — NO depende del locale del navegador.
+ * @param date — fecha a convertir (default: ahora)
+ * @returns string 'HH:mm' local del negocio
+ */
+export function localTimeStr(date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: BUSINESS_TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: string) => (parts.find(p => p.type === type) || {}).value;
+  return `${get('hour')}:${get('minute')}`;
+}
+
 export default localDateStr;

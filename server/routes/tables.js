@@ -49,7 +49,12 @@ router.get('/', requireAuth, (req, res) => {
       SELECT id, number, capacity, status, current_order_id, assigned_waiter_id, section, position, notes
       FROM tables ORDER BY number ASC
     `).all();
-    res.json({ success: true, tables });
+    res.json({
+      success: true,
+      tables,
+      // P2-3: capacidad declarada = nº real de mesas (SSOT capacity.totalTables=10).
+      capacity: { totalTables: tables.length },
+    });
   } catch (err) {
     console.error('[Tables] List error:', err.message);
     res.status(500).json({ success: false, error: 'Error al listar mesas', code: 'TABLES_LIST_ERROR' });

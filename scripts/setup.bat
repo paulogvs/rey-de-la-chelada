@@ -96,6 +96,21 @@ if !errorlevel! neq 0 (
     echo   [OK] Node.js !NODE_VER!
 )
 
+REM P1-3: Node >= 22.9 OBLIGATORIO (el server usa --env-file-if-exists=.env).
+REM Si la instalacion via winget no expuso node aun, reintentamos leer la version.
+if "!NODE_VER!"=="" for /f "tokens=*" %%i in ('node -v') do set NODE_VER=%%i
+set "NODE_MAJOR=0"
+for /f "tokens=1 delims=v." %%m in ("!NODE_VER!") do set "NODE_MAJOR=%%m"
+if !NODE_MAJOR! LSS 22 (
+    echo   [ERROR] Node.js !NODE_VER! no es compatible.
+    echo   Se requiere Node 22.9+ ^(el server usa --env-file-if-exists para .env^).
+    echo   Instala desde https://nodejs.org o con nvm:  nvm install 22
+    pause
+    exit /b 1
+) else (
+    echo   [OK] Version de Node compatible: !NODE_VER! ^(requerido ^>= 22.9^)
+)
+
 where npm >nul 2>&1
 if !errorlevel! neq 0 (
     echo   [ERROR] npm no disponible ^(viene con Node.js^).

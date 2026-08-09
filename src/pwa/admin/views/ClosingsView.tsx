@@ -12,6 +12,7 @@ import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
 import { Loader } from '@/ui/components/Loader';
 import { fetchClosings, type ClosingRow } from '../../_shared/api/adminApi';
+import { localDateTimeStr } from '../../_shared/utils/localDate';
 
 interface ClosingsViewProps {
   token: string;
@@ -22,10 +23,7 @@ function fmtDateTime(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso.slice(0, 16).replace('T', ' ');
-  return d.toLocaleString('es-BO', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
+  return localDateTimeStr(d);
 }
 
 export function ClosingsView({ token, onToast }: ClosingsViewProps) {

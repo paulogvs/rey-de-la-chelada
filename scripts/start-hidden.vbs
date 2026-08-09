@@ -12,4 +12,4 @@ root = fso.GetParentFolderName(scriptFolder)  ' scripts/ -> app root
 Dim shell
 Set shell = CreateObject("WScript.Shell")
 shell.CurrentDirectory = root
-shell.Run "cmd /c node server/index.js", 0, False
+shell.Run "cmd /c node --env-file-if-exists=.env server/index.js", 0, False

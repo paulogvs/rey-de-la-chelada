@@ -22,6 +22,7 @@ import { Button } from '@/ui/components/Button';
 import { FormField } from '@/ui/components/FormField';
 import { useToast } from '@/ui/components/Toast';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
+import { localDateTimeStr } from '../_shared/utils/localDate';
 
 interface ClosingViewProps {
   token: string;
@@ -122,11 +123,14 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
             <div className="caja-close__field">
               <label>Iniciado</label>
               <div className="caja-close__value">
-                {new Date(closing.opened_at).toLocaleString('es-BO')}
+                {localDateTimeStr(new Date(closing.opened_at))}
               </div>
             </div>
 
             <div className="caja-close__field">
+              {/* C5 (SSOT): expected_cash = SOLO efectivo físico (C5);
+                  propinas en QR/tarjeta NO van al cajón. La diferencia
+                  contra el efectivo real se calcula contra este total. */}
               <label>Efectivo esperado (ventas del día)</label>
               <div className="caja-close__value">
                 Bs. {(closing.expected_cash ?? 0).toFixed(2)}

@@ -44,7 +44,7 @@ export function createClientSession(db, tableNumber, ttlMinutes = DEFAULT_TTL_MI
     return { success: false, code: 'TABLE_NOT_FOUND', error: 'Mesa no encontrada' };
   }
 
-  const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+  const sessionId = `sess_${randomUUID()}`;
   const expiresAt = addMinutesIso(ttlMinutes);
 
   db.prepare(`
@@ -165,7 +165,7 @@ export function validateClientSession(db, sessionId, tableNumber, hasActiveOrder
  * @returns {{ sessionId: string }}
  */
 function renewClientSession(db, oldSession, tableNumber) {
-  const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+  const sessionId = `sess_${randomUUID()}`;
   const expiresAt = addMinutesIso(DEFAULT_TTL_MINUTES);
 
   db.prepare(`

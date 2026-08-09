@@ -64,6 +64,27 @@ if "!GITHUB_REPO!"=="" set "GITHUB_REPO=paulogvs/rey-de-la-chelada"
 echo   Config: app=!APP_NAME! puerto=!PORT! repo=!GITHUB_REPO!
 echo.
 
+REM P1-3: validacion SUAVE de version de Node (update de un server que ya corre).
+REM Si Node < 22.9 se advierte pero se continua: el server actual seguira
+REM arrancando; el aviso recuerda que --env-file-if-exists no existia antes.
+set "NODE_VER="
+for /f "tokens=*" %%i in ('node -v 2^>nul') do set "NODE_VER=%%i"
+if "!NODE_VER!"=="" (
+    echo   [WARN] No se pudo leer la version de Node.
+) else (
+    set "NODE_MAJOR=0"
+    for /f "tokens=1 delims=v." %%m in ("!NODE_VER!") do set "NODE_MAJOR=%%m"
+    if !NODE_MAJOR! LSS 22 (
+        echo   [AVISO] Node.js !NODE_VER! es viejo ^(se requiere ^>= 22.9^).
+        echo   El server usa --env-file-if-exists=.env; instala Node 22+ desde
+        echo   https://nodejs.org o nvm install 22 para que .env cargue bien.
+        echo   Continuando de todos modos...
+    ) else (
+        echo   [OK] Node.js !NODE_VER! ^(^>= 22.9^)
+    )
+)
+echo.
+
 REM ==========================================================
 REM Phase 1: Pull (repositorio publico - sin token)
 REM ==========================================================

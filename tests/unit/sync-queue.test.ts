@@ -8,7 +8,7 @@
 
 import 'fake-indexeddb/auto';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SyncQueue, MAX_RETRY_ATTEMPTS, BACKOFF_BASE_MS, getBackoffDelay, isRetryDue } from '../../src/core/engine/SyncQueue';
+import { SyncQueue, MAX_RETRY_ATTEMPTS, BACKOFF_BASE_MS, FLUSH_BATCH_SIZE, getBackoffDelay, isRetryDue } from '../../src/core/engine/SyncQueue';
 
 describe('SyncQueue', () => {
   let queue: SyncQueue;
@@ -135,6 +135,91 @@ describe('SyncQueue', () => {
       const result = await queue.flush(transport);
       expect(transport).not.toHaveBeenCalled();
       expect(result.processed).toBe(0);
+    });
+  });
+
+  describe('flush batch (P2-1)', () => {
+    it('should not process more than FLUSH_BATCH_SIZE items per call', async () => {
+      const transport = vi.fn(async () => ({ ok: true }));
+      // 60 items con timestamps crecientes → FIFO
+      for (let i = 0; i < FLUSH_BATCH_SIZE + 10; i++) {
+        await queue.enqueue('create_order', { n: i });
+      }
+
+      const first = await queue.flush(transport);
+      expect(first.processed).toBe(FLUSH_BATCH_SIZE);
+      // Los 10 restantes siguen pendientes
+      expect(await queue.getPending()).toHaveLength(10);
+
+      const second = await queue.flush(transport);
+      expect(second.processed).toBe(10);
+      expect(await queue.getPending()).toHaveLength(0);
+    });
+  });
+
+  describe('pruneAbandoned (P2-1)', () => {
+    /** Helper: retrocede el timestamp de un item en la DB */
+    async function setTimestamp(id: number, ts: number): Promise<void> {
+      const db = (queue as unknown as { db: { queue: { update: (id: number, mods: object) => Promise<number> } } }).db;
+      await db.queue.update(id, { timestamp: ts });
+    }
+
+    /** Abandona un item: lo quema hasta MAX_RETRY_ATTEMPTS fallos */
+    async function abandonItem(now: number): Promise<number> {
+      const item = await queue.enqueue('create_order', { doomed: true });
+      const transport = vi.fn(async () => { throw new Error('nope'); });
+      // El timestamp del item ≈ ahora real; el backoff es relativo a ese
+      // timestamp, así que avanzamos t por ENCIMA de cada ventana.
+      let t = now;
+      for (let i = 0; i < MAX_RETRY_ATTEMPTS; i++) {
+        t += BACKOFF_BASE_MS * 2 ** i + 10;
+        await queue.flush(transport, t);
+      }
+      return item.id as number;
+    }
+
+    it('borra abandonados viejos y conserva los vivos pendientes', async () => {
+      const now = Date.now();
+      // 1) Abandonado VIEJO (8 días) → debe purgarse
+      const oldId = await abandonItem(now);
+      await setTimestamp(oldId, now - 8 * 24 * 60 * 60 * 1000);
+      // 2) Item vivo reciente → debe conservarse
+      const live = await queue.enqueue('create_order', { live: true });
+
+      const removed = await queue.pruneAbandoned(7 * 24 * 60 * 60 * 1000, now);
+
+      expect(removed).toBe(1);
+      const pending = await queue.getPending();
+      expect(pending.map(i => i.id)).toContain(live.id);
+      expect(pending.map(i => i.id)).not.toContain(oldId);
+    });
+
+    it('conserva abandonados RECIENTES (dentro de maxAgeMs)', async () => {
+      const now = Date.now();
+      const recentId = await abandonItem(now); // timestamp ≈ ahora
+      const removed = await queue.pruneAbandoned(7 * 24 * 60 * 60 * 1000, now);
+      expect(removed).toBe(0);
+      expect((await queue.getPending()).map(i => i.id)).toContain(recentId);
+    });
+
+    it('emite evento "cleared" cuando purga items', async () => {
+      const now = Date.now();
+      const spy = vi.fn();
+      queue.subscribe(spy);
+      const oldId = await abandonItem(now);
+      await setTimestamp(oldId, now - 8 * 24 * 60 * 60 * 1000);
+
+      await queue.pruneAbandoned(7 * 24 * 60 * 60 * 1000, now);
+
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({ type: 'cleared', count: 1 }));
+    });
+
+    it('no emite "cleared" cuando no hay nada que purgar', async () => {
+      const now = Date.now();
+      const spy = vi.fn();
+      queue.subscribe(spy);
+      await queue.pruneAbandoned(7 * 24 * 60 * 60 * 1000, now);
+      expect(spy).not.toHaveBeenCalled();
     });
   });
 

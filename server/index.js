@@ -47,9 +47,15 @@ import { broadcaster, buildKDSEvent, KDSEventType } from './services/websocket-b
 // Re-export so route handlers can import from a single place
 export { broadcaster, buildKDSEvent, KDSEventType };
 
+// ── Env guard (P0-2): fail-loud JWT_SECRET en producción ──
+import { assertProdSecret } from './config/env-guard.js';
+
 // ============================================================
 // Setup
 // ============================================================
+
+// Fail-loud: en producción, JWT_SECRET es obligatorio (aborta el arranque).
+assertProdSecret();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
