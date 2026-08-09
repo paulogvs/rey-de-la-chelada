@@ -10,6 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
+import { localDateStr } from '../../scripts/date-utils.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -31,7 +32,8 @@ afterEach(() => {
 });
 
 function todayLogFile() {
-  const day = new Date().toISOString().slice(0, 10);
+  // SSOT fecha del negocio (America/La_Paz) — NUNCA toISOString() (UTC)
+  const day = localDateStr();
   return path.join(tempLogDir, `app-${day}.log`);
 }
 
@@ -80,6 +82,6 @@ describe('Logger', () => {
     vi.resetModules();
     const fresh = await import('../../server/utils/logger.js');
     fresh.logger.info('crea dir');
-    expect(fs.existsSync(path.join(nested, `app-${new Date().toISOString().slice(0, 10)}.log`))).toBe(true);
+    expect(fs.existsSync(path.join(nested, `app-${localDateStr()}.log`))).toBe(true);
   });
 });
