@@ -49,11 +49,6 @@ const PIZZA_SIZE_ADJUST = { Mediana: 0, Familiar: 20, XL: 40 };
 
 const FALLBACK_PRICE = 25;
 
-// ── Helpers ────────────────────────────────────────────────
-function round2(n) {
-  return Math.round(n * 100) / 100;
-}
-
 /**
  * Apply demo BOB prices to all menu items + pizza size adjustments.
  * Idempotent: skips items whose price already matches.

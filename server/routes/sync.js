@@ -235,7 +235,7 @@ router.post('/push', requireAuth, (req, res) => {
             if (!menuItem) {
               throw new Error(`Item inválido: ${item.menu_item_id}`);
             }
-            const quantity = Number(item.quantity) ?? 1;
+            const quantity = Number(item.quantity);
             if (!Number.isFinite(quantity) || quantity < 1) {
               throw new Error(`Cantidad inválida: ${item.quantity}`);
             }

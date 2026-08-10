@@ -434,7 +434,9 @@ router.post('/closing', requireAuth, requireRole('admin', 'caja'), (req, res) =>
 
 router.put('/closing/close', requireAuth, requireRole('admin', 'caja'), (req, res) => {
   try {
-    const { actual_cash, notes, is_reconciled } = req.body;
+    const { actual_cash, notes } = req.body;
+    // M9: el cliente puede enviar is_reconciled, pero el SERVER lo ignora y lo
+    // recalcula — nunca confiar en el valor del cliente. (ver línea de `reconciled`)
 
     if (actual_cash === undefined) {
       return res.status(400).json({ success: false, error: 'Monto final requerido', code: 'FINAL_AMOUNT_REQUIRED' });

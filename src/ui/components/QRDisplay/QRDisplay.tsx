@@ -42,7 +42,7 @@ export function QRDisplay({
       const root = document.documentElement;
       const computed = getComputedStyle(root);
       const qrDark = computed.getPropertyValue('--dorado-rey').trim() || '#D4AF37';
-      const qrLight = computed.getPropertyValue('--bg').trim() || '#1A0F0A';
+      const qrLight = computed.getPropertyValue('--bg').trim() || '#14100C';
 
       import('qrcode').then(QRCode => {
         QRCode.toCanvas(canvasRef.current, data, {

@@ -33,7 +33,6 @@ import { fileURLToPath } from 'url';
 
 // ── Middleware ────────────────────────────────────────────
 import { apiLimiter, authLimiter, corsOptions, helmetCspConfig, securityHeaders } from './middleware/security.js';
-import { requireAuth, optionalAuth } from './middleware/auth.js';
 
 // ── Database ──────────────────────────────────────────────
 import { getDb } from './db/index.js';
@@ -226,7 +225,6 @@ import reportsRoutes from './routes/reports.js';
 import waiterCallsRoutes from './routes/waiter-calls.js';
 import clientOrdersRoutes from './routes/client-orders.js';
 import clientSessionsRoutes from './routes/client-sessions.js';
-import { requireRole } from './middleware/auth.js';
 
 // ── Route registration ────────────────────────────────────
 app.use('/api/auth', authLimiter, authRoutes);

@@ -24,10 +24,10 @@
 
 ## 2. TESTING
 
-| Framework | Ubicación |
-|-----------|-----------|
-| Vitest | `tests/unit/`, `tests/integration/` |
-| Playwright | `tests/e2e/` |
+| Framework | Ubicación | Estado |
+|-----------|-----------|--------|
+| Vitest (unit + integration) | `tests/unit/`, `tests/integration/` | ✅ 505 tests — `hookTimeout`/`testTimeout` 60s + `pool: forks` (F1 2026-08-10, elimina flakiness) |
+| Playwright (e2e) | `tests/e2e/` | ⏳ **En progreso** — carpeta vacía, sin `playwright.config`. Los e2e reales hoy son scripts manuales en `scripts/e2e-*.mjs` (requieren server arriba) |
 
 ## 2b. FASE 2 — CONTRATOS DE DATOS (2026-08-06)
 
@@ -44,6 +44,7 @@ Decisiones SSOT documentadas en código (NO romper en FASE 3):
 | **Nº de mesas (SSOT)** | `src/core/config/app.config.ts` → `capacity.totalTables` (=10). Server lee `DEFAULT_TABLES` env con fallback al SSOT (ver `server/db/bootstrap.js` + `seed.js`). |
 | **DEFAULT_TABLES (.env)** | `DEFAULT_TABLES` en `.env` debe coincidir con `capacity.totalTables` del SSOT (10). GET /api/tables expone `capacity.totalTables` real (= nº de filas en `tables`); si `.env` difiere del SSOT, el seed lo sobreescribe y el cliente puede ver mesas de más/menos. |
 | **DB** | SQLite (better-sqlite3). NO postgres. `.env` → `DB_PATH` (default `data/rey-de-la-chelada.db`). |
+| **Menú (SSOT)** | `src/core/data/menu-seed.json` = **49 items / 8 categorías** (Micheladas de la Casa 10, Ensaladas 5, Tablas y Canastas 6, Burgers & Sandwiches 10, Quesadillas 3, Pizzas 4, Empanadas 7, Salsas y Extras 4). `seed.js` NO siembra menú genérico (limpiado F1 2026-08-10); `bootstrap.js` carga el menú real vía `load-menu.js`. |
 
 Scripts nuevos FASE 2: `scripts/cleanup-placeholder-data.mjs` (borra items placeholder del menú genérico sin uso; dry-run por defecto, `--yes` para borrar), `scripts/date-utils.mjs`.
 
@@ -56,23 +57,33 @@ rey-de-la-chelada/
 ├── DESIGN.md                ← Design tokens (paleta dorado/ambar)
 ├── SPEC_INICIAL.md          ← Especificación original
 ├── VALIDATION_GATES.md      ← 15 gates (5 restaurant-specific)
+├── MANUAL_DE_INSTALACION.md ← Guía de instalación/despliegue (Node ≥22.9)
+├── MANUAL_DE_USUARIO.md     ← Manual de uso (6 PWAs, PINs, flujos)
 ├── forchi-brand.md          ← Nivel 2
 ├── branding.json            ← Brand tracking
-├── ecosystem.config.js      ← PM2 config
+├── ecosystem.config.cjs     ← PM2 config (OBSOLETO — el deploy real usa start-hidden.vbs)
 ├── elevate.vbs             ← Elevación UAC (para setup bootstrap manual)
-├── scripts/                 ← TODOS los .bat (setup, update, start, stop, backup, sync)
+├── opencode.json            ← Config OpenCode
+├── scripts/                 ← TODOS los .bat/.ps1/.mjs (setup, update, start, stop, backup, sync, watchdog)
 │   ├── setup.bat           ← instalación PC nueva (auto-eleva, clona, instala, build, arranca)
 │   ├── update.bat          ← auto-update desde GitHub (pull→install→build→restart real)
 │   ├── start.bat           ← inicia el servicio (oculto)
 │   ├── stop.bat            ← detiene el servicio
 │   ├── backup.bat          ← backup diario DB
 │   ├── sync.bat            ← sync con ecosistema FORCH.iA
-│   ├── start-hidden.vbs    ← arranque oculto (sin ventana)
+│   ├── start-hidden.vbs    ← arranque oculto real del server (sin ventana)
+│   ├── watchdog.ps1        ← watchdog: /health cada 5 min, relanza si cae (3 fallos)
+│   ├── watchdog-start.bat  ← lanza watchdog en segundo plano
+│   ├── watchdog-stop.bat   ← detiene watchdog (crea watchdog.stop)
+│   ├── install-backup-schedule.bat ← agenda backup diario 01:00 (schtasks ReyChelada-Backup)
 │   ├── date-utils.mjs      ← fecha local America/La_Paz (FASE 2, Node)
-│   └── cleanup-placeholder-data.mjs ← limpia menú placeholder genérico (FASE 2)
+│   ├── cleanup-placeholder-data.mjs ← limpia menú placeholder genérico (FASE 2)
+│   ├── verify-pwas.mjs     ← verifica que las 6 PWAs respondan (requiere server arriba)
+│   └── e2e-*.mjs / debug-*.mjs / smoke-*.mjs ← utilidades dev/QA
 ├── src/
 │   ├── core/
 │   │   ├── config/         ← SSOT Config (app.config, pwa-registry, capabilities, security)
+│   │   ├── data/           ← SSOT menú real (menu-seed.json → 49 items, 8 categorías)
 │   │   ├── engine/         ← SSOT — motor de datos único (Table, Menu, Order)
 │   │   └── types/          ← Tipos compartidos (Table, Order, MenuItem, KDS, etc.)
 │   ├── modules/
@@ -96,10 +107,13 @@ rey-de-la-chelada/
 │       ├── meseros/        ← Mesas + pedidos
 │       ├── caja/           ← Corte de caja
 │       └── admin/          ← Administración
-├── server/                 ← Express API (multi-PWA routing)
-├── tests/
+├── server/                 ← Express API (multi-PWA routing) + db + scripts
+├── tests/                  ← unit + integration (vitest); e2e/ (Playwright — en progreso)
 ├── docs/
 ├── legal/
+├── backups/                ← backups DB (creados por backup.bat)
+├── logs/                   ← app-*.log, watchdog.log, backup.log
+├── data/                   ← SQLite DB + prices
 └── logo/                   ← rey_de_la_chelada_logo.png
 ```
 

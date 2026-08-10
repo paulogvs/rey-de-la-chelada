@@ -67,71 +67,11 @@ export function ensureTables(db, count = 10) {
 }
 
 // ============================================================
-// Menu (base genérico — el menú REAL lo carga load-menu.js)
+// Menu — el menú REAL lo carga load-menu.js (menu-seed.json = SSOT).
+// Aquí NO se siembran categorías genéricas: el menú de producción
+// (8 categorías / 49 items) proviene exclusivamente de
+// src/core/data/menu-seed.json vía server/db/bootstrap.js.
 // ============================================================
-
-const CATEGORIES = [
-  { name: 'Cervezas', emoji: '🍺', sort_order: 1 },
-  { name: 'Tragos', emoji: '🍹', sort_order: 2 },
-  { name: 'Comidas', emoji: '🍽', sort_order: 3 },
-  { name: 'Entradas', emoji: '🥨', sort_order: 4 },
-];
-
-const ITEMS = {
-  'Cervezas': [
-    { name: 'Cerveza Pacena', price: 15, area: 'bar', sort_order: 1, size_variants: JSON.stringify({ media: 15, litro: 25 }) },
-    { name: 'Cerveza Huari', price: 14, area: 'bar', sort_order: 2 },
-    { name: 'Cerveza Taquina', price: 15, area: 'bar', sort_order: 3 },
-    { name: 'Cerveza Sin Alcohol', price: 13, area: 'bar', sort_order: 4 },
-  ],
-  'Tragos': [
-    { name: 'Cuba Libre', price: 35, area: 'bar', sort_order: 1 },
-    { name: 'Mojito', price: 35, area: 'bar', sort_order: 2 },
-    { name: 'Chelada Clásica', price: 20, area: 'bar', sort_order: 3, description: 'Cerveza con limón y sal' },
-  ],
-  'Comidas': [
-    { name: 'Pique Macho', price: 85, area: 'cocina', sort_order: 1, preparation_time: 25, description: 'Carne, salchicha, papas y ají' },
-    { name: 'Silpancho', price: 45, area: 'cocina', sort_order: 2, preparation_time: 20 },
-    { name: 'Fricase', price: 40, area: 'cocina', sort_order: 3, preparation_time: 15 },
-    { name: 'Picante de Pollo', price: 50, area: 'cocina', sort_order: 4, preparation_time: 25 },
-  ],
-  'Entradas': [
-    { name: 'Papas Fritas', price: 18, area: 'cocina', sort_order: 1, preparation_time: 10 },
-    { name: 'Salteñas (2)', price: 20, area: 'cocina', sort_order: 2, preparation_time: 10 },
-    { name: 'Queso Frito', price: 25, area: 'cocina', sort_order: 3, preparation_time: 10 },
-  ],
-};
-
-/**
- * Ensure the generic base menu exists (idempotent).
- * @param {object} db — better-sqlite3 instance
- */
-export function ensureMenu(db) {
-  for (const cat of CATEGORIES) {
-    let category = db.prepare('SELECT id FROM menu_categories WHERE name = ?').get(cat.name);
-    if (!category) {
-      const id = randomUUID();
-      db.prepare(
-        'INSERT INTO menu_categories (id, name, emoji, sort_order) VALUES (?, ?, ?, ?)'
-      ).run(id, cat.name, cat.emoji, cat.sort_order);
-      category = { id };
-    }
-
-    for (const item of ITEMS[cat.name] || []) {
-      const existing = db.prepare('SELECT id FROM menu_items WHERE name = ? AND category_id = ?').get(item.name, category.id);
-      if (!existing) {
-        db.prepare(`
-          INSERT INTO menu_items (id, category_id, name, description, price, currency,
-                                  is_active, is_available, preparation_time, sort_order, area, size_variants)
-          VALUES (?, ?, ?, ?, ?, 'BOB', 1, 1, ?, ?, ?, ?)
-        `).run(
-          randomUUID(), category.id, item.name, item.description || '',
-          item.price, item.preparation_time || 15, item.sort_order || 0, item.area, item.size_variants || null
-        );
-      }
-    }
-  }
-}
 
 // ============================================================
 // Run (v2: 3 roles only)
@@ -151,7 +91,6 @@ export function runSeed(db = getDb()) {
   // ⚠️ M4/2.8: 10 = SSOT src/core/config/app.config.ts (capacity.totalTables).
   // DEFAULT_TABLES env lo sobreescribe en runtime (ver bootstrap.js).
   ensureTables(db, parseInt(process.env.DEFAULT_TABLES || '10', 10));
-  ensureMenu(db);
 
   return db;
 }
@@ -159,7 +98,7 @@ export function runSeed(db = getDb()) {
 // CLI entry — solo cuando se ejecuta directamente
 const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isDirectRun) {
-  const db = runSeed();
+  runSeed();
   console.log('[Seed] Completo ✅');
   closeDb();
 }

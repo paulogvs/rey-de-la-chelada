@@ -208,6 +208,18 @@ scripts\watchdog-stop.bat     "Detenerlo limpiamente (en su próximo ciclo)"
 
 Todo lo que hace el watchdog queda registrado en **`logs\watchdog.log`**.
 
+### 🚀 Auto-arranque del servicio al iniciar Windows (F1, 2026-08-10)
+
+El **servidor** (`start-hidden.vbs`) y el **watchdog** (`watchdog.ps1`) se lanzan automáticamente al **inicio de sesión** de Windows usando la **carpeta de Inicio del usuario** (sin necesidad de admin/UAC):
+
+1. Abre la carpeta de inicio: `Win+R` → `shell:startup` → Enter
+2. Crea dos accesos directos (o copia los `.bat`):
+   - `start.bat` → `C:\ReyChelada\scripts\start.bat` (inicia el servidor oculto)
+   - `watchdog-start.bat` → `C:\ReyChelada\scripts\watchdog-start.bat` (lanza el vigilante)
+3. Reinicia la PC y verifica: `http://localhost:3002/health` responde y `logs\watchdog.log` muestra "Watchdog iniciado"
+
+> ⚠️ Como el startup corre con la sesión del usuario, la PC debe **iniciarse con ese usuario logueado** (es el caso típico del restaurante). El backup diario usa Task Scheduler (`ReyChelada-Backup`, 01:00) y no depende de la sesión.
+
 > 💡 **Resumen de archivos de registro (logs):**
 > - `logs\app-AAAA-MM-DD.log` — actividad del servidor (uno por día, retención 7 días)
 > - `logs\backup.log` — resultado de cada backup

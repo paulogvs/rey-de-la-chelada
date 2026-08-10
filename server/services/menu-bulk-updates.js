@@ -4,8 +4,6 @@
  * Extracted from menu.js so the logic can be unit-tested without
  * an Express server.
  */
-
-import { randomUUID } from 'node:crypto';
 /**
  * Validate the shape of an individual update entry.
  * @returns {{ valid: boolean, error: string|null }}

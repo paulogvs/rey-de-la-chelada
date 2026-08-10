@@ -5,7 +5,7 @@
   "primary_color": "#D4AF37",
   "secondary_color": "#2B1B10",
   "accent_color": "#E08B27",
-  "background_color": "#1A0F0A",
+  "background_color": "#14100C",
   "text_color": "#F4E8C1",
   "logo": "logo/rey_de_la_chelada_logo.png",
   "version": "1.0.0",
@@ -36,18 +36,18 @@
   "stack": {
     "language": "TypeScript",
     "framework": "React 19 + Express 5",
-    "deployment": "Windows Self-Hosted (PM2 + nssm)"
+    "deployment": "Windows Self-Hosted (start-hidden.vbs + watchdog)"
   },
   "ecosystem_dependencies": {
-    "agents_count": 264,
-    "skills_count": 475,
-    "rules_count": 44,
+    "agents_count": 286,
+    "skills_count": 514,
+    "rules_count": 52,
     "mcp_servers": 20,
     "orchestrator": "@forchi"
   },
   "last_review": {
-    "date": "2026-07-29",
+    "date": "2026-08-10",
     "reviewer": "@forchi",
-    "status": "PENDING"
+    "status": "OK"
   }
 }

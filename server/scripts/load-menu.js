@@ -48,7 +48,7 @@ export function loadMenuFromSeed(db, { log = console.log } = {}) {
     const raw = readFileSync(SEED_PATH, 'utf-8');
     seedData = JSON.parse(raw);
   } catch (err) {
-    throw new Error(`[load-menu] Error reading seed: ${err.message}`);
+    throw new Error(`[load-menu] Error reading seed: ${err.message}`, { cause: err });
   }
 
   const menu = seedData.restobar?.menu;

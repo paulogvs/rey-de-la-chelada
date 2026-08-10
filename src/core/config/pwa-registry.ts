@@ -101,7 +101,7 @@ export const PWA_REGISTRY: Record<PwaModuleId, PwaRegistration> = {
       scope: '/bar/',
       display: 'standalone',
       orientation: 'landscape',
-      background_color: '#1A0F0A',
+      background_color: '#14100C',
       theme_color: '#E08B27',
       categories: ['business', 'food', 'restaurant'],
       icons: [
@@ -132,7 +132,7 @@ export const PWA_REGISTRY: Record<PwaModuleId, PwaRegistration> = {
       scope: '/meseros/',
       display: 'standalone',
       orientation: 'any',
-      background_color: '#1A0F0A',
+      background_color: '#14100C',
       theme_color: '#D4AF37',
       categories: ['business', 'restaurant'],
       icons: [
@@ -163,7 +163,7 @@ export const PWA_REGISTRY: Record<PwaModuleId, PwaRegistration> = {
       scope: '/caja/',
       display: 'standalone',
       orientation: 'any',
-      background_color: '#1A0F0A',
+      background_color: '#14100C',
       theme_color: '#0D5C3A',
       categories: ['business', 'finance', 'restaurant'],
       icons: [
@@ -194,7 +194,7 @@ export const PWA_REGISTRY: Record<PwaModuleId, PwaRegistration> = {
       scope: '/admin/',
       display: 'standalone',
       orientation: 'any',
-      background_color: '#1A0F0A',
+      background_color: '#14100C',
       theme_color: '#D4AF37',
       categories: ['business', 'administration'],
       icons: [
@@ -225,7 +225,7 @@ export const PWA_REGISTRY: Record<PwaModuleId, PwaRegistration> = {
       scope: '/clientes/',
       display: 'standalone',
       orientation: 'portrait',
-      background_color: '#1A0F0A',
+      background_color: '#14100C',
       theme_color: '#D4AF37',
       categories: ['food', 'restaurant', 'lifestyle'],
       icons: [
