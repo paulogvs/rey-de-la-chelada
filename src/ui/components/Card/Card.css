@@ -93,11 +93,11 @@
   margin-bottom: var(--space-3);
   background: linear-gradient(90deg,
     var(--surface) 25%,
-    var(--surface-elevated) 50%,
+    color-mix(in srgb, var(--surface-elevated) 70%, var(--dorado-rey-soft)) 50%,
     var(--surface) 75%
   );
   background-size: 200% 100%;
-  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  animation: skeleton-shimmer 1.6s var(--ease-in-out) infinite;
   border-radius: var(--radius-sm);
 }
 
@@ -110,7 +110,7 @@
 .skeleton-line--w40 { width: 40%; }
 .skeleton-line--w100 { width: 100%; }
 
-@keyframes skeleton-pulse {
+@keyframes skeleton-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }

@@ -29,8 +29,9 @@
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-lg);
-  border: 1px solid;
+  border: 1px solid var(--glass-border, var(--border));
   border-left-width: 4px;
+  border-left-color: currentColor;
   pointer-events: auto;
   cursor: pointer;
   min-height: var(--touch-min-target);
@@ -38,7 +39,7 @@
   background: var(--glass-bg-strong);
   backdrop-filter: var(--glass-blur-strong);
   -webkit-backdrop-filter: var(--glass-blur-strong);
-  animation: toast-slide-in var(--duration-normal) var(--ease-out) forwards;
+  animation: toast-slide-in var(--duration-normal) var(--duration-spring) forwards;
 }
 
 .toast--exit {

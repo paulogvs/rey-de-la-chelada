@@ -204,4 +204,9 @@ a,
 
   /* ---- Surface hover (elevación light premium, sin saturar) ---- */
   --surface-hover: color-mix(in srgb, var(--surface-elevated) 55%, var(--surface));
+
+  /* ---- Premium Minimal: texto atenuado + glow dorado (fallback estático,
+         los valores reales los aplica theme.js desde tokens.json) ---- */
+  --text-faint: rgba(232, 214, 178, 0.32);
+  --dorado-rey-glow: rgba(212, 175, 55, 0.18);
 }

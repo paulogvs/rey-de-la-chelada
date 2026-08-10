@@ -19,6 +19,7 @@ import { Badge } from '@/ui/components/Badge';
 import { Loader } from '@/ui/components/Loader';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { PriceDisplay } from '@/ui/components/PriceDisplay';
+import { SegmentedControl, type SegmentedOption } from '@/ui/components/SegmentedControl';
 import { useToast } from '@/ui/components/Toast';
 import { appConfig } from '@/core/config';
 import { METHOD_LABELS, METHOD_ICONS, PAYMENT_METHODS } from '../_shared/utils/paymentMethods';
@@ -46,6 +47,12 @@ const STATUS_VARIANTS: Record<string, 'pending' | 'preparing' | 'ready' | 'paid'
   ready: 'ready',
   served: 'paid',
 };
+
+/** Método de pago como opciones del SegmentedControl (Premium Minimal). */
+const PAYMENT_OPTIONS: SegmentedOption[] = PAYMENT_METHODS.map(m => ({
+  value: m,
+  label: `${METHOD_ICONS[m]} ${METHOD_LABELS[m]}`,
+}));
 
 /** Saldo pendiente de un pedido (total − pagos completed). SSOT server. */
 export function orderRemaining(order: Order): number {
@@ -219,19 +226,13 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                   {/* Cobro */}
                   <div className="caja-collect__pay">
                     <div className="caja-collect__pay-field">
-                      <label htmlFor={`method-${order.id}`}>Método</label>
-                      <select
-                        id={`method-${order.id}`}
+                      <span className="caja-collect__pay-label" id={`method-label-${order.id}`}>Método</span>
+                      <SegmentedControl
                         className="caja-collect__pay-method"
+                        options={PAYMENT_OPTIONS}
                         value={method}
-                        onChange={e => setMethod(e.target.value as (typeof PAYMENT_METHODS)[number])}
-                      >
-                        {PAYMENT_METHODS.map(m => (
-                          <option key={m} value={m}>
-                            {METHOD_ICONS[m]} {METHOD_LABELS[m]}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={v => setMethod(v as (typeof PAYMENT_METHODS)[number])}
+                      />
                     </div>
 
                     <div className="caja-collect__pay-field">

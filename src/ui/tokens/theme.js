@@ -107,6 +107,7 @@ class ThemeManager {
     this._setProp(root, '--dorado-rey', palette.brand['dorado-rey']);
     this._setProp(root, '--dorado-rey-hover', palette.brand['dorado-rey-hover']);
     this._setProp(root, '--dorado-rey-soft', this._rgba(palette.brand['dorado-rey-soft']));
+    this._setProp(root, '--dorado-rey-glow', this._rgba(palette.brand['dorado-rey-glow']));
     this._setProp(root, '--madera-oscura', palette.brand['madera-oscura']);
     this._setProp(root, '--ambar-cerveza', palette.brand['ambar-cerveza']);
     this._setProp(root, '--crema-espuma', palette.brand['crema-espuma']);
@@ -141,6 +142,7 @@ class ThemeManager {
       this._setProp(root, '--text', text.body);
       this._setProp(root, '--text-strong', text.strong);
       this._setProp(root, '--text-muted', this._rgba(text.muted));
+      this._setProp(root, '--text-faint', this._rgba(text.faint));
     }
 
     // 4. Status colors

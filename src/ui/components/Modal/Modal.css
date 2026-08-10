@@ -7,9 +7,9 @@
   position: fixed;
   inset: 0;
   z-index: var(--z-overlay);
-  background: color-mix(in srgb, var(--overlay) 92%, transparent);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: color-mix(in srgb, var(--overlay) 85%, transparent);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -37,7 +37,7 @@
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  animation: modal-slide-up var(--duration-normal) var(--ease-out) forwards;
+  animation: modal-slide-up var(--duration-normal) var(--duration-spring) forwards;
   box-shadow: var(--shadow-modal);
   border: 1px solid var(--glass-border);
   border-bottom: none;

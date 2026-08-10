@@ -1,290 +1,233 @@
 /* ============================================================
-   CAJA — CollectView (S2-C): pedidos pendientes de cobro
-   AMBER & GLASS — FASE 3d (premium redesign)
-   SOLO CSS — la lógica (POST /api/payments, paid_amount, estados)
-   vive en CollectView.tsx y NO se toca.
-   ZERO hardcoded colors — variables de tokens.css + color-mix().
+   CAJA — CollectView Premium Minimal
+   Segmented control (método de pago), mono prices, aire
+   ZERO hardcoded colors — variables de tokens.json
    ============================================================ */
 
 .caja-collect {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  max-width: 860px;
+  max-width: 720px;
   margin: 0 auto;
   width: 100%;
 }
 
-/* ---- Resumen hero: total pendiente de cobro ---- */
-
 .caja-collect__summary {
-  padding: var(--space-5);
+  padding: 16px 20px;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
-  border-top: 3px solid var(--dorado-rey);
-  box-shadow: var(--shadow-card), 0 0 32px -16px color-mix(in srgb, var(--dorado-rey) 35%, transparent);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
 }
 
 .caja-collect__summary-label {
-  font-size: var(--text-sm);
+  font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
+  font-weight: 600;
 }
 
 .caja-collect__summary-value {
   font-family: var(--font-mono);
-  font-size: var(--text-4xl);
+  font-size: 22px;
   font-weight: 800;
-  color: var(--dorado-rey);
-  line-height: 1;
-  text-shadow: 0 0 28px color-mix(in srgb, var(--dorado-rey) 35%, transparent);
+  color: var(--text-strong);
+  letter-spacing: -0.03em;
 }
 
 .caja-collect__error {
-  padding: var(--space-4);
+  padding: 12px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   color: var(--status-cancelled);
-  background: color-mix(in srgb, var(--status-cancelled) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--status-cancelled) 25%, transparent);
+  background: color-mix(in srgb, var(--status-cancelled) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-cancelled) 14%, transparent);
+  border-radius: var(--radius-md);
+  font-size: 13px;
 }
 
 .caja-collect__list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 10px;
 }
-
-/* ---- Pedido (lista de espera de cobro) ---- */
 
 .caja-collect__order {
   overflow: hidden;
-  transition: border-color var(--duration-normal) var(--ease-out),
-              box-shadow var(--duration-normal) var(--ease-out),
-              transform var(--duration-normal) var(--ease-out);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--duration-fast) var(--ease-out);
 }
 
-.caja-collect__order:hover {
-  border-color: var(--border-hover);
-  box-shadow: var(--shadow-card-hover), 0 0 24px -10px color-mix(in srgb, var(--dorado-rey) 30%, transparent);
-}
+.caja-collect__order:hover { border-color: var(--border-hover); }
 
 .caja-collect__order-head {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  padding: var(--space-4) var(--space-5);
+  padding: 14px 16px;
   background: transparent;
   border: none;
   cursor: pointer;
   font-family: var(--font-body);
   color: var(--text);
   text-align: left;
-  min-height: var(--touch-primary-action);
-  transition: background-color var(--duration-fast) var(--ease-out);
-}
-
-.caja-collect__order-head:hover {
-  background: var(--surface-hover);
-}
-
-.caja-collect__order-head:focus-visible {
-  outline: none;
-  box-shadow: inset var(--focus-ring);
+  min-height: 56px;
 }
 
 .caja-collect__order-table {
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
-  font-weight: 700;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 650;
   color: var(--text-strong);
-  min-width: 96px;
+  min-width: 84px;
 }
 
 .caja-collect__order-items {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
+  font-size: 12px;
+  color: var(--text-faint);
   margin-left: auto;
+  white-space: nowrap;
 }
 
 .caja-collect__order-amount {
   font-family: var(--font-mono);
-  font-size: var(--text-xl);
-  font-weight: 800;
-  color: var(--dorado-rey);
-  min-width: 120px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-strong);
+  min-width: 96px;
   text-align: right;
-  text-shadow: 0 0 20px color-mix(in srgb, var(--dorado-rey) 30%, transparent);
+  letter-spacing: -0.02em;
 }
 
 .caja-collect__order-caret {
-  color: var(--text-muted);
-  font-size: var(--text-sm);
+  color: var(--text-faint);
+  font-size: 12px;
   min-width: 16px;
-  text-align: center;
 }
 
-/* ---- Detalle ---- */
-
 .caja-collect__order-detail {
-  padding: var(--space-5);
-  border-top: 1px solid var(--glass-border);
+  padding: 16px;
+  border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  background: color-mix(in srgb, var(--surface-soft) 65%, transparent);
-  animation: caja-slide-in var(--duration-normal) var(--ease-out);
+  gap: 14px;
+  background: var(--surface-soft);
 }
 
 .caja-collect__order-items-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 6px;
 }
 
 .caja-collect__item {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--text-sm);
-  padding: var(--space-1) 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
-}
-
-.caja-collect__item:last-child {
-  border-bottom: none;
+  font-size: 13px;
 }
 
 .caja-collect__item-qty {
   font-family: var(--font-mono);
-  font-weight: 700;
-  color: var(--dorado-rey);
-  min-width: 32px;
+  color: var(--text-faint);
+  min-width: 28px;
+  font-size: 12px;
 }
 
-.caja-collect__item-name {
-  color: var(--text);
-  flex: 1;
-}
-
-.caja-collect__item-price {
-  font-family: var(--font-mono);
-  color: var(--text-muted);
-}
+.caja-collect__item-name { color: var(--text); flex: 1; }
+.caja-collect__item-price { font-family: var(--font-mono); color: var(--text-muted); font-size: 12px; }
 
 .caja-collect__order-total {
   border-top: 1px dashed var(--border);
-  padding-top: var(--space-3);
+  padding-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-/* Montos con jerarquía: total / ya cobrado / saldo */
 .caja-collect__paid-hint {
-  font-size: var(--text-sm);
-  color: var(--status-pending);
+  font-size: 12px;
+  color: var(--text-faint);
   font-family: var(--font-mono);
-  padding: var(--space-2) var(--space-3);
-  background: color-mix(in srgb, var(--status-pending) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--status-pending) 22%, transparent);
-  border-radius: var(--radius-md);
 }
-
-/* ---- Panel de cobro ---- */
 
 .caja-collect__pay {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  background: var(--glass-bg-strong);
-  backdrop-filter: var(--glass-blur-strong);
-  -webkit-backdrop-filter: var(--glass-blur-strong);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
-  border-top: 3px solid var(--dorado-rey);
-  box-shadow: var(--shadow-card);
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
 }
 
 .caja-collect__pay-field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 6px;
 }
 
-.caja-collect__pay-field label {
-  font-size: var(--text-sm);
+.caja-collect__pay-label {
+  font-size: 11px;
   color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   font-weight: 600;
 }
 
-/* Método de pago: control grande táctil (card-like) */
+/* Segmented control de método de pago (Premium Minimal):
+   reemplaza el <select> nativo — wrap en pantallas estrechas,
+   opciones con touch target ≥48px (proyecto). */
 .caja-collect__pay-method {
-  min-height: var(--touch-primary-action);
-  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: var(--space-1);
   background: var(--surface-soft);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  color: var(--text-strong);
-  font-family: var(--font-mono);
-  font-size: var(--text-base);
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color var(--duration-fast) var(--ease-out),
-              box-shadow var(--duration-fast) var(--ease-out),
-              background-color var(--duration-fast) var(--ease-out);
 }
 
-.caja-collect__pay-method:hover {
-  border-color: var(--dorado-rey);
-  background: var(--surface-hover);
-}
-
-.caja-collect__pay-method:focus-visible {
-  outline: none;
-  border-color: var(--dorado-rey);
-  box-shadow: var(--focus-ring);
+.caja-collect__pay-method .segmented__option {
+  flex: 1 1 118px;
+  min-height: var(--touch-min-target);
 }
 
 .caja-collect__tip-options {
   display: flex;
-  gap: var(--space-2);
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-.caja-collect__tip-options .btn {
-  flex: 1 1 72px;
+.caja-collect__tip-options button {
   min-height: var(--touch-min-target);
+  padding: 0 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
-/* Botón "Cobrar" destacado (primario dorado, 56px+) */
-.caja-collect__pay > .btn {
-  min-height: var(--touch-primary-action);
-  border-radius: var(--radius-lg);
-  font-size: var(--text-base);
-  letter-spacing: 0.01em;
-}
-
-/* ---- Motion ---- */
-
-@keyframes caja-slide-in {
-  from { opacity: 0; transform: translateY(-8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .caja-collect__order-detail {
-    animation: none;
-  }
+.caja-collect__tip-options button.active {
+  background: var(--text-strong);
+  color: var(--bg);
+  border-color: var(--text-strong);
 }
 
 @media (max-width: 480px) {
-  .caja-collect__order-items {
-    display: none;
-  }
+  .caja-collect__order-items { display: none; }
 }

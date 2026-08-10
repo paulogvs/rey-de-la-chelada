@@ -1,5 +1,5 @@
-/* LoginScreen — PIN keypad (zero hardcoded colors, CSS vars only)
-   Amber & Glass (Fase 3c): glow dorado, card glass, focus-visible. */
+/* LoginScreen — Premium Minimal (círculos iOS, sin card pesada)
+   ZERO hardcoded colors — variables de tokens.json */
 
 .login-screen {
   min-height: 100dvh;
@@ -8,91 +8,96 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-6);
-  padding: var(--space-4);
-  background:
-    var(--accent-glow),
-    var(--bg);
+  padding: var(--space-6);
+  background: var(--bg);
 }
 
 .login-screen__card {
   width: 100%;
   max-width: 340px;
-  background: var(--glass-bg-strong);
-  border: 1px solid var(--glass-border, var(--border));
-  border-radius: var(--radius-2xl, var(--radius-lg));
-  padding: var(--space-6) var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 28px 24px;
   text-align: center;
-  box-shadow: var(--shadow-lg, var(--shadow-md));
+  box-shadow: var(--shadow-card);
 }
 
 .login-screen__title {
-  font-size: var(--text-hero, 1.5rem);
+  font-family: var(--font-display);
+  font-size: 20px;
   font-weight: 700;
   color: var(--text-strong);
-  margin: 0 0 var(--space-1);
-  letter-spacing: 0.01em;
+  margin: 0 0 4px;
+  letter-spacing: -0.02em;
 }
 
 .login-screen__subtitle {
   color: var(--text-muted);
-  margin: 0 0 var(--space-5);
-  font-size: 0.9rem;
+  margin: 0 0 24px;
+  font-size: 13px;
 }
 
 .login-screen__dots {
   display: flex;
   justify-content: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-5);
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
 .login-screen__dot {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  border: 2px solid var(--border);
+  border: 1.5px solid var(--border);
   background: transparent;
-  transition: background 0.15s ease;
+  transition: all var(--duration-fast) var(--ease-out);
 }
 
 .login-screen__dot.filled {
-  background: var(--dorado-rey);
-  border-color: var(--dorado-rey);
+  background: var(--text-strong);
+  border-color: var(--text-strong);
+  transform: scale(1.1);
 }
 
 .login-screen__error {
   color: var(--status-cancelled);
-  font-size: 0.85rem;
-  margin: 0 0 var(--space-3);
+  font-size: 13px;
+  margin: 0 0 12px;
+  background: color-mix(in srgb, var(--status-cancelled) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-cancelled) 15%, transparent);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
 }
 
 .login-screen__busy {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  margin-top: var(--space-3);
+  color: var(--text-faint);
+  font-size: 13px;
+  margin-top: 12px;
 }
 
 .login-screen__keypad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-2);
+  gap: 10px;
 }
 
 .login-screen__key {
-  min-height: var(--touch-min-target);
+  min-height: 56px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface-soft);
   color: var(--text-strong);
-  font-size: 1.4rem;
+  font-size: 20px;
   font-weight: 600;
+  font-family: var(--font-mono);
   cursor: pointer;
-  transition: background 0.15s var(--ease-in), transform 0.05s var(--ease-in), box-shadow 0.15s var(--ease-in);
+  transition: all var(--duration-fast) var(--ease-out);
 }
 
 .login-screen__key:hover:not(:disabled) {
-  background: var(--surface-hover);
   border-color: var(--border-hover);
+  background: var(--surface-elevated);
 }
 
 .login-screen__key:focus-visible {
@@ -100,31 +105,23 @@
   box-shadow: var(--focus-ring);
 }
 
-.login-screen__key:active {
-  transform: scale(0.95);
-  background: var(--surface-elevated);
-}
+.login-screen__key:active { transform: scale(0.96); }
 
-.login-screen__key:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+.login-screen__key:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .login-screen__key--ok {
-  background: var(--dorado-rey);
-  border-color: var(--dorado-rey);
-  color: var(--on-accent);
-  box-shadow: var(--shadow-golden, none);
-}
-
-.login-screen__key--ok:hover:not(:disabled) {
-  background: var(--dorado-rey-hover);
-  border-color: var(--dorado-rey-hover);
+  background: var(--text-strong);
+  border-color: var(--text-strong);
+  color: var(--bg);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .login-screen__key--ok:disabled {
   background: var(--surface-soft);
   border-color: var(--border);
-  color: var(--text-muted);
-  box-shadow: none;
+  color: var(--text-faint);
 }
