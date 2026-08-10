@@ -29,7 +29,9 @@ export interface TrackedOrder {
   total: number;
 }
 
-const POLL_INTERVAL_MS = 5000;
+// F1: 10s en vez de 5s — el tracking solo actualiza una línea de estado;
+  // reduce a la mitad el polling de clientes (2-3 req/min → 1 req/min/www)
+const POLL_INTERVAL_MS = 10000;
 const POLL_MAX_RETRIES = 3;
 
 /** Map raw order status → friendly UI phase label (Spanish). */

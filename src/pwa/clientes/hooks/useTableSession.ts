@@ -219,11 +219,33 @@ export function useTableSession(): TableSession {
     const unsubscribe = orderEngine.onChange(evaluateSession);
 
     // Re-evaluar cada 30 segundos (renovación de token)
-    const interval = setInterval(evaluateSession, 30000);
+    // F1: pausa cuando la pestaña está oculta (evita polling "fantasma")
+    // de pestañas en background — reduce requests sin UX perdida.
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const startPolling = () => {
+      if (interval) return;
+      interval = setInterval(evaluateSession, 30000);
+    };
+    const stopPolling = () => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+    const onVisibility = () => {
+      if (document.hidden) stopPolling();
+      else {
+        void evaluateSession();
+        startPolling();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    startPolling();
 
     return () => {
       unsubscribe();
-      clearInterval(interval);
+      stopPolling();
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [evaluateSession]);
 

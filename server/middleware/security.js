@@ -10,16 +10,31 @@
 import rateLimit from 'express-rate-limit';
 
 // ============================================================
-// Rate Limiting
+// Rate Limiting — diseño por método (F1 2026-08-10)
+//
+//  El polling multi-PWA (6 PWAs en una IP) quemaba el presupuesto
+//  global de 100 req/15min → 429 "Demasiadas solicitudes". Solución:
+//
+//   GET/HEAD/OPTIONS  → readLimiter  (techo ALTO: 2500/15min ≈ 167 req/min)
+//   POST/PUT/PATCH/DELETE → apiLimiter (estricto: 350/15min ≈ 23 mut/min)
+//   POST /api/auth    → authLimiter  (20/min, anti brute-force PIN)
+//
+//  De esta forma el polling legítimo nunca se bloquea y el abuso de
+//  escritura (client-orders, waiter-calls, pagos) sigue protegido.
 // ============================================================
 
+/** ¿La request es de LECTURA? (GET/HEAD/OPTIONS — polling legítimo) */
+export function shouldSkipRateLimit(method) {
+  return ['GET', 'HEAD', 'OPTIONS'].includes(method);
+}
+
 /**
- * General API rate limiter
- * 100 requests per 15 minutes per IP
+ * Rate limiter de LECTURAS (polling) — techo alto para no bloquear
+ * el uso legítimo multi-dispositivo. Cuenta TODO (GET incluido).
  */
-export const apiLimiter = rateLimit({
+export const readLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15 minutes
-  max: 100,
+  limit: Number(process.env.API_READ_RATE_LIMIT_MAX) || 2500,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -30,12 +45,30 @@ export const apiLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter de ESCRITURAS — estricto, SKIP en lecturas.
+ * Un bot sin auth puede spammear POST /api/client-orders o
+ * POST /api/waiter-calls: este tope lo frena sin afectar el polling.
+ */
+export const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutes
+  limit: Number(process.env.API_WRITE_RATE_LIMIT_MAX) || 350,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => shouldSkipRateLimit(req.method),
+  message: {
+    success: false,
+    error: 'Demasiadas solicitudes. Intente nuevamente en 15 minutos.',
+    code: 'RATE_LIMIT_EXCEEDED',
+  },
+});
+
+/**
  * Stricter limiter for auth endpoints
- * 10 attempts per minute per IP (P2-5: subido de 5; override vía env)
+ * 20 attempts per minute per IP (override vía env)
  */
 export const authLimiter = rateLimit({
   windowMs: 60 * 1000,  // 1 minute
-  max: Number(process.env.AUTH_RATE_LIMIT_MAX) || 10,
+  limit: Number(process.env.AUTH_RATE_LIMIT_MAX) || 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

@@ -46,8 +46,9 @@ function MeserosApp() {
   // Tables — real API with WS refresh + polling
   const tables = useTables({ token, pollMs: 15000 });
 
-  // Waiter calls — real API board
-  const waiterCalls = useWaiterCalls({ token, pollMs: 10000 });
+  // Waiter calls — real API board (F1: 30s en vez de 10s — el board no es
+  // crítico en tiempo real y reduce ~40% del polling de meseros)
+  const waiterCalls = useWaiterCalls({ token, pollMs: 30000 });
 
   // S2-A: mesas con pedido listo para servir (badge "🍴 Listo")
   const readyTables = useReadyTables();
