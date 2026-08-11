@@ -15,10 +15,10 @@
  *  'paid' / 'cancelled' son terminales y NUNCA se derivan ni se pisan.
  *
  *  RONDAS (v7): `resolveRound` decide a qué ronda van los items NUEVOS:
- *    - si la orden aún tiene trabajo sin procesar (items 'pending') →
- *      MISMA ronda (la comanda sigue abierta).
- *    - si TODO ya fue procesado (preparing/ready/delivered/cancelled) →
- *      RONDA NUEVA (max+1) → el KDS lo ve como tarjeta separada prioritaria.
+ *    - sin items → ronda 1.
+ *    - con items existentes → SIEMPRE ronda nueva (max+1) → el KDS lo ve
+ *      como tarjeta separada prioritaria "Mesa 4 · Ronda N 🆕" (el usuario
+ *      quiere que un producto agregado sea SIEMPRE "otra orden").
  * ═══════════════════════════════════════════════════════════
  */
 
@@ -65,8 +65,10 @@ export function recalcOrderStatus(db, orderId) {
 /**
  * Resuelve la ronda para items NUEVOS de una orden (FASE 4B):
  *   - Sin items → ronda 1.
- *   - Con trabajo sin procesar (algún item 'pending') → misma ronda en curso.
- *   - Todo ya procesado → ronda nueva (max + 1).
+ *   - Con items existentes → SIEMPRE ronda nueva (max + 1). El usuario
+ *     pidió que un producto agregado aparezca SIEMPRE como "otra orden"
+ *     para la mesa en cocina/bar (orden de prioridades), aunque la comanda
+ *     anterior aún no se haya procesado.
  *
  * @param {object} db — better-sqlite3
  * @param {string} orderId
@@ -74,14 +76,10 @@ export function recalcOrderStatus(db, orderId) {
  */
 export function resolveRound(db, orderId) {
   const row = db.prepare(`
-    SELECT
-      COUNT(*) as total,
-      SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
-      COALESCE(MAX(round), 1) as maxRound
+    SELECT COUNT(*) as total, COALESCE(MAX(round), 0) as maxRound
     FROM order_items WHERE order_id = ?
   `).get(orderId);
 
   if (!row || Number(row.total) === 0) return 1;
-  if (Number(row.pending) > 0) return Number(row.maxRound);
   return Number(row.maxRound) + 1;
 }

@@ -97,9 +97,9 @@ describe('resolveRound — segunda comanda', () => {
     expect(resolveRound(db, orderId)).toBe(1);
   });
 
-  it('con items pending (trabajo sin procesar) → misma ronda', () => {
+  it('con items existentes (aún pending) → ronda nueva (max + 1)', () => {
     insertItem('a', 'pending', 1);
-    expect(resolveRound(db, orderId)).toBe(1);
+    expect(resolveRound(db, orderId)).toBe(2);
   });
 
   it('todo procesado → ronda nueva (max + 1)', () => {
@@ -109,9 +109,9 @@ describe('resolveRound — segunda comanda', () => {
     expect(resolveRound(db, orderId)).toBe(3);
   });
 
-  it('ronda en curso con algunos procesados y otros pending → misma ronda', () => {
+  it('siempre crea ronda nueva aunque quede trabajo sin procesar', () => {
     insertItem('a', 'delivered', 1);
     insertItem('b', 'pending', 1);
-    expect(resolveRound(db, orderId)).toBe(1);
+    expect(resolveRound(db, orderId)).toBe(2);
   });
 });
