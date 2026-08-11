@@ -37,6 +37,14 @@ function makeDb() {
             }
             return undefined;
           }
+          if (sql.includes('FROM modifier_options WHERE group_id') && sql.includes('name')) {
+            // P0-2 UPSERT lookup: SELECT id, price_adjustment FROM modifier_options WHERE group_id = ? AND name = ?
+            const [group_id, name] = args;
+            for (const opt of options.values()) {
+              if (opt.group_id === group_id && opt.name === name) return opt;
+            }
+            return undefined;
+          }
           return undefined;
         },
         run(...args) {
@@ -59,13 +67,16 @@ function makeDb() {
             }
             return { changes: 1 };
           }
-          if (sql.includes('DELETE FROM modifier_options')) {
-            const [group_id] = args;
-            let count = 0;
-            for (const [oid, opt] of options) {
-              if (opt.group_id === group_id) { options.delete(oid); count++; }
+          if (sql.includes('UPDATE modifier_options')) {
+            // P0-2 (2026-08-11): UPSERT — SET price_adjustment=?, is_default=?, sort_order=? WHERE id=?
+            const [price_adjustment, is_default, sort_order, id] = args;
+            const opt = options.get(id);
+            if (opt) {
+              opt.price_adjustment = price_adjustment;
+              opt.is_default = is_default;
+              opt.sort_order = sort_order;
             }
-            return { changes: count };
+            return { changes: 1 };
           }
           if (sql.includes('INSERT INTO modifier_options')) {
             const [id, group_id, name, price_adjustment, is_default, sort_order] = args;
@@ -187,5 +198,46 @@ describe('createModifierGroupsForItem', () => {
     createModifierGroupsForItem(db, 'item-10', { super_extra: 100 });
     const opts = Array.from(db.options.values());
     expect(opts[0].name).toBe('Super_extra');
+  });
+
+  // ═══ P0-1/P0-2 (2026-08-11) — fixes del bootstrap ═══════════
+
+  it('P0-2: re-run conserva los option_ids (UPSERT por nombre, sin regenerar UUIDs)', () => {
+    // 1ª carga con precios
+    const firstOpts = [];
+    createModifierGroupsForItem(db, 'item-11', { mediana: 50, familiar: 70, xl: 90 });
+    Array.from(db.options.values()).forEach(o => firstOpts.push({ name: o.name, id: o.id }));
+
+    // 2ª carga (simula restart del server — loadMenuFromSeed corre otra vez)
+    createModifierGroupsForItem(db, 'item-11', { mediana: 50, familiar: 70, xl: 90 });
+
+    const secondOpts = Array.from(db.options.values());
+    expect(secondOpts.length).toBe(3); // sin duplicados
+    for (const fo of firstOpts) {
+      const match = secondOpts.find(o => o.name === fo.name);
+      expect(match.id).toBe(fo.id); // MISMO id — no regenerado
+    }
+  });
+
+  it('P0-1: seed con precios null NO pisa price_adjustment existente (demo-prices)', () => {
+    // Simula: applyDemoPrices ya puso +20/+40 en la DB
+    createModifierGroupsForItem(db, 'item-12', { mediana: 0, familiar: 20, xl: 40 });
+
+    // Restart: load-menu re-corre con seed null (precios: { mediana: null, familiar: null, xl: null })
+    createModifierGroupsForItem(db, 'item-12', { mediana: null, familiar: null, xl: null });
+
+    const byName = Object.fromEntries(Array.from(db.options.values()).map(o => [o.name, o]));
+    expect(byName['Familiar'].price_adjustment).toBe(20); // conservado, NO 0
+    expect(byName['XL'].price_adjustment).toBe(40);       // conservado, NO 0
+  });
+
+  it('P0-1: seed con precios numéricos SÍ actualiza price_adjustment', () => {
+    createModifierGroupsForItem(db, 'item-13', { mediana: 0, familiar: 20, xl: 40 });
+    // El seed trae precios nuevos (números) → se propagan
+    createModifierGroupsForItem(db, 'item-13', { mediana: 0, familiar: 25, xl: 45 });
+
+    const byName = Object.fromEntries(Array.from(db.options.values()).map(o => [o.name, o]));
+    expect(byName['Familiar'].price_adjustment).toBe(25);
+    expect(byName['XL'].price_adjustment).toBe(45);
   });
 });

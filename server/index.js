@@ -32,7 +32,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 // ── Middleware ────────────────────────────────────────────
-import { apiLimiter, readLimiter, authLimiter, corsOptions, helmetCspConfig, securityHeaders } from './middleware/security.js';
+import { apiLimiter, readLimiter, authLimiter, kdsLimiter, corsOptions, helmetCspConfig, securityHeaders } from './middleware/security.js';
 
 // ── Database ──────────────────────────────────────────────
 import { getDb } from './db/index.js';
@@ -233,6 +233,9 @@ import clientSessionsRoutes from './routes/client-sessions.js';
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/tables', tablesRoutes);          // Auth handled inside
 app.use('/api/menu', menuRoutes);              // Public read, admin write (handled inside)
+// P2-2 (2026-08-11): kdsLimiter (60/10s) definido pero NUNCA montado —
+// el polling del KDS está protegido ahora (cocina + bar).
+app.use('/api/orders/kds', kdsLimiter);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/staff', staffRoutes);

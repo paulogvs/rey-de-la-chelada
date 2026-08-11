@@ -50,6 +50,69 @@ const PIZZA_SIZE_ADJUST = { Mediana: 0, Familiar: 20, XL: 40 };
 const FALLBACK_PRICE = 25;
 
 /**
+ * Aplica SOLO los ajustes de tamaño de pizza (modifier_options.price_adjustment)
+ * desde PIZZA_SIZE_ADJUST. Idempotente y NO destructivo:
+ *
+ *   - opción en 0 (estado "roto" del bug P0-1) → se reaplica el plan (sanación)
+ *   - opción con ajuste > 0 (editado por admin) → se PRESERVA, no se pisa
+ *   - opción con ajuste == target → no-op
+ *
+ * ⚠️ FIX P0-1 (2026-08-11): bootstrap re-carga el menú en cada arranque y
+ * load-menu.js (upsert) escribía price_adjustment = 0 cuando el seed trae
+ * null → los +20/+40 de Familiar/XL se perdían silenciosamente. Este helper
+ * se ejecuta SIEMPRE en el bootstrap (a diferencia de applyDemoPrices, que
+ * solo corre cuando hay items sin precio) para garantizar que los ajustes
+ * sobrevivan a cada restart SIN pisar precios de items editados por admin.
+ *
+ * @param {object} db — better-sqlite3 instance
+ * @param {{ log?: (msg: string) => void, dryRun?: boolean }} [opts]
+ * @returns {{ updated: number, failed: number, message: string }}
+ */
+export function applyPizzaSizeAdjustments(db, { log = console.log, dryRun = false } = {}) {
+  const modOptions = db.prepare(`
+    SELECT mo.id, mo.name, mo.price_adjustment, mg.menu_item_id, mi.name as item_name
+    FROM modifier_options mo
+    JOIN modifier_groups mg ON mo.group_id = mg.id
+    JOIN menu_items mi ON mg.menu_item_id = mi.id
+  `).all();
+
+  const modUpdates = [];
+  const summary = [];
+
+  for (const opt of modOptions) {
+    const adjust = PIZZA_SIZE_ADJUST[opt.name];
+    if (adjust === undefined) continue;
+    // Sanar solo el estado roto (0) — nunca pisar un ajuste manual > 0
+    if (opt.price_adjustment === 0 && adjust !== 0) {
+      modUpdates.push({ id: opt.id, priceAdjustment: adjust });
+      summary.push(`  Tamaño ${opt.name} (${opt.item_name}): ${opt.price_adjustment} → +${adjust} (sanación)`);
+    }
+  }
+
+  if (dryRun) {
+    log('[pizza-size-adjust] DRY RUN:');
+    log(summary.join('\n') || '  (sin cambios)');
+    return { updated: modUpdates.length, failed: 0, message: 'dry-run' };
+  }
+
+  if (modUpdates.length === 0) {
+    return { updated: 0, failed: 0, message: 'no-op' };
+  }
+
+  const modResult = applyBulkModifierPriceUpdates(db, modUpdates);
+  log('[pizza-size-adjust] Resultado:');
+  log(`  Opciones actualizadas: ${modResult.updated}${modResult.failed > 0 ? ` (${modResult.failed} fallaron)` : ''}`);
+  log('');
+  log(summary.join('\n'));
+
+  return {
+    updated: modResult.updated,
+    failed: modResult.failed,
+    message: 'applied',
+  };
+}
+
+/**
  * Apply demo BOB prices to all menu items + pizza size adjustments.
  * Idempotent: skips items whose price already matches.
  *
@@ -83,7 +146,6 @@ export function applyDemoPrices(db, { log = console.log, dryRun = false, reset =
 
   // ── Construir updates ──────────────────────────────────────
   const itemUpdates = []; // { id, price }
-  const modUpdates = []; // { id, priceAdjustment }
   const summary = []; // human-readable lines
 
   if (RESET) {
@@ -116,49 +178,43 @@ export function applyDemoPrices(db, { log = console.log, dryRun = false, reset =
     });
   }
 
-  // Ajustes de tamaño (pizza): Mediana 0, Familiar +20, XL +40
-  for (const opt of modOptions) {
-    const adjust = PIZZA_SIZE_ADJUST[opt.name];
-    if (adjust === undefined) continue;
-    if (opt.price_adjustment !== adjust) {
-      modUpdates.push({ id: opt.id, priceAdjustment: adjust });
-      summary.push(`  Tamaño ${opt.name} (${opt.item_name}): ${opt.price_adjustment} → +${adjust}`);
-    }
+  // Ajustes de tamaño (pizza): Mediana 0, Familiar +20, XL +40 — delegado
+  // al helper dedicado applyPizzaSizeAdjustments (P0-1: reaplicable siempre).
+  const modResultFromHelper = applyPizzaSizeAdjustments(db, { log, dryRun: DRY_RUN });
+  if (modResultFromHelper.message === 'applied' || modResultFromHelper.message === 'dry-run') {
+    summary.push(`  [tamaños pizza] ${modResultFromHelper.updated} opciones ajustadas`);
   }
 
   // ── Apply / dry-run ────────────────────────────────────────
   if (DRY_RUN) {
     log('[demo-prices] DRY RUN — no se escribirá nada. Cambios:');
     log(`  Items a actualizar: ${itemUpdates.length}`);
-    log(`  Opciones a actualizar: ${modUpdates.length}`);
+    log(`  Opciones a actualizar: ${modResultFromHelper.updated}`);
     log('');
     log(summary.join('\n') || '  (sin cambios)');
-    return { updated: itemUpdates.length, failed: 0, message: 'dry-run' };
+    return { updated: itemUpdates.length + modResultFromHelper.updated, failed: 0, message: 'dry-run' };
   }
 
-  if (itemUpdates.length === 0 && modUpdates.length === 0) {
-    log('[demo-prices] Sin cambios — los precios ya están cargados.');
+  if (itemUpdates.length === 0) {
+    log('[demo-prices] Sin cambios en items — los precios ya están cargados.');
     return { updated: 0, failed: 0, message: 'no-op' };
   }
 
   const itemResult = applyBulkPriceUpdates(db, itemUpdates);
-  const modResult = applyBulkModifierPriceUpdates(db, modUpdates);
 
   log('[demo-prices] Resultado:');
   log(`  Items actualizados:   ${itemResult.updated}${itemResult.failed > 0 ? ` (${itemResult.failed} fallaron)` : ''}`);
-  log(`  Opciones actualizadas: ${modResult.updated}${modResult.failed > 0 ? ` (${modResult.failed} fallaron)` : ''}`);
   log('');
   log(summary.join('\n'));
 
-  if (itemResult.failed > 0 || modResult.failed > 0) {
-    const errors = [...itemResult.errors, ...modResult.errors];
+  if (itemResult.failed > 0) {
     log('\nErrores:');
-    for (const e of errors) log(`  ${e.id}: ${e.reason}`);
+    for (const e of itemResult.errors) log(`  ${e.id}: ${e.reason}`);
   }
 
   return {
-    updated: itemResult.updated + modResult.updated,
-    failed: itemResult.failed + modResult.failed,
+    updated: itemResult.updated + modResultFromHelper.updated,
+    failed: itemResult.failed + modResultFromHelper.failed,
     message: 'applied',
   };
 }

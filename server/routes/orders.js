@@ -275,6 +275,22 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
       return res.status(404).json({ success: false, error: 'Mesa no encontrada', code: 'TABLE_NOT_FOUND' });
     }
 
+    // P1-1 (2026-08-11): UN SOLO PEDIDO ACTIVO POR MESA — el mesero
+    // (POST /api/orders) y sync (create_order) deben respetar el mismo
+    // contrato que el path público client-orders. Antes el mesero podía
+    // abrir un 2º pedido en una mesa ya ocupada → 2 pedidos cobrables.
+    const activeOrder = db.prepare(
+      "SELECT id FROM orders WHERE table_id = ? AND status NOT IN ('paid','cancelled')"
+    ).get(table_id);
+    if (activeOrder) {
+      return res.status(409).json({
+        success: false,
+        error: 'La mesa ya tiene un pedido activo — edítalo con PUT /api/orders/:id',
+        code: 'TABLE_HAS_ACTIVE_ORDER',
+        activeOrderId: activeOrder.id,
+      });
+    }
+
     // Calculate totals
     let subtotal = 0;
     const orderItems = [];
@@ -399,6 +415,32 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
       (Array.isArray(remove_item_ids) && remove_item_ids.length > 0);
 
     if (itemsChanged) {
+      // P2-3 (2026-08-11): validar TODA la entrada ANTES de la transacción.
+      // ANTES, qty inválida (<1) hacía `continue` silencioso → el cliente
+      // creía que cambió la cantidad cuando no se tocó nada. Ahora → 400.
+      if (Array.isArray(items) && items.length > 0) {
+        for (const item of items) {
+          const quantity = item.quantity ?? 1;
+          if (!Number.isFinite(quantity) || quantity < 1) {
+            return res.status(400).json({
+              success: false,
+              error: `Cantidad inválida (debe ser ≥ 1): ${item.id || item.menu_item_id || 'item sin id'}`,
+              code: 'INVALID_QUANTITY',
+            });
+          }
+          const menuItem = db.prepare(
+            'SELECT id, name, price FROM menu_items WHERE id = ? AND is_active = 1'
+          ).get(item.menu_item_id);
+          if (!menuItem) {
+            return res.status(400).json({
+              success: false,
+              error: `Item inválido: ${item.menu_item_id}`,
+              code: 'INVALID_MENU_ITEM',
+            });
+          }
+        }
+      }
+
       const runUpdate = db.transaction(() => {
         const currentIds = db.prepare('SELECT id FROM order_items WHERE order_id = ?')
           .all(req.params.id).map(r => r.id);
@@ -720,6 +762,16 @@ router.patch('/:id/items/:itemId/status', requireAuth, requireRole('admin', 'kds
     if (Number(remaining.n) === 0) {
       db.prepare("UPDATE orders SET status = 'served', updated_at = datetime('now') WHERE id = ? AND status NOT IN ('paid','cancelled')")
         .run(req.params.id);
+    } else {
+      // P2-1 (2026-08-11): pedido completo para servir (todos los items
+      // 'ready') pero aún no entregado → orders.status = 'ready' (el KDS
+      // marca item a item; ANTES la DB seguía en 'confirmed' mientras el
+      // evento order_complete decía 'ready' — estado inconsistente).
+      const orderSnapshot = buildOrder(db, req.params.id);
+      if (isOrderFullyReady(orderSnapshot) && orderSnapshot.status !== 'ready') {
+        db.prepare("UPDATE orders SET status = 'ready', updated_at = datetime('now') WHERE id = ? AND status NOT IN ('paid','cancelled','served')")
+          .run(req.params.id);
+      }
     }
 
     // Broadcast real-time: item_ready cuando queda listo, status_change en el resto

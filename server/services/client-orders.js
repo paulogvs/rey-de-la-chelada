@@ -15,6 +15,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { computeTotals, round2 } from '../../src/core/config/iva.js';
+import { localDateTimeStr } from '../utils/date-utils.js'; // P2-4: hora local La Paz
 
 /**
  * Create a public order from the clientes PWA.
@@ -119,15 +120,24 @@ export function createPublicOrder(db, input) {
   // mesa NO puede crear otro pedido mientras exista uno activo
   // (status NOT IN ('paid','cancelled')). Regla documentada:
   //   - pedido activo de OTRO session_id → rechazo 409 TABLE_HAS_ACTIVE_ORDER
-  //   - excepción: pedido activo del MISMO session_id (mismo teléfono,
-  //     mismo flujo de tracking/reintento) → se permite
+  //   - pedido activo del MISMO session_id (mismo teléfono, doble-tap o
+  //     reintento del SyncEngine) → IDEMPOTENTE (P1-2, 2026-08-11): se
+  //     devuelve el pedido existente, NO se crea otro. ANTES se permitía
+  //     crear un 2º pedido real → 2 pedidos cobrables por doble-tap.
   // El session_id se guarda en orders.local_id al insertar (abajo).
   // OJO: corre DESPUÉS de validar items (orden de validación histórico:
   // INVALID_MENU_ITEM primero — ver tests/unit/client-orders-agotados.test.js).
   const activeOrder = db.prepare(
     "SELECT id, local_id FROM orders WHERE table_id = ? AND status NOT IN ('paid','cancelled')"
   ).get(table.id);
-  if (activeOrder && activeOrder.local_id !== session_id) {
+  if (activeOrder) {
+    if (activeOrder.local_id === session_id) {
+      // P1-2: mismo teléfono reenvió (doble-tap / retry offline) → el
+      // pedido ya existe, devolverlo sin duplicar. Marca 'duplicate' para
+      // que el caller pueda distinguir la creación real del reintento.
+      const existingOrder = buildOrder(db, activeOrder.id);
+      return { success: true, order: existingOrder, duplicate: true };
+    }
     return {
       success: false,
       code: 'TABLE_HAS_ACTIVE_ORDER',
@@ -218,13 +228,20 @@ export function getPublicOrderStatus(db, orderId) {
     FROM order_items WHERE order_id = ?
   `).all(orderId);
 
+  // P2-4 (2026-08-11): la DB guarda updated_at en UTC ('YYYY-MM-DD HH:MM:SS');
+  // el cliente veía la hora UTC cruda (ej. 20:54 cuando local eran 16:54).
+  // Convertir a timestamp local America/La_Paz para el tracking público.
+  const updatedAtLocal = order.updated_at
+    ? localDateTimeStr(new Date(order.updated_at.replace(' ', 'T') + 'Z'))
+    : null;
+
   return {
     success: true,
     status: order.status,
     tableNumber: order.table_number,
     total: order.total,
     items,
-    updatedAt: order.updated_at,
+    updatedAt: updatedAtLocal,
   };
 }
 

@@ -57,6 +57,16 @@ function createMockDb() {
       if (sql.includes('FROM orders WHERE id')) {
         return orders.find(o => o.id === params[0]) || undefined;
       }
+      if (sql.includes('FROM orders WHERE table_id') && sql.includes('status')) {
+        // P1-2: búsqueda de pedido activo por mesa
+        return orders.find(o =>
+          o.table_id === params[0] && !['paid', 'cancelled'].includes(o.status)
+        ) || undefined;
+      }
+      if (sql.includes('SELECT id, status, table_number, total, updated_at')) {
+        // P2-4: getPublicOrderStatus
+        return orders.find(o => o.id === params[0]) || undefined;
+      }
       if (sql.includes('FROM waiter_calls WHERE table_id') && sql.includes('pending')) {
         return calls.find(c => c.table_id === params[0] && c.status === 'pending') || undefined;
       }
@@ -83,7 +93,7 @@ function createMockDb() {
         const order = {
           id: params[0], table_id: params[1], table_number: params[2], waiter_id: params[3],
           waiter_name: params[4], status: 'called', subtotal: params[5], iva_amount: params[6],
-          total: params[7], notes: params[8], guest_count: params[9], created_at: now(),
+          total: params[7], notes: params[8], guest_count: params[9], local_id: params[10], created_at: now(),
         };
         orders.push(order);
         return { changes: 1, lastInsertRowid: 0 };
@@ -280,6 +290,76 @@ describe('createPublicOrder service', () => {
     expect(result.success).toBe(false);
     expect(result.code).toBe('INVALID_MODIFIER_OPTION');
   });
+
+  // ═══ P1-2 (2026-08-11): retry idempotente por session_id/local_id ═══
+
+  it('P1-2: mismo session_id + pedido activo → devuelve el existente (no duplica)', async () => {
+    const { createPublicOrder } = await import('../../server/services/client-orders.js');
+
+    const first = createPublicOrder(mockDb, {
+      table_number: 1,
+      session_id: 'session-x',
+      items: [{ menu_item_id: 'm1', quantity: 2 }],
+    });
+    expect(first.success).toBe(true);
+    expect(first.duplicate).toBeUndefined();
+    const firstOrderId = first.order.id;
+    expect(mockDb._state.orders).toHaveLength(1);
+
+    // Doble-tap: mismo teléfono reenvía el mismo pedido
+    const second = createPublicOrder(mockDb, {
+      table_number: 1,
+      session_id: 'session-x',
+      items: [{ menu_item_id: 'm1', quantity: 2 }],
+    });
+
+    expect(second.success).toBe(true);
+    expect(second.duplicate).toBe(true);
+    expect(second.order.id).toBe(firstOrderId); // el MISMO pedido
+    expect(mockDb._state.orders).toHaveLength(1); // NO se creó otro
+    expect(mockDb._state.orderItems).toHaveLength(1); // sin items duplicados
+  });
+
+  it('P1-2: mismo session_id PERO pedido ya pagado → puede crear uno nuevo', async () => {
+    const { createPublicOrder } = await import('../../server/services/client-orders.js');
+
+    const first = createPublicOrder(mockDb, {
+      table_number: 1,
+      session_id: 'session-y',
+      items: [{ menu_item_id: 'm1', quantity: 1 }],
+    });
+    // Cerrar el pedido (pagado)
+    const order = mockDb._state.orders.find(o => o.id === first.order.id);
+    order.status = 'paid';
+
+    const second = createPublicOrder(mockDb, {
+      table_number: 1,
+      session_id: 'session-y',
+      items: [{ menu_item_id: 'm1', quantity: 1 }],
+    });
+    expect(second.success).toBe(true);
+    expect(second.duplicate).toBeUndefined(); // nuevo pedido real
+    expect(mockDb._state.orders).toHaveLength(2);
+  });
+
+  it('P1-2: OTRO session_id con pedido activo → 409 TABLE_HAS_ACTIVE_ORDER', async () => {
+    const { createPublicOrder } = await import('../../server/services/client-orders.js');
+
+    createPublicOrder(mockDb, {
+      table_number: 1,
+      session_id: 'session-a',
+      items: [{ menu_item_id: 'm1', quantity: 1 }],
+    });
+
+    const other = createPublicOrder(mockDb, {
+      table_number: 1,
+      session_id: 'session-b', // otro teléfono
+      items: [{ menu_item_id: 'm1', quantity: 1 }],
+    });
+    expect(other.success).toBe(false);
+    expect(other.code).toBe('TABLE_HAS_ACTIVE_ORDER');
+    expect(mockDb._state.orders).toHaveLength(1);
+  });
 });
 
 describe('getPublicOrderStatus service', () => {
@@ -304,5 +384,34 @@ describe('getPublicOrderStatus service', () => {
     const status = getPublicOrderStatus(mockDb, 'nope');
     expect(status.success).toBe(false);
     expect(status.code).toBe('ORDER_NOT_FOUND');
+  });
+
+  // ═══ P2-4 (2026-08-11): updatedAt en hora local La Paz (no UTC) ═══
+
+  it('P2-4: updatedAt se devuelve en hora local America/La_Paz (UTC-4)', async () => {
+    const { getPublicOrderStatus } = await import('../../server/services/client-orders.js');
+    // DB guarda UTC: '2026-08-11 20:54:32' → local La Paz = 16:54:32 (UTC-4)
+    const order = {
+      id: 'ord-local', status: 'confirmed', table_number: 1, total: 20,
+      updated_at: '2026-08-11 20:54:32', created_at: '2026-08-11 20:54:32',
+    };
+    mockDb._state.orders.push(order);
+
+    const status = getPublicOrderStatus(mockDb, 'ord-local');
+    expect(status.success).toBe(true);
+    expect(status.updatedAt).toBe('2026-08-11 16:54:32');
+  });
+
+  it('P2-4: updatedAt null → no rompe (null seguro)', async () => {
+    const { getPublicOrderStatus } = await import('../../server/services/client-orders.js');
+    const order = {
+      id: 'ord-null', status: 'draft', table_number: 2, total: 10,
+      updated_at: null, created_at: '2026-08-11 20:54:32',
+    };
+    mockDb._state.orders.push(order);
+
+    const status = getPublicOrderStatus(mockDb, 'ord-null');
+    expect(status.success).toBe(true);
+    expect(status.updatedAt).toBeNull();
   });
 });

@@ -218,6 +218,18 @@ router.post('/push', requireAuth, (req, res) => {
             continue;
           }
 
+          // P1-1 (2026-08-11): contrato SSOT "1 pedido activo por mesa".
+          // El sync offline NO debe crear un 2º pedido en una mesa que ya
+          // tiene uno activo (llamado/confirmado/en preparación/...).
+          if (order.table_id) {
+            const tableActive = db.prepare(
+              "SELECT id FROM orders WHERE table_id = ? AND status NOT IN ('paid','cancelled')"
+            ).get(order.table_id);
+            if (tableActive) {
+              throw new Error(`La mesa ya tiene un pedido activo: ${tableActive.id}`);
+            }
+          }
+
           const waiterId = order.waiter_id || req.user.sub;
           const waiterName = order.waiter_name || req.user.displayName || req.user.username;
 

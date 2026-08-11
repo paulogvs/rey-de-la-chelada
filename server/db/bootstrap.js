@@ -21,7 +21,7 @@
 
 import { ensureStaff, ensureTables } from './seed.js';
 import { loadMenuFromSeed } from '../scripts/load-menu.js';
-import { applyDemoPrices } from '../scripts/demo-prices.js';
+import { applyDemoPrices, applyPizzaSizeAdjustments } from '../scripts/demo-prices.js';
 
 /**
  * Ensure the DB is bootstrapped (staff + tables + menu + prices).
@@ -82,6 +82,20 @@ export function ensureBootstrap(db, { log = console.log } = {}) {
   } else {
     log(`[Bootstrap] Todos los items ya tienen precio — skip`);
     steps.push('prices-existing');
+  }
+
+  // ── 3b. Ajustes de tamaño de pizza — SIEMPRE (P0-1, 2026-08-11) ──
+  // load-menu re-upsertea las options en cada arranque y el seed trae
+  // precios null → ANTES los adjustments Familiar +20 / XL +40 se perdían
+  // silenciosamente (pizza vendida a precio Mediana → pérdida de ingresos).
+  // applyPizzaSizeAdjustments es idempotente y SOLO toca modifier_options
+  // (no pisa precios de items editados por admin). Correr en cada bootstrap.
+  try {
+    const sizeResult = applyPizzaSizeAdjustments(db, { log });
+    steps.push(`size-adjustments:${sizeResult.message}`);
+  } catch (sizeErr) {
+    log(`[Bootstrap] Error en ajustes de tamaño: ${sizeErr.message}`);
+    steps.push('size-adjustments:error');
   }
 
   const seeded = staffCount === 0;

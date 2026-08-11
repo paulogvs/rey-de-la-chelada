@@ -68,10 +68,13 @@ export function broadcastOrderStatusChange(order, previousStatus) {
  */
 export function broadcastOrderComplete(order) {
   if (!order) return;
+  // P2-1 (2026-08-11): emitir el status REAL del pedido (ahora 'ready' en
+  // DB cuando todos los items están listos) — ANTES estaba hardcodeado a
+  // 'ready' mientras la DB decía 'confirmed'.
   broadcaster.broadcastMeseros(buildKDSEvent(KDSEventType.ORDER_COMPLETE, {
     orderId: order.id,
     tableNumber: order.table_number,
-    status: 'ready',
+    status: order.status || 'ready',
   }));
 }
 

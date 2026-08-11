@@ -41,6 +41,26 @@ export function localDateStr(date = new Date()) {
 }
 
 /**
+ * Fecha+hora local 'YYYY-MM-DD HH:mm:ss' de America/La_Paz para un Date.
+ * @param {Date} [date]
+ * @returns {string} timestamp local del negocio (ej. '2026-08-11 14:30:05')
+ */
+export function localDateTimeStr(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: BUSINESS_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const get = type => (parts.find(p => p.type === type) || {}).value;
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`;
+}
+
+/**
  * Expresión SQL para comparar una columna timestamp UTC contra una
  * fecha local: `DATE(col, '-4 hours')`.
  * @param {string} column — columna timestamp (p.ej. 'p.processed_at')
@@ -60,4 +80,4 @@ export function localHourExpr(column) {
   return `strftime('%H', ${column}, '${SQL_UTC_OFFSET_MODIFIER}')`;
 }
 
-export default { BUSINESS_TIMEZONE, SQL_UTC_OFFSET_MODIFIER, localDateStr, localDateExpr, localHourExpr };
+export default { BUSINESS_TIMEZONE, SQL_UTC_OFFSET_MODIFIER, localDateStr, localDateTimeStr, localDateExpr, localHourExpr };

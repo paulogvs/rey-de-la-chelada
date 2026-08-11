@@ -109,4 +109,76 @@ describe('ensureBootstrap', () => {
     expect(logs.some(l => l.includes('Bootstrap'))).toBe(true);
     db.close();
   });
+
+  // ═══ P0-1 (2026-08-11): ajustes de tamaño sobreviven a los restarts ═══
+
+  it('P0-1: pizza size adjustments (Familiar +20 / XL +40) sobreviven al restart', () => {
+    const db = makeDb();
+    ensureBootstrap(db);
+
+    // Simular restart 1: re-bootstrap
+    ensureBootstrap(db);
+
+    const rows = db.prepare(`
+      SELECT mo.name, mo.price_adjustment
+      FROM modifier_options mo
+      JOIN modifier_groups mg ON mo.group_id = mg.id
+      WHERE mg.name = 'Tamaño'
+    `).all();
+    const byName = Object.fromEntries(rows.map(r => [r.name, r.price_adjustment]));
+    expect(byName['Familiar']).toBe(20);
+    expect(byName['XL']).toBe(40);
+    db.close();
+  });
+
+  it('P0-1: reaplica los adjustments aunque la DB los tenga en 0 (sanación)', () => {
+    const db = makeDb();
+    ensureBootstrap(db);
+
+    // Alguien dejó los adjustments en 0 (bug P0-1 original)
+    db.prepare('UPDATE modifier_options SET price_adjustment = 0').run();
+
+    // Restart → bootstrap reaplica
+    ensureBootstrap(db);
+
+    const xl = db.prepare(`
+      SELECT mo.price_adjustment
+      FROM modifier_options mo
+      JOIN modifier_groups mg ON mo.group_id = mg.id
+      WHERE mg.name = 'Tamaño' AND mo.name = 'XL'
+    `).get();
+    expect(xl.price_adjustment).toBe(40);
+    db.close();
+  });
+
+  it('P0-1: NO pisa precios de items editados por admin (solo ajusta tamaños)', () => {
+    const db = makeDb();
+    ensureBootstrap(db);
+
+    // Admin cambia el precio de un item (y de una opción de tamaño)
+    db.prepare("UPDATE menu_items SET price = 99 WHERE name = 'La Rey'").run();
+    db.prepare(`
+      UPDATE modifier_options SET price_adjustment = 55
+      WHERE id IN (
+        SELECT mo.id FROM modifier_options mo
+        JOIN modifier_groups mg ON mo.group_id = mg.id
+        JOIN menu_items mi ON mg.menu_item_id = mi.id
+        WHERE mi.name = 'La Rey' AND mo.name = 'XL'
+      )
+    `).run();
+
+    ensureBootstrap(db);
+
+    expect(db.prepare("SELECT price FROM menu_items WHERE name = 'La Rey'").get().price).toBe(99);
+    const xl = db.prepare(`
+      SELECT mo.price_adjustment
+      FROM modifier_options mo
+      JOIN modifier_groups mg ON mo.group_id = mg.id
+      JOIN menu_items mi ON mg.menu_item_id = mi.id
+      WHERE mi.name = 'La Rey' AND mo.name = 'XL'
+    `).get();
+    // El admin puso 55 → bootstrap NO lo pisa con el plan 40 (menu-seed null conserva)
+    expect(xl.price_adjustment).toBe(55);
+    db.close();
+  });
 });
