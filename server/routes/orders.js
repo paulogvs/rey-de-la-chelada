@@ -101,7 +101,7 @@ router.get('/', requireAuth, (req, res) => {
     let sql = `
       SELECT o.*, t.number as table_number, s.display_name as waiter_name_resolved,
              COALESCE((
-               SELECT SUM(p.amount + p.tip) FROM payments p
+               SELECT SUM(p.amount) FROM payments p
                WHERE p.order_id = o.id AND p.status = 'completed'
              ), 0) as paid_amount
       FROM orders o
@@ -624,12 +624,12 @@ router.patch('/:id/status', requireAuth, (req, res) => {
     // C3 (Fase 1 — caja cuadre al centavo): INVARIANTE — un pedido SOLO
     // puede pasar a 'paid' si hay pago COMPLETO registrado (completed).
     // El flujo normal: POST /api/payments marca paid automáticamente cuando
-    // SUM(amount + tip) >= total; este PATCH a 'paid' solo es válido si ya
+    // SUM(amount) >= total; este PATCH a 'paid' solo es válido si ya
     // existe ese pago. Sin él → 409 (nunca is_paid=1 sin pago).
     if (canonical === 'paid') {
       const orderTotal = db.prepare('SELECT total FROM orders WHERE id = ?').get(req.params.id);
       const paidSum = db.prepare(`
-        SELECT COALESCE(SUM(amount + tip), 0) as total FROM payments
+        SELECT COALESCE(SUM(amount), 0) as total FROM payments
         WHERE order_id = ? AND status = 'completed'
       `).get(req.params.id);
       if ((paidSum?.total || 0) + 0.001 < (orderTotal?.total || 0)) {

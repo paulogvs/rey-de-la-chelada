@@ -10,7 +10,7 @@
  *  PUT    /api/payments/closing/close → Cerrar corte de caja
  *
  *  Alineado al SSOT: server/db/schema.js
- *  payments.method:  cash, qr_yape, qr_simple, card, transfer
+ *  payments.method:  cash, qr  (FASE 3: solo Efectivo o QR — adiós yape/simple/card/transfer)
  *  payments.status:  pending, completed, failed, refunded
  *  cash_closings:    sin columna status → abierto = closed_at IS NULL
  *  Pedido pagado:    orders.is_paid = 1, status = 'paid'
@@ -18,9 +18,12 @@
  *  FASE 1 (caja cuadre al centavo):
  *  - C1: "hoy" = fecha local America/La_Paz (UTC-4) → date-utils.js.
  *  - C2: solo payments status='completed' cuentan como cobrados.
- *  - C4: propina en payments.tip → total cobrado = amount + tip.
  *  - C5: expected_cash = SOLO method='cash'; is_reconciled lo decide el server.
  *  - A4: processPayment atómico (db.transaction → rollback total).
+ *  FASE 3 (simplificación — 2026-08-11):
+ *  - F3-1: propina ELIMINADA (se da directo al mesero). tip se ignora/elimina.
+ *  - F3-2: efectivo al centavo — payments.received (lo que entrega el cliente) y
+ *    payments.change (vuelto = received - amount). SUM(amount) = neto en caja.
  * ═══════════════════════════════════════════════════════════
  */
 
@@ -38,12 +41,11 @@ const router = Router();
 // Helpers
 // ============================================================
 
+// FASE 3: SOLO 2 métodos cash|qr. Sinónimos ES aceptados; métodos legacy
+// (qr_yape/qr_simple/card/transfer) ya NO existen → el request se rechaza (400).
 const PAYMENT_METHOD_MAP = {
   efectivo: 'cash', cash: 'cash',
-  qr: 'qr_yape', qr_yape: 'qr_yape', yape: 'qr_yape',
-  qr_simple: 'qr_simple',
-  tarjeta: 'card', card: 'card',
-  transferencia: 'transfer', transfer: 'transfer',
+  qr: 'qr', 'qr-code': 'qr',
 };
 
 const PAYMENT_STATUS_MAP = {
@@ -56,12 +58,13 @@ const PAYMENT_STATUS_MAP = {
 /**
  * Registra un pago y devuelve { paymentId, fullyPaid, remaining }.
  *
- * SEMÁNTICA (C4 — propina):
- *   - `amount` = monto aplicado al saldo del pedido.
- *   - `tip`    = propina del mismo pago (mismo método; NO sujeta a IVA).
- *   - Total cobrado por el pago = amount + tip.
- *   - El saldo del pedido se cubre con SUM(amount + tip) de payments completed.
- *   - Retrocompatible: payments sin tip (tip=0) se comportan igual que antes.
+ * SEMÁNTICA (FASE 3):
+ *   - `amount` = monto aplicado al saldo del pedido (SIEMPRE neto).
+ *   - `received` (solo cash) = lo que el cliente ENTREGA (ej. Bs 50 por cuenta de 34.50).
+ *   - `change` (solo cash)   = vuelto = received - amount (ej. 15.50). El server lo calcula.
+ *   - La propina NO existe: el cliente la da directo al mesero, fuera de la app.
+ *   - El saldo del pedido se cubre con SUM(amount) de payments completed.
+ *   - Retrocompatible: payments sin received (received=0) → received=amount, change=0.
  *
  * SEMÁNTICA (C2 — estado):
  *   - Solo payments con status='completed' cuentan como cobrados.
@@ -72,16 +75,30 @@ const PAYMENT_STATUS_MAP = {
  * huérfanos ni pedidos parcialmente actualizados.
  *
  * @param {object} db — better-sqlite3
- * @param {{ order_id, method, amount, iva_amount, reference, notes, status, processed_by, tip }} args
+ * @param {{ order_id, method, amount, iva_amount, reference, notes, status, processed_by, received }} args
  */
-export function processPayment(db, { order_id, method, amount, iva_amount, reference, notes, status, processed_by, tip }) {
+export function processPayment(db, { order_id, method, amount, iva_amount, reference, notes, status, processed_by, received }) {
   const canonicalMethod = PAYMENT_METHOD_MAP[method];
   const canonicalStatus = PAYMENT_STATUS_MAP[status || 'completed'];
   const amountValue = round2(Number(amount) || 0);
-  const tipValue = round2(Math.max(0, Number(tip) || 0));
 
   if (!canonicalMethod) {
     throw new Error(`Método de pago inválido: ${method}`);
+  }
+
+  // F3-2: efectivo al centavo. received = lo que entrega el cliente.
+  // Si no se envía (retrocompat) → received = amount, change = 0.
+  let receivedValue = amountValue;
+  let changeValue = 0;
+  if (received !== undefined && received !== null) {
+    receivedValue = round2(Number(received) || 0);
+    if (canonicalMethod !== 'cash') {
+      throw new Error('El campo received solo aplica a pagos en efectivo');
+    }
+    if (receivedValue < amountValue) {
+      throw new Error('Cambio inválido: el monto recibido es menor al cobrado');
+    }
+    changeValue = round2(receivedValue - amountValue);
   }
 
   const execute = db.transaction(() => {
@@ -93,17 +110,17 @@ export function processPayment(db, { order_id, method, amount, iva_amount, refer
       throw new Error('No se puede pagar un pedido cancelado');
     }
 
-    // C2: solo completed cuenta como cobrado. C4: total cobrado = amount + tip.
+    // C2: solo completed cuenta como cobrado. FASE 3: sin propina → SUM(amount).
     const paid = db.prepare(`
-      SELECT COALESCE(SUM(amount + tip), 0) as total_paid FROM payments
+      SELECT COALESCE(SUM(amount), 0) as total_paid FROM payments
       WHERE order_id = ? AND status = 'completed'
     `).get(order_id);
     const remaining = round2((order.total || 0) - paid.total_paid);
 
-    // C2/C4: la constraint de saldo SOLO aplica a pagos que cuentan como
+    // C2: la constraint de saldo SOLO aplica a pagos que cuentan como
     // cobrados (completed). failed/refunded se registran sin tocar el saldo:
     // un refund se puede registrar aunque el pedido ya esté paid.
-    if (canonicalStatus === 'completed' && amountValue + tipValue > remaining + 0.001) {
+    if (canonicalStatus === 'completed' && amountValue > remaining + 0.001) {
       throw new Error(`El monto excede el saldo pendiente. Restante: Bs ${remaining.toFixed(2)}`);
     }
 
@@ -112,17 +129,17 @@ export function processPayment(db, { order_id, method, amount, iva_amount, refer
     // (orders.iva_amount) — evita pagos con IVA 0 inconsistentes.
     const ivaAmount = iva_amount ?? order.iva_amount ?? 0;
     db.prepare(`
-      INSERT INTO payments (id, order_id, method, amount, iva_amount, tip, reference,
+      INSERT INTO payments (id, order_id, method, amount, iva_amount, received, change, reference,
                             status, processed_by, notes, synced_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      paymentId, order_id, canonicalMethod, amountValue, ivaAmount, tipValue, reference || '',
+      paymentId, order_id, canonicalMethod, amountValue, ivaAmount, receivedValue, changeValue, reference || '',
       canonicalStatus, processed_by, notes || '', new Date().toISOString()
     );
 
     // El nuevo pago solo aporta al saldo si es completed
     const isCompleted = canonicalStatus === 'completed';
-    const totalPaid = paid.total_paid + (isCompleted ? amountValue + tipValue : 0);
+    const totalPaid = paid.total_paid + (isCompleted ? amountValue : 0);
     const fullyPaid = isCompleted && round2(totalPaid) >= round2(order.total || 0);
 
     // Update order payment state
@@ -155,7 +172,7 @@ export function processPayment(db, { order_id, method, amount, iva_amount, refer
       }
     }
 
-    return { paymentId, fullyPaid, remaining: round2(remaining - (isCompleted ? amountValue + tipValue : 0)) };
+    return { paymentId, fullyPaid, remaining: round2(remaining - (isCompleted ? amountValue : 0)) };
   });
 
   return execute();
@@ -257,7 +274,7 @@ router.get('/:id', requireAuth, (req, res) => {
 
 router.post('/', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res) => {
   try {
-    const { order_id, amount, method, iva_amount, reference, notes, status, tip } = req.body;
+    const { order_id, amount, method, iva_amount, reference, notes, status, received } = req.body;
 
     if (!order_id || amount === undefined || !method) {
       return res.status(400).json({
@@ -275,18 +292,27 @@ router.post('/', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res)
       });
     }
 
-    // C4: la propina debe ser un número ≥ 0 (el server la registra aparte)
-    if (tip !== undefined && (typeof tip !== 'number' || Number.isNaN(tip) || tip < 0)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Propina inválida (debe ser un número ≥ 0)',
-        code: 'INVALID_TIP',
-      });
+    // F3-2: el efectivo al centavo exige received ≥ 0 y recibido ≥ cobrado
+    if (received !== undefined && received !== null) {
+      if (typeof received !== 'number' || Number.isNaN(received) || received < 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Monto recibido inválido (debe ser un número ≥ 0)',
+          code: 'INVALID_RECEIVED',
+        });
+      }
+      if (PAYMENT_METHOD_MAP[method] === 'cash' && round2(Number(received)) < round2(Number(amount))) {
+        return res.status(400).json({
+          success: false,
+          error: 'El monto recibido no puede ser menor al monto cobrado',
+          code: 'INVALID_RECEIVED',
+        });
+      }
     }
 
     const db = getDb();
     const result = processPayment(db, {
-      order_id, amount, method, iva_amount, reference, notes, status, tip,
+      order_id, amount, method, iva_amount, reference, notes, status, received,
       processed_by: req.user.sub,
     });
 
@@ -313,6 +339,9 @@ router.post('/', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res)
       remaining: result.remaining,
     });
   } catch (err) {
+    if (err.message.startsWith('Cambio inválido')) {
+      return res.status(400).json({ success: false, error: err.message, code: 'INVALID_RECEIVED' });
+    }
     const known = err.message.startsWith('El monto') || err.message.startsWith('Método') ||
                    err.message.startsWith('Pedido no encontrado') || err.message.startsWith('No se puede pagar');
     if (known) {
@@ -338,21 +367,29 @@ router.get('/closing/current', requireAuth, requireRole('admin', 'caja'), (req, 
 
     // C1: "hoy" local America/La_Paz (no UTC) — ver server/utils/date-utils.js
     const today = localDateStr();
-    // C2: solo completed. C4: total cobrado = amount + tip. C5: cash = solo efectivo.
+    // C2: solo completed. C5: cash = solo efectivo. FASE 3: sin propina → SUM(amount).
     const summary = db.prepare(`
-      SELECT p.method, COUNT(*) as count, SUM(p.amount + p.tip) as total
+      SELECT p.method, COUNT(*) as count, SUM(p.amount) as total
       FROM payments p
       WHERE ${localDateExpr('p.processed_at')} = ? AND p.status = 'completed'
       GROUP BY p.method
     `).all(today);
 
     const totalToday = db.prepare(`
-      SELECT COALESCE(SUM(amount + tip), 0) as total FROM payments
+      SELECT COALESCE(SUM(amount), 0) as total FROM payments
       WHERE ${localDateExpr('processed_at')} = ? AND status = 'completed'
     `).get(today);
 
     const cashToday = db.prepare(`
-      SELECT COALESCE(SUM(amount + tip), 0) as total FROM payments
+      SELECT COALESCE(SUM(amount), 0) as total FROM payments
+      WHERE ${localDateExpr('processed_at')} = ? AND status = 'completed' AND method = 'cash'
+    `).get(today);
+
+    // F3-2: efectivo al centavo — lo que el cliente entregó (received) y el vuelto
+    // (change) del día. Neto en caja = received_total - change_total == cash.
+    const cashFlowToday = db.prepare(`
+      SELECT COALESCE(SUM(received), 0) as received, COALESCE(SUM(change), 0) as change
+      FROM payments
       WHERE ${localDateExpr('processed_at')} = ? AND status = 'completed' AND method = 'cash'
     `).get(today);
 
@@ -372,6 +409,8 @@ router.get('/closing/current', requireAuth, requireRole('admin', 'caja'), (req, 
         payments: summary,
         total: totalToday?.total || 0,
         cash: cashToday?.total || 0,
+        received_total: cashFlowToday?.received || 0,
+        change_total: cashFlowToday?.change || 0,
         orders: ordersToday,
       },
     });
@@ -396,10 +435,10 @@ router.post('/closing', requireAuth, requireRole('admin', 'caja'), (req, res) =>
     }
 
     // C1: "hoy" local America/La_Paz. C5: expected_cash = SOLO method='cash'
-    // (QR/card/transfer son "ya depositados" — el cajero cuadra únicamente el efectivo).
+    // (QR es "ya depositado" — el cajero cuadra únicamente el efectivo).
     const today = localDateStr();
     const expected = db.prepare(`
-      SELECT COALESCE(SUM(amount + tip), 0) as total FROM payments
+      SELECT COALESCE(SUM(amount), 0) as total FROM payments
       WHERE ${localDateExpr('processed_at')} = ? AND status = 'completed' AND method = 'cash'
     `).get(today);
 

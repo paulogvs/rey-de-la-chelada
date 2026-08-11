@@ -34,7 +34,7 @@ describe('fetchDailySales', () => {
       },
       by_payment_method: [
         { method: 'cash', count: 8, total: 300 },
-        { method: 'qr_yape', count: 4, total: 200 },
+        { method: 'qr', count: 4, total: 200 },
       ],
       hourly: [],
     }));
@@ -48,7 +48,7 @@ describe('fetchDailySales', () => {
     expect(d.completedOrders).toBe(10);
     expect(d.totalSales).toBe(450); // net_revenue (paid only)
     expect(d.grossRevenue).toBe(500);
-    expect(d.byMethod).toEqual({ cash: 300, qr_yape: 200 });
+    expect(d.byMethod).toEqual({ cash: 300, qr: 200 });
     expect(d.averageTicket).toBeCloseTo(45, 5); // 450 / 10
     // IVA included in prices: iva = total - total/(1+rate)
     expect(d.totalIva).toBeCloseTo(51.77, 2); // 450 - 450/1.13

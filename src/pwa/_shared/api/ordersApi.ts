@@ -46,7 +46,7 @@ export interface ServerOrder {
   created_at: string;
   updated_at: string;
   local_id: string | null;
-  /** S2-C: suma de pagos completed (amount + tip) — SSOT server */
+  /** S2-C: suma de pagos completed (amount) — SSOT server */
   paid_amount?: number;
   items?: ServerOrderItem[];
 }
@@ -84,7 +84,7 @@ export interface Order {
   createdAt: string;
   updatedAt: string;
   localId: string | null;
-  /** S2-C: suma de pagos completed (amount + tip) — SSOT server */
+  /** S2-C: suma de pagos completed (amount) — SSOT server */
   paidAmount: number;
   items: OrderLineItem[];
 }

@@ -43,9 +43,9 @@ router.get('/sales/daily', requireAuth, requireRole('admin', 'caja'), (req, res)
       WHERE ${localDateExpr('created_at')} = ?
     `).get(targetDate);
 
-    // By payment method (C2: solo completed; C4: total cobrado = amount + tip)
+    // By payment method (C2: solo completed; FASE 3: sin propina → SUM(amount))
     const byMethod = db.prepare(`
-      SELECT p.method, COUNT(*) as count, SUM(p.amount + p.tip) as total
+      SELECT p.method, COUNT(*) as count, SUM(p.amount) as total
       FROM payments p
       WHERE ${localDateExpr('p.processed_at')} = ? AND p.status = 'completed'
       GROUP BY p.method

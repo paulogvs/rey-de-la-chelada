@@ -10,13 +10,13 @@ import { apiFetch, type ApiResult } from './apiFetch';
 export interface PaymentPayload {
   order_id: string;
   amount: number;
-  method: 'cash' | 'qr_yape' | 'qr_simple' | 'card' | 'transfer';
+  method: 'cash' | 'qr';
   iva_amount?: number;
   reference?: string;
   notes?: string;
   status?: string;
-  /** C4: propina del mismo pago (mismo método). amount+tip = total cobrado. */
-  tip?: number;
+  /** F3-2: efectivo al centavo — lo que el cliente ENTREGA (el server calcula el vuelto) */
+  received?: number;
 }
 
 export interface ServerPayment {
@@ -25,7 +25,8 @@ export interface ServerPayment {
   method: string;
   amount: number;
   iva_amount: number;
-  tip: number;
+  received: number;
+  change: number;
   reference: string;
   status: string;
   processed_by: string;

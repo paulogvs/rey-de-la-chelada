@@ -46,13 +46,10 @@ export interface DailySalesCsvSource {
 
 const METHOD_LABELS: Record<string, string> = {
   cash: 'Efectivo',
-  qr_yape: 'Yape',
-  qr_simple: 'QR Simple',
-  card: 'Tarjeta',
-  transfer: 'Transferencia',
+  qr: 'QR',
 };
 
-const DEFAULT_METHODS = ['cash', 'qr_yape', 'qr_simple', 'card', 'transfer'];
+const DEFAULT_METHODS = ['cash', 'qr'];
 
 /**
  * Build a CSV string for the daily sales report.

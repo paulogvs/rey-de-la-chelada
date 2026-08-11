@@ -24,7 +24,7 @@ function makeDaily() {
     totalIva: 40.27,
     baseRevenue: 309.73,
     averageTicket: 87.5,
-    byMethod: { cash: 250, qr_yape: 100, qr_simple: 0, card: 0, transfer: 0 },
+    byMethod: { cash: 250, qr: 100 },
   };
 }
 
@@ -75,7 +75,7 @@ describe('buildDailySalesCsv', () => {
     expect(lines[0]).toContain('Fecha');
     expect(lines[0]).toContain('Venta neta (Bs)');
     expect(lines[0]).toContain('Efectivo');
-    expect(lines[0]).toContain('Transferencia');
+    expect(lines[0]).toContain('QR');
   });
 
   it('includes a summary row with values', () => {
@@ -89,10 +89,10 @@ describe('buildDailySalesCsv', () => {
   it('adds a row per non-zero payment method', () => {
     const csv = buildDailySalesCsv(makeDaily());
     const lines = csv.replace('\uFEFF', '').trim().split('\r\n');
-    // header + summary + cash + qr_yape = 4 lines
+    // header + summary + cash + qr = 4 lines
     expect(lines).toHaveLength(4);
     expect(lines[2]).toBe('Efectivo,250.00');
-    expect(lines[3]).toBe('Yape,100.00');
+    expect(lines[3]).toBe('QR,100.00');
   });
 
   it('handles empty methods with only header + summary', () => {

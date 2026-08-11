@@ -6,9 +6,9 @@
  * existentes. Idempotente: si el CHECK ya incluye 'caja', no recrea.
  *
  * Verifica:
- *  - SCHEMA_VERSION = 5
+ *  - SCHEMA_VERSION = 6
  *  - DB nueva: staff acepta role 'caja'
- *  - Upgrade v4→v5: datos preservados + INSERT role 'caja' funciona
+ *  - Upgrade v4→v6: datos preservados + INSERT role 'caja' funciona
  *  - Idempotente: aplicar 2 veces no rompe nada
  */
 
@@ -77,15 +77,15 @@ function seedV4World(db) {
   `).run();
 }
 
-describe('Migración staff rol caja (v4 → v5)', () => {
-  it('SCHEMA_VERSION ahora es 5', () => {
-    expect(SCHEMA_VERSION).toBe(5);
+describe('Migración staff rol caja (v4 → v6)', () => {
+  it('SCHEMA_VERSION ahora es 6', () => {
+    expect(SCHEMA_VERSION).toBe(6);
   });
 
-  it('DB nueva: applySchema crea staff que acepta role caja y registra versión 5', () => {
+  it('DB nueva: applySchema crea staff que acepta role caja y registra versión 6', () => {
     const db = new Database(':memory:');
     applySchema(db);
-    expect(currentVersion(db)).toBe(5);
+    expect(currentVersion(db)).toBe(6);
     db.prepare(`
       INSERT INTO staff (id, pin_hash, role, display_name)
       VALUES ('caja-1', 'hash', 'caja', 'Cajero')
@@ -95,13 +95,13 @@ describe('Migración staff rol caja (v4 → v5)', () => {
     db.close();
   });
 
-  it('upgrade v4→v5: recrea staff con CHECK nuevo, preserva datos y acepta caja', () => {
+  it('upgrade v4→v6: recrea staff con CHECK nuevo, preserva datos y acepta caja', () => {
     const db = new Database(':memory:');
     seedV4World(db);
 
     applySchema(db);
 
-    expect(currentVersion(db)).toBe(5);
+    expect(currentVersion(db)).toBe(6);
     // Los datos existentes se preservan
     const admin = db.prepare('SELECT role, display_name FROM staff WHERE id = ?').get('admin-1');
     expect(admin.role).toBe('admin');
@@ -115,11 +115,11 @@ describe('Migración staff rol caja (v4 → v5)', () => {
     db.close();
   });
 
-  it('idempotente: aplicar el schema 2 veces (v5→v5) no rompe nada', () => {
+  it('idempotente: aplicar el schema 2 veces (v6→v6) no rompe nada', () => {
     const db = new Database(':memory:');
     applySchema(db);
     applySchema(db);
-    expect(currentVersion(db)).toBe(5);
+    expect(currentVersion(db)).toBe(6);
     db.prepare(`
       INSERT INTO staff (id, pin_hash, role, display_name)
       VALUES ('caja-1', 'hash', 'caja', 'Cajero')
@@ -138,8 +138,8 @@ describe('Migración staff rol caja (v4 → v5)', () => {
 });
 
 // T6 — cash_closings: las columnas fantasma se eliminan preservando datos
-describe('Migración cash_closings sin columnas fantasma (T6, misma v5)', () => {
-  it('upgrade v4→v5: elimina total_sales/total_iva/total_orders/sales_by_method y preserva la fila real', () => {
+describe('Migración cash_closings sin columnas fantasma (T6, misma v6)', () => {
+  it('upgrade v4→v6: elimina total_sales/total_iva/total_orders/sales_by_method y preserva la fila real', () => {
     const db = new Database(':memory:');
     seedV4World(db);
     // Un cash_closing real en DEV (1 fila) que debe sobrevivir intacto
@@ -153,7 +153,7 @@ describe('Migración cash_closings sin columnas fantasma (T6, misma v5)', () => 
 
     applySchema(db);
 
-    expect(currentVersion(db)).toBe(5);
+    expect(currentVersion(db)).toBe(6);
     // Columnas fantasma ELIMINADAS
     expect(hasColumn(db, 'cash_closings', 'total_sales')).toBe(false);
     expect(hasColumn(db, 'cash_closings', 'total_iva')).toBe(false);

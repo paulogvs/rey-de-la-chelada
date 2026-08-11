@@ -22,11 +22,11 @@ export type KDSStatus = 'pending' | 'preparing' | 'ready' | 'delivered' | 'cance
 /** Order status lifecycle */
 export type OrderStatus = 'draft' | 'called' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'paid' | 'cancelled';
 
-/** System roles (v2: 3 roles only) */
-export type UserRole = 'admin' | 'mesero' | 'kds';
+/** System roles (v5: 4 roles — admin, mesero, kds, caja) */
+export type UserRole = 'admin' | 'mesero' | 'kds' | 'caja';
 
-/** Payment methods */
-export type PaymentMethod = 'cash' | 'qr_yape' | 'qr_simple' | 'card' | 'transfer';
+/** Payment methods (FASE 3: SOLO Efectivo o QR — el corte separa cajón vs depósito) */
+export type PaymentMethod = 'cash' | 'qr';
 
 /** Menu item modifier type */
 export type ModifierType = 'select' | 'multi' | 'toggle';
@@ -165,14 +165,16 @@ export interface Order {
   localId: string;                    // Client-side ID (IndexedDB)
 }
 
-/** Payment transaction */
+/** Payment transaction (FASE 3: sin propina; received/change = efectivo al centavo) */
 export interface Payment {
   id: string;
   orderId: string;
   method: PaymentMethod;
   amount: number;
   ivaAmount: number;
-  reference: string;          // QR code, transaction ID, etc.
+  received: number;          // efectivo: lo que el cliente entrega (0 si no aplica)
+  change: number;            // efectivo: vuelto = received - amount (0 si no aplica)
+  reference: string;         // QR code, transaction ID, etc.
   status: 'pending' | 'completed' | 'failed' | 'refunded';
   processedBy: string;        // User ID
   processedAt: string;
@@ -208,31 +210,20 @@ export interface ShiftRecord {
   notes: string;
 }
 
-/** Daily cash closing (corte de caja) */
+/** Daily cash closing (corte de caja) — campos REALES de la tabla v5+ */
 export interface CashClosing {
   id: string;
-  date: string;                    // YYYY-MM-DD
+  closingDate: string;            // YYYY-MM-DD
   openedAt: string;
-  closedAt: string;
+  closedAt: string | null;
   openedBy: string;
-  closedBy: string;
-  
-  // Sales breakdown
-  totalSales: number;
-  totalIva: number;
-  totalOrders: number;
-  
-  // By payment method
-  salesByMethod: Record<PaymentMethod, number>;
-  
-  // Cash reconciliation
-  expectedCash: number;
-  actualCash: number;
-  cashDifference: number;
-  
-  // Notes
+  closedBy: string | null;
+  expectedCash: number;           // SOLO efectivo (SUM amount cash completed del día)
+  actualCash: number;             // lo que contó el cajero en el cajón
+  cashDifference: number;         // actual - expected (al centavo)
+  isReconciled: boolean;          // |difference| <= 0.01 → lo decide el server (M9)
   notes: string;
-  isReconciled: boolean;
+  createdAt: string;
 }
 
 // ============================================================

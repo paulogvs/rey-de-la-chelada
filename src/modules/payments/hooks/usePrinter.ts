@@ -3,7 +3,7 @@
  *
  * Handles:
  * - Thermal printer commands (ESC/POS)
- * - Ticket format: header → items → IVA → tip → total → QR → footer
+ * - Ticket format: header → items → IVA → total → QR → footer
  * - 58mm or 80mm paper support
  * - USB or network connection
  *
@@ -74,7 +74,6 @@ const DEFAULT_CONFIG: PrinterConfig = {
 export function generateTicket(
   order: Order,
   payment?: Payment,
-  tipAmount: number = 0,
   config: PrinterConfig = DEFAULT_CONFIG,
 ): Uint8Array {
   const cpl = config.paperSize === '58mm' ? 32 : config.characterPerLine;
@@ -145,13 +144,6 @@ export function generateTicket(
   ticket += ESCPOS.DOUBLE_ON;
   ticket += right('TOTAL:', `Bs. ${order.total.toFixed(2)}`) + '\n';
   ticket += ESCPOS.DOUBLE_OFF;
-
-  if (tipAmount > 0) {
-    ticket += right('Propina:', `Bs. ${tipAmount.toFixed(2)}`) + '\n';
-    ticket += ESCPOS.FONT_B;
-    ticket += '  * Propina no sujeta a IVA\n';
-    ticket += ESCPOS.FONT_A;
-  }
 
   ticket += line();
 
@@ -233,13 +225,12 @@ export function usePrinter(config: Partial<PrinterConfig> = {}) {
   const printTicket = useCallback(async (
     order: Order,
     payment?: Payment,
-    tipAmount: number = 0,
   ): Promise<boolean> => {
     setState(prev => ({ ...prev, printing: true, error: null }));
 
     try {
       // Generate ticket data
-      const data = generateTicket(order, payment, tipAmount, fullConfig);
+      const data = generateTicket(order, payment, fullConfig);
 
       // In production: send data to printer
       console.log(`[Printer] Printing ticket for order ${order.id} (${data.length} bytes)`);

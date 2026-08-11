@@ -1,10 +1,12 @@
 /**
- * Integración — Pagos & Corte de Caja (Fase 1: "la caja cuadre al centavo")
+ * Integración — Pagos & Corte de Caja (FASE 3: simplificación)
  *
- * C2 — failed/refunded NO cuentan como cobrados
- * C3 — Invariante: pedido solo queda paid con pago completed
- * C4 — Propina funcional (columna tip; total cobrado = amount + tip)
- * C5 — Corte: expected = SOLO efectivo (cash); is_reconciled lo decide el server
+ * F3-1 — Propina ELIMINADA: el server rechaza/ignora tip; SOLO 2 métodos: cash | qr
+ * F3-2 — Efectivo al centavo: received (lo que entrega el cliente) + change (vuelto);
+ *        SUM(amount) = lo que queda en caja; el cierre cuadra al centavo.
+ * F3-3 — Cierre: expected = SOLO efectivo (cash); is_reconciled lo decide el server.
+ * C2   — failed/refunded NO cuentan como cobrados
+ * C3   — Invariante: pedido solo queda paid con pago completed
  *
  * Patrón: server real con DB_PATH = temp (NO toca data/rey-de-la-chelada.db).
  * DB_PATH se setea ANTES de importar server/index.js.
@@ -104,12 +106,114 @@ async function pay(orderId, amount, method, extra = {}) {
   });
 }
 
+// Helper: monto base del día (para no acoplar tests entre sí)
+async function todayTotalBaseline() {
+  const cur = await api('/api/payments/closing/current', { token: adminToken });
+  return cur.json?.today?.total || 0;
+}
+
+// ═══════════════════════════════════════════════════════════
+// F3-1 — Propina ELIMINADA + solo métodos cash|qr
+// ═══════════════════════════════════════════════════════════
+
+describe('F3-1 — sin propina, solo cash|qr', () => {
+  it('rechaza métodos legacy (qr_yape/card/transfer) → 400 INVALID_METHOD', async () => {
+    const { orderId, total } = await createOrder();
+    for (const m of ['qr_yape', 'qr_simple', 'card', 'transfer', 'tarjeta']) {
+      const r = await pay(orderId, total, m);
+      expect(r.status).toBe(400);
+      expect(r.json.code).toBe('INVALID_METHOD');
+    }
+    // Y el pedido NO quedó paid
+    const order = await api(`/api/orders/${orderId}`, { token: meseroToken });
+    expect(order.json.order.is_paid).toBe(0);
+  });
+
+  it('acepta cash y qr (efectivo y QR simple)', async () => {
+    const o1 = await createOrder();
+    const cash = await pay(o1.orderId, o1.total, 'cash');
+    expect(cash.status).toBe(201);
+    expect(cash.json.fully_paid).toBe(true);
+
+    const o2 = await createOrder();
+    const qr = await pay(o2.orderId, o2.total, 'qr');
+    expect(qr.status).toBe(201);
+    expect(qr.json.fully_paid).toBe(true);
+    expect(qr.json.payment.method).toBe('qr');
+  });
+
+  it('el payment devuelto NO tiene campo tip (columna eliminada)', async () => {
+    const { orderId, total } = await createOrder();
+    const r = await pay(orderId, total, 'qr');
+    expect(r.status).toBe(201);
+    expect(r.json.payment.tip).toBeUndefined();
+  });
+
+  it('un tip enviado por el cliente se IGNORA (no rompe el flujo)', async () => {
+    const { orderId, total } = await createOrder();
+    const r = await pay(orderId, total, 'qr', { tip: 5 });
+    expect(r.status).toBe(201);
+    expect(r.json.fully_paid).toBe(true);
+    expect(r.json.payment.tip).toBeUndefined();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// F3-2 — Efectivo al centavo: received/change
+// ═══════════════════════════════════════════════════════════
+
+describe('F3-2 — efectivo received/change (vuelto al centavo)', () => {
+  it('pago cash con received > amount → registra change = received - amount', async () => {
+    const { orderId, total } = await createOrder();
+    const received = Math.round((total + 10) * 100) / 100; // cliente entrega billete de más
+    const r = await pay(orderId, total, 'cash', { received });
+    expect(r.status).toBe(201);
+    expect(r.json.payment.amount).toBe(total);
+    expect(r.json.payment.received).toBe(received);
+    expect(r.json.payment.change).toBe(Math.round((received - total) * 100) / 100);
+    expect(r.json.fully_paid).toBe(true);
+  });
+
+  it('pago cash sin received → default received = amount, change = 0 (retrocompat)', async () => {
+    const { orderId, total } = await createOrder();
+    const r = await pay(orderId, total, 'cash');
+    expect(r.status).toBe(201);
+    expect(r.json.payment.received).toBe(total);
+    expect(r.json.payment.change).toBe(0);
+  });
+
+  it('rechaza received < amount (no puede entregar menos de lo que se cobra) → 400', async () => {
+    const { orderId, total } = await createOrder();
+    const r = await pay(orderId, total, 'cash', { received: Math.round((total - 1) * 100) / 100 });
+    expect(r.status).toBe(400);
+    expect(r.json.code).toBe('INVALID_RECEIVED');
+  });
+
+  it('el corte actual reporta received_total y change_total del efectivo (cuadre al centavo)', async () => {
+    const before = await api('/api/payments/closing/current', { token: adminToken });
+    const baselineReceived = before.json?.today?.received_total || 0;
+    const baselineChange = before.json?.today?.change_total || 0;
+
+    const { orderId, total } = await createOrder();
+    const received = Math.round((total + 20) * 100) / 100;
+    await pay(orderId, total, 'cash', { received });
+
+    const cur = await api('/api/payments/closing/current', { token: adminToken });
+    expect(cur.json.today.received_total).toBe(Math.round((baselineReceived + received) * 100) / 100);
+    expect(cur.json.today.change_total).toBe(Math.round((baselineChange + (received - total)) * 100) / 100);
+    // El neto en caja (amount) sigue cuadrando: received_total - change_total == cash total
+    const net = Math.round((cur.json.today.received_total - cur.json.today.change_total) * 100) / 100;
+    expect(net).toBe(cur.json.today.cash);
+  });
+});
+
 // ═══════════════════════════════════════════════════════════
 // C2 — failed/refunded NO cuentan como cobrados
 // ═══════════════════════════════════════════════════════════
 
 describe('C2 — pagos failed/refunded no cuentan como cobrados', () => {
   it('un pago failed NO deja el pedido paid y NO bloquea el pago completed posterior', async () => {
+    const before = await todayTotalBaseline();
     const { orderId, total } = await createOrder();
 
     // Pago failed por el total (el route acepta status en body)
@@ -131,26 +235,20 @@ describe('C2 — pagos failed/refunded no cuentan como cobrados', () => {
 
     // closing/current: total del día = SOLO el completed (failed excluido)
     const cur = await api('/api/payments/closing/current', { token: adminToken });
-    expect(cur.json.today.total).toBe(total);
+    expect(cur.json.today.total).toBe(before + total);
   });
 
   it('pagos refunded tampoco cuentan en el total del día', async () => {
     const before = await todayTotalBaseline();
     const { orderId, total } = await createOrder();
     // completed (cuenta) + refunded (no cuenta)
-    await pay(orderId, total, 'card');
-    const ref = await pay(orderId, 10, 'card', { status: 'refunded' });
+    await pay(orderId, total, 'qr');
+    const ref = await pay(orderId, 10, 'qr', { status: 'refunded' });
     expect(ref.status).toBe(201);
     const cur = await api('/api/payments/closing/current', { token: adminToken });
     expect(cur.json.today.total).toBe(before + total);
   });
 });
-
-// Helper: monto base del día (para no acoplar tests entre sí)
-async function todayTotalBaseline() {
-  const cur = await api('/api/payments/closing/current', { token: adminToken });
-  return cur.json?.today?.total || 0;
-}
 
 // ═══════════════════════════════════════════════════════════
 // C3 — Invariante: paid requiere pago completed
@@ -164,7 +262,6 @@ describe('C3 — invariante: pedido solo queda paid con pago completed', () => {
     });
     expect(r.status).toBe(409);
     expect(r.json.code).toBe('PAYMENT_REQUIRED');
-    // is_paid NO debe quedar en 1 sin pago
     const order = await api(`/api/orders/${orderId}`, { token: meseroToken });
     expect(order.json.order.is_paid).toBe(0);
   });
@@ -173,15 +270,14 @@ describe('C3 — invariante: pedido solo queda paid con pago completed', () => {
     const { orderId, total } = await createOrder();
     const half = Math.round((total / 2) * 100) / 100;
 
-    await pay(orderId, half, 'qr_yape');
+    await pay(orderId, half, 'qr');
     const partial = await api(`/api/orders/${orderId}/status`, {
       method: 'PATCH', token: meseroToken, body: { status: 'paid' },
     });
     expect(partial.status).toBe(409);
     expect(partial.json.code).toBe('PAYMENT_REQUIRED');
 
-    // Completar pago (processPayment marca paid automáticamente)
-    await pay(orderId, Math.round((total - half) * 100) / 100, 'qr_yape');
+    await pay(orderId, Math.round((total - half) * 100) / 100, 'qr');
     const full = await api(`/api/orders/${orderId}/status`, {
       method: 'PATCH', token: meseroToken, body: { status: 'paid' },
     });
@@ -190,96 +286,25 @@ describe('C3 — invariante: pedido solo queda paid con pago completed', () => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// C4 — Propina funcional (tip)
-// ═══════════════════════════════════════════════════════════
-
-describe('C4 — propina funcional', () => {
-  it('split cash+QR con propina: 2 payments, suma(amount+tip) == total, tip en el payment cash', async () => {
-    const { orderId, total } = await createOrder();
-    const half = Math.round((total / 2) * 100) / 100;
-    const rest = Math.round((total - half) * 100) / 100;
-    const tip = 5;
-    // SEMÁNTICA C4 (documentada): amount + tip <= remaining. La propina va
-    // DENTRO del split que la recibe: cash envía amount = rest - tip.
-    const qr = await pay(orderId, half, 'qr_yape');
-    expect(qr.status).toBe(201);
-    expect(qr.json.payment.tip).toBe(0);
-
-    const cash = await pay(orderId, Math.round((rest - tip) * 100) / 100, 'cash', { tip });
-    expect(cash.status).toBe(201);
-    expect(cash.json.fully_paid).toBe(true);
-    expect(cash.json.payment.tip).toBe(tip);
-
-    const order = await api(`/api/orders/${orderId}`, { token: meseroToken });
-    expect(order.json.order.status).toBe('paid');
-    expect(order.json.order.is_paid).toBe(1);
-
-    const list = await api(`/api/payments?order_id=${orderId}`, { token: meseroToken });
-    expect(list.json.payments).toHaveLength(2);
-    // La suma de cobros (amount + tip) cubre EXACTAMENTE el total del pedido
-    const sum = list.json.payments.reduce((s, p) => s + p.amount + p.tip, 0);
-    expect(Math.round(sum * 100) / 100).toBe(total);
-    const cashPay = list.json.payments.find(p => p.method === 'cash');
-    expect(cashPay.tip).toBe(tip);
-  });
-
-  it('pago con propina NO rompe el flujo (regresión: el bug era 409 tras propina)', async () => {
-    const { orderId, total } = await createOrder();
-    // amount (del pedido) y tip (propina) por separado → suma cuadra
-    const amount = Math.round((total - 5) * 100) / 100;
-    const r = await pay(orderId, amount, 'cash', { tip: 5 });
-    expect(r.status).toBe(201);
-    expect(r.json.fully_paid).toBe(true);
-    expect(r.json.payment.tip).toBe(5);
-  });
-
-  it('retrocompat: pago sin tip funciona igual (tip default 0)', async () => {
-    const { orderId, total } = await createOrder();
-    const r = await pay(orderId, total, 'card');
-    expect(r.status).toBe(201);
-    expect(r.json.payment.tip).toBe(0);
-    expect(r.json.fully_paid).toBe(true);
-  });
-
-  it('rechaza tip negativo (400)', async () => {
-    const { orderId, total } = await createOrder();
-    const r = await pay(orderId, total, 'cash', { tip: -1 });
-    expect(r.status).toBe(400);
-    expect(r.json.code).toBe('INVALID_TIP');
-  });
-
-  it('rechaza amount+tip que exceda el saldo del pedido (409)', async () => {
-    const { orderId, total } = await createOrder();
-    // amount total + tip 5 → excede el saldo (amount+tip > remaining)
-    const r = await pay(orderId, total, 'cash', { tip: 5 });
-    expect(r.status).toBe(409);
-    expect(r.json.code).toBe('PAYMENT_CONFLICT');
-  });
-});
-
-// ═══════════════════════════════════════════════════════════
-// C5 — Corte: expected = solo efectivo (cash)
+// F3-3 / C5 — Corte: expected = solo efectivo (cash)
 // ═══════════════════════════════════════════════════════════
 
 describe('C5 — expected_cash = solo efectivo', () => {
   it('corte con SOLO pagos QR → el QR NO aporta al expected (solo efectivo cuenta)', async () => {
-    // Baseline: efectivo ya registrado hoy por tests anteriores
     const before = await api('/api/payments/closing/current', { token: adminToken });
     const baselineCash = before.json?.today?.cash || 0;
 
     const { orderId, total } = await createOrder();
-    await pay(orderId, total, 'qr_yape');
+    await pay(orderId, total, 'qr');
 
     const open = await api('/api/payments/closing', { method: 'POST', token: adminToken, body: {} });
     expect(open.status).toBe(201);
-    // El pago QR NO suma al efectivo esperado
     expect(open.json.closing.expected).toBe(baselineCash);
 
     const cur = await api('/api/payments/closing/current', { token: adminToken });
     expect(cur.json.today.cash).toBe(baselineCash);
     expect(cur.json.today.total).toBeGreaterThan(0); // el día sí registra ventas (QR)
 
-    // Cerrar con el efectivo correcto → difference 0 y reconciliado (aunque el cliente mande false)
     const close = await api('/api/payments/closing/close', {
       method: 'PUT', token: adminToken, body: { actual_cash: baselineCash, is_reconciled: false },
     });
@@ -288,26 +313,27 @@ describe('C5 — expected_cash = solo efectivo', () => {
     expect(close.json.closing.is_reconciled).toBe(1);
   });
 
-  it('corte mixto: expected = SOLO cash (+baseline); server decide is_reconciled', async () => {
+  it('corte mixto: expected = SOLO cash; el vuelto (change) ya está descontado en amount', async () => {
     const before = await api('/api/payments/closing/current', { token: adminToken });
     const baselineCash = before.json?.today?.cash || 0;
     const baselineTotal = before.json?.today?.total || 0;
 
-    // Pedido A pagado con QR (no suma al efectivo), Pedido B con cash
+    // Pedido A pagado con QR, Pedido B con cash (cliente entrega billete de más)
     const oA = await createOrder();
-    await pay(oA.orderId, oA.total, 'qr_yape');
+    await pay(oA.orderId, oA.total, 'qr');
     const oB = await createOrder();
-    await pay(oB.orderId, oB.total, 'cash');
+    const receivedB = Math.round((oB.total + 50) * 100) / 100;
+    await pay(oB.orderId, oB.total, 'cash', { received: receivedB });
 
     const open = await api('/api/payments/closing', { method: 'POST', token: adminToken, body: {} });
     expect(open.status).toBe(201);
+    // El expected NO incluye el vuelto: amount ya es neto (received - change)
     expect(open.json.closing.expected).toBe(Math.round((baselineCash + oB.total) * 100) / 100);
 
     const cur = await api('/api/payments/closing/current', { token: adminToken });
     expect(cur.json.today.cash).toBe(Math.round((baselineCash + oB.total) * 100) / 100);
     expect(cur.json.today.total).toBe(Math.round((baselineTotal + oA.total + oB.total) * 100) / 100);
 
-    // Cerrar con el efectivo correcto pero cliente manda is_reconciled=false → server decide 1
     const closeOk = await api('/api/payments/closing/close', {
       method: 'PUT', token: adminToken, body: { actual_cash: baselineCash + oB.total, is_reconciled: false },
     });
@@ -315,7 +341,7 @@ describe('C5 — expected_cash = solo efectivo', () => {
     expect(closeOk.json.closing.difference).toBe(0);
     expect(closeOk.json.closing.is_reconciled).toBe(1);
 
-    // Nuevo corte; cerrar con efectivo incorrecto pero cliente manda true → server decide 0
+    // Nuevo corte; cerrar con efectivo incorrecto → server decide no reconciliado
     const open2 = await api('/api/payments/closing', { method: 'POST', token: adminToken, body: {} });
     expect(open2.json.closing.expected).toBe(Math.round((baselineCash + oB.total) * 100) / 100);
     const closeBad = await api('/api/payments/closing/close', {

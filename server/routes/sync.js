@@ -63,17 +63,11 @@ const ITEM_STATUS_MAP = {
   cancelled: 'cancelled',
 };
 
-// Métodos de payments (schema CHECK): cash, qr_yape, qr_simple, card, transfer
+// Métodos de payments (schema CHECK v6): SOLO cash | qr
 const PAYMENT_METHOD_MAP = {
   efectivo: 'cash',
   cash: 'cash',
-  qr: 'qr_yape',
-  qr_yape: 'qr_yape',
-  qr_simple: 'qr_simple',
-  tarjeta: 'card',
-  card: 'card',
-  transferencia: 'transfer',
-  transfer: 'transfer',
+  qr: 'qr',
 };
 
 /** Log de sync compatible con CHECK constraints de sync_log */
@@ -336,7 +330,7 @@ router.post('/push', requireAuth, (req, res) => {
           // un push previo). Sin pago → error, sin marcar is_paid.
           if (status === 'paid') {
             const paidCheck = db.prepare(`
-              SELECT COALESCE(SUM(amount + tip), 0) as total FROM payments
+              SELECT COALESCE(SUM(amount), 0) as total FROM payments
               WHERE order_id = ? AND status = 'completed'
             `).get(order.id);
             const ord = db.prepare('SELECT total FROM orders WHERE id = ?').get(order.id);
@@ -393,19 +387,21 @@ router.post('/push', requireAuth, (req, res) => {
             continue;
           }
 
-          // C4: tip viaja con el payment (total cobrado = amount + tip).
-          const tipValue = Math.max(0, Number(order.tip) || 0);
+          // F3-2: received/change viajan con el payment (efectivo al centavo).
+          const receivedValue = Math.max(0, Number(order.received) || order.amount || 0);
+          const changeValue = Math.max(0, Number(order.change) || Math.max(0, receivedValue - (order.amount || 0)));
           db.prepare(`
-            INSERT INTO payments (id, order_id, method, amount, iva_amount, tip, reference,
+            INSERT INTO payments (id, order_id, method, amount, iva_amount, received, change, reference,
                                   status, processed_by, notes, synced_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?)
           `).run(
             paymentId,
             orderId,
             method,
             order.amount || 0,
             order.iva_amount || 0,
-            tipValue,
+            receivedValue,
+            changeValue,
             order.reference || '',
             order.processed_by || req.user.sub,
             order.notes || '',
@@ -413,10 +409,10 @@ router.post('/push', requireAuth, (req, res) => {
           );
 
           // Actualizar estado de pago del pedido
-          // C2: solo completed cuenta; C4: suma con tip.
+          // C2: solo completed cuenta; FASE 3: sin propina → SUM(amount).
           const ord = db.prepare('SELECT total FROM orders WHERE id = ?').get(orderId);
           const totalPaid = db.prepare(`
-            SELECT COALESCE(SUM(amount + tip), 0) as paid FROM payments
+            SELECT COALESCE(SUM(amount), 0) as paid FROM payments
             WHERE order_id = ? AND status = 'completed'
           `).get(orderId).paid;
           if (ord && totalPaid >= ord.total) {

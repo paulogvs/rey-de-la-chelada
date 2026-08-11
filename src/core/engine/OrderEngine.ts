@@ -203,6 +203,8 @@ class OrderEngine {
       processedAt: now,
       notes: '',
       syncedAt: null,
+      received: 0,
+      change: 0,
     };
 
     this.payments.set(payment.id, payment);

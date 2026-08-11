@@ -59,16 +59,6 @@ export interface ICEConfig {
   applicableCategories: string[];
 }
 
-export interface TippingConfig {
-  enabled: boolean;
-  /** Opciones de propina predeterminadas (porcentajes) */
-  presetPercentages: number[];
-  /** Permitir propina personalizada */
-  allowCustom: boolean;
-  /** La propina NO está sujeta a IVA */
-  subjectToIva: boolean;
-}
-
 export interface SFEConfig {
   /** Sistema de Facturación Electrónica — Bolivia SIN */
   enabled: boolean;
@@ -148,9 +138,6 @@ export interface RestaurantConfig {
     ice?: ICEConfig;
   };
 
-  /** Propinas */
-  tipping: TippingConfig;
-
   /** Facturación electrónica (SFE — SIN Bolivia) */
   invoicing: SFEConfig;
 
@@ -218,13 +205,6 @@ export const DEFAULT_CONFIG: RestaurantConfig = {
       adValoremRate: 0.01,
       applicableCategories: ['cervezas', 'destilados', 'vinos', 'licores'],
     },
-  },
-
-  tipping: {
-    enabled: true,
-    presetPercentages: [0, 5, 10, 15],
-    allowCustom: true,
-    subjectToIva: false,
   },
 
   invoicing: {

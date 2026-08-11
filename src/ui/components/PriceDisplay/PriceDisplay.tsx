@@ -1,9 +1,9 @@
 /**
- * PriceDisplay — Shows price with/without IVA breakdown, optional tip line
+ * PriceDisplay — Shows price with/without IVA breakdown
  *
  * Zero hardcoded colors — all from CSS variables
  * IVA is included in price by default (Bolivia standard)
- * Tip is NOT subject to IVA (separate line)
+ * FASE 3: propina eliminada de la app (se da directo al mesero).
  */
 
 import React, { useState } from 'react';
@@ -17,8 +17,6 @@ export interface PriceDisplayProps {
   ivaPercentage?: number;
   /** Show IVA breakdown toggle */
   showBreakdown?: boolean;
-  /** Show tip selection (for payment screens) */
-  showTip?: boolean;
   /** Currency symbol (defaults to app config) */
   currencySymbol?: string;
   /** Large display mode (for KDS / totals) */
@@ -30,7 +28,6 @@ export function PriceDisplay({
   priceWithIVA,
   ivaPercentage,
   showBreakdown = false,
-  showTip = false,
   currencySymbol,
   large = false,
   className = '',
@@ -39,7 +36,6 @@ export function PriceDisplay({
   const symbol = currencySymbol || config.currency.symbol;
   const rate = (ivaPercentage ?? config.taxes.iva.percentage) / 100;
   const [breakdownOpen, setBreakdownOpen] = useState(false);
-  const [selectedTip, setSelectedTip] = useState<number>(0);
 
   const classes = [
     'price-display',
@@ -60,10 +56,6 @@ export function PriceDisplay({
 
   const base = Math.round((priceWithIVA / (1 + rate)) * 100) / 100;
   const ivaAmount = Math.round((priceWithIVA - base) * 100) / 100;
-  const tipAmount = Math.round((priceWithIVA * (selectedTip / 100)) * 100) / 100;
-  const totalWithTip = Math.round((priceWithIVA + tipAmount) * 100) / 100;
-
-  const tipPresets = config.tipping.presetPercentages;
 
   return (
     <div className={classes}>
@@ -99,54 +91,6 @@ export function PriceDisplay({
             <span>Total</span>
             <span className="price-display__value">{symbol} {priceWithIVA.toFixed(2)}</span>
           </div>
-        </div>
-      )}
-
-      {/* Tip Selection */}
-      {showTip && config.tipping.enabled && (
-        <div className="price-display__tip">
-          <div className="price-display__tip-label">Propina</div>
-          <div className="price-display__tip-options">
-            {tipPresets.map(pct => (
-              <button
-                key={pct}
-                className={`price-display__tip-btn ${selectedTip === pct ? 'active' : ''}`}
-                onClick={() => setSelectedTip(pct)}
-              >
-                {pct === 0 ? 'Sin propina' : `${pct}%`}
-              </button>
-            ))}
-            {config.tipping.allowCustom && (
-              <button
-                className={`price-display__tip-btn ${!tipPresets.includes(selectedTip) && selectedTip !== 0 ? 'active' : ''}`}
-                onClick={() => {
-                  const custom = prompt('Propina personalizada (Bs.):');
-                  if (custom) {
-                    const val = parseFloat(custom);
-                    if (!isNaN(val)) setSelectedTip(val);
-                  }
-                }}
-              >
-                Personalizado
-              </button>
-            )}
-          </div>
-          {selectedTip > 0 && (
-            <div className="price-display__row price-display__row--tip">
-              <span>Propina ({selectedTip}%)</span>
-              <span className="price-display__value">{symbol} {tipAmount.toFixed(2)}</span>
-            </div>
-          )}
-          {selectedTip > 0 && (
-            <>
-              <div className="price-display__divider" />
-              <div className="price-display__row price-display__row--total">
-                <span>Total con propina</span>
-                <span className="price-display__value">{symbol} {totalWithTip.toFixed(2)}</span>
-              </div>
-              <div className="price-display__note">* La propina no está sujeta a IVA</div>
-            </>
-          )}
         </div>
       )}
     </div>

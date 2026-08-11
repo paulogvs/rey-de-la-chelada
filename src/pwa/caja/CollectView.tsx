@@ -3,7 +3,8 @@
  *
  * Flujo primario, última milla: la caja ve los pedidos servidos/activos
  * que esperan cobro, revisa su detalle y cobra con POST /api/payments
- * (mismo contrato que meseros: { order_id, amount, method, tip }).
+ * (mismo contrato que meseros: { order_id, amount, method, received }).
+ * FASE 3: sin propina; efectivo con received/change (vuelto al centavo).
  * El server libera la mesa al pagar completo (payments.js processPayment).
  *
  * Datos (SSOT server): GET /api/orders?pending=1 → orders con total,
@@ -21,7 +22,6 @@ import { EmptyState } from '@/ui/components/EmptyState';
 import { PriceDisplay } from '@/ui/components/PriceDisplay';
 import { SegmentedControl, type SegmentedOption } from '@/ui/components/SegmentedControl';
 import { useToast } from '@/ui/components/Toast';
-import { appConfig } from '@/core/config';
 import { METHOD_LABELS, METHOD_ICONS, PAYMENT_METHODS } from '../_shared/utils/paymentMethods';
 import './CollectView.css';
 
@@ -61,14 +61,13 @@ export function orderRemaining(order: Order): number {
 
 export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
   const { addToast } = useToast();
-  const config = appConfig.all;
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [method, setMethod] = useState<(typeof PAYMENT_METHODS)[number]>('cash');
-  const [tip, setTip] = useState(0);
+  const [received, setReceived] = useState(0);
   const [paying, setPaying] = useState(false);
 
   const load = useCallback(async () => {
@@ -99,14 +98,11 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
           addToast({ type: 'warning', message: 'El pedido ya está cubierto', duration: 3000 });
           return;
         }
-        // C4: la propina se descuenta del amount (amount + tip = total cobrado)
-        const totalTip = Math.min(Math.round((remaining * tip) / 100 * 100) / 100, remaining);
-        const amount = Math.round((remaining - totalTip) * 100) / 100;
         const result = await processPayment(token, {
           order_id: order.id,
-          amount,
+          amount: remaining,
           method,
-          tip: totalTip,
+          received: method === 'cash' && received > 0 ? received : undefined,
         });
         if (!result.ok) {
           addToast({ type: 'error', message: result.error || 'Error al procesar el pago', duration: 5000 });
@@ -135,7 +131,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
         setPaying(false);
       }
     },
-    [token, method, tip, addToast, onPaid, load]
+    [token, method, received, addToast, onPaid, load]
   );
 
   if (loading && orders.length === 0) {
@@ -178,6 +174,9 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
         {orders.map(order => {
           const remaining = orderRemaining(order);
           const isExpanded = expandedId === order.id;
+          const change = method === 'cash' && received > remaining
+            ? Math.round((received - remaining) * 100) / 100
+            : 0;
           return (
             <Card key={order.id} padded={false} className="caja-collect__order">
               <button
@@ -235,21 +234,26 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                       />
                     </div>
 
-                    <div className="caja-collect__pay-field">
-                      <label>Propina</label>
-                      <div className="caja-collect__tip-options">
-                        {config.tipping.presetPercentages.map(pct => (
-                          <Button
-                            key={pct}
-                            variant={tip === pct ? 'primary' : 'secondary'}
-                            size="sm"
-                            onClick={() => setTip(pct)}
-                          >
-                            {pct === 0 ? 'Sin' : `${pct}%`}
-                          </Button>
-                        ))}
+                    {method === 'cash' && (
+                      <div className="caja-collect__pay-field">
+                        <label htmlFor={`received-${order.id}`}>Efectivo recibido</label>
+                        <input
+                          id={`received-${order.id}`}
+                          type="number"
+                          className="caja-collect__received"
+                          value={received || ''}
+                          min={remaining}
+                          step={0.01}
+                          placeholder="Bs."
+                          onChange={e => setReceived(parseFloat(e.target.value) || 0)}
+                        />
+                        {change > 0 && (
+                          <p className="caja-collect__change">
+                            Cambio: <strong>Bs. {change.toFixed(2)}</strong>
+                          </p>
+                        )}
                       </div>
-                    </div>
+                    )}
 
                     <Button
                       variant="primary"

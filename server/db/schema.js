@@ -15,7 +15,12 @@
 // (propina registrada en el MISMO payment que la recibe; total cobrado = amount + tip).
 // v5 (S1): rol 'caja' REAL en staff (CHECK acepta 'caja') + cash_closings sin
 // columnas fantasma (total_sales/total_iva/total_orders/sales_by_method nunca escritas).
-const SCHEMA_VERSION = 5;
+// v6 (Fase 3 — simplificación): propina ELIMINADA de la app (se da directo al mesero).
+//   - payments.method CHECK IN ('cash','qr') — solo Efectivo o QR (adiós yape/simple/card/transfer).
+//   - payments.tip eliminada; payments.received/change REAL DEFAULT 0 — efectivo al centavo:
+//     received = lo que el cliente ENTREGA, change = vuelto (received - amount).
+//     Migración: métodos legacy → 'qr'; amount' = amount + tip (no falsear históricos).
+const SCHEMA_VERSION = 6;
 
 const CREATE_TABLES = [
   // ── Staff / Users (v5: 4 roles — admin, mesero, kds, caja) ─────
@@ -153,13 +158,15 @@ const CREATE_TABLES = [
   )`,
 
   // ── Payments ──────────────────────────────────────────
+  // v6 (Fase 3): SOLO cash|qr, sin propina. received/change = efectivo al centavo.
   `CREATE TABLE IF NOT EXISTS payments (
     id            TEXT PRIMARY KEY,
     order_id      TEXT NOT NULL,
-    method        TEXT NOT NULL CHECK(method IN ('cash','qr_yape','qr_simple','card','transfer')),
+    method        TEXT NOT NULL CHECK(method IN ('cash','qr')),
     amount        REAL NOT NULL,
     iva_amount    REAL NOT NULL DEFAULT 0,
-    tip           REAL NOT NULL DEFAULT 0,  -- v4: propina del payment (total cobrado = amount + tip)
+    received      REAL NOT NULL DEFAULT 0,  -- efectivo: lo que el cliente entrega
+    change        REAL NOT NULL DEFAULT 0,  -- efectivo: vuelto = received - amount
     reference     TEXT NOT NULL DEFAULT '',
     status        TEXT NOT NULL DEFAULT 'completed' CHECK(status IN ('pending','completed','failed','refunded')),
     processed_by  TEXT NOT NULL,
@@ -277,11 +284,13 @@ function applySchema(db) {
         db.exec(sql);
       }
       // ── Migraciones idempotentes ──────────────────────────
-      // v4: payments.tip — agrega la columna SOLO si no existe
-      // (CREATE TABLE IF NOT EXISTS no toca tablas existentes).
-      if (!hasColumn(db, 'payments', 'tip')) {
-        db.exec('ALTER TABLE payments ADD COLUMN tip REAL NOT NULL DEFAULT 0');
-        console.log('[DB] Migration v4: added payments.tip');
+      // v6 (Fase 3): payments sin propina, SOLO cash|qr, +received/change.
+      // Disparador: payments PRE-v6 (sin columna received — solo existe en v6).
+      // Cubre v3 (sin tip, 5 métodos), v4/v5 (con tip). La columna tip se
+      // detecta DENTRO de migratePaymentsV6 para absorberla en amount.
+      if (!hasColumn(db, 'payments', 'received')) {
+        migratePaymentsV6(db);
+        console.log('[DB] Migration v6: payments sin propina, métodos cash|qr, +received/change');
       }
       // v5a: staff con rol 'caja' — recrear SOLO si el CHECK viejo no lo acepta
       if (!staffAcceptsCajaRole(db)) {
@@ -348,6 +357,39 @@ function recreateTable(db, { table, newSql, copyColumns }) {
 function hasColumn(db, table, column) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
   return cols.some(c => c.name === column);
+}
+
+/**
+ * v6 (Fase 3): recrea `payments` con el DDL nuevo (sin tip, CHECK cash|qr,
+ * +received/change) PRESERVANDO datos:
+ *  - métodos legacy (qr_yape, qr_simple, card, transfer) → 'qr' (todo no-efectivo es QR).
+ *  - si la columna tip existe (v4/v5): amount' = amount + tip → los totales
+ *    históricos del día no cambian (SUM(amount) nuevo == SUM(amount + tip) viejo).
+ *    En v3 (sin tip): amount' = amount.
+ *  - received/change = 0 en pagos legacy (no había registro de vuelto).
+ * DEBE correr con foreign_keys=OFF (misma transacción de applySchema).
+ */
+function migratePaymentsV6(db) {
+  const ddl = CREATE_TABLES
+    .find(t => t.includes('CREATE TABLE IF NOT EXISTS payments'))
+    .replace('CREATE TABLE IF NOT EXISTS', 'CREATE TABLE')
+    .replace('payments', 'payments_v6');
+  const hasTip = hasColumn(db, 'payments', 'tip');
+  const amountExpr = hasTip ? 'amount + tip' : 'amount';
+  db.exec(`
+    ${ddl};
+    INSERT INTO payments_v6
+      (id, order_id, method, amount, iva_amount, received, change, reference,
+       status, processed_by, processed_at, notes, synced_at)
+    SELECT id, order_id,
+           CASE WHEN method = 'cash' THEN 'cash' ELSE 'qr' END,
+           ${amountExpr},
+           iva_amount, 0, 0, reference,
+           status, processed_by, processed_at, notes, synced_at
+    FROM payments;
+    DROP TABLE payments;
+    ALTER TABLE payments_v6 RENAME TO payments;
+  `);
 }
 
 export { applySchema, SCHEMA_VERSION, CREATE_TABLES };

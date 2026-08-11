@@ -112,7 +112,7 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
   }
 
   const byMethod = daily?.byMethod ?? {};
-  const qrTotal = (byMethod['qr_yape'] ?? 0) + (byMethod['qr_simple'] ?? 0);
+  const qrTotal = (byMethod['qr'] ?? 0) + (byMethod['qr_yape'] ?? 0) + (byMethod['qr_simple'] ?? 0);
 
   return (
     <div className="caja-close">
@@ -129,9 +129,9 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
             </div>
 
             <div className="caja-close__field">
-              {/* C5 (SSOT): expected_cash = SOLO efectivo físico (C5);
-                  propinas en QR/tarjeta NO van al cajón. La diferencia
-                  contra el efectivo real se calcula contra este total. */}
+              {/* C5 (SSOT): expected_cash = SOLO efectivo físico;
+                  ventas QR NO van al cajón. La diferencia contra el
+                  efectivo real se calcula contra este total. */}
               <label>Efectivo esperado (ventas del día)</label>
               <div className="caja-close__value">
                 Bs. {(closing.expected_cash ?? 0).toFixed(2)}
@@ -222,14 +222,6 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
             <div className="caja-close__history-item">
               <span>Ventas QR</span>
               <span className="caja-close__history-value">Bs. {qrTotal.toFixed(2)}</span>
-            </div>
-            <div className="caja-close__history-item">
-              <span>Ventas tarjeta</span>
-              <span className="caja-close__history-value">Bs. {(byMethod['card'] ?? 0).toFixed(2)}</span>
-            </div>
-            <div className="caja-close__history-item">
-              <span>Ventas transferencia</span>
-              <span className="caja-close__history-value">Bs. {(byMethod['transfer'] ?? 0).toFixed(2)}</span>
             </div>
           </div>
         </div>

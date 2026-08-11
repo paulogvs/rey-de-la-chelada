@@ -110,18 +110,18 @@ describe('fetchPendingOrders (S2-C)', () => {
 });
 
 describe('paymentMethods helpers', () => {
-  it('tiene los 5 métodos del SSOT server', () => {
-    expect(PAYMENT_METHODS).toEqual(['cash', 'qr_yape', 'qr_simple', 'card', 'transfer']);
+  it('tiene SOLO los 2 métodos del SSOT server (cash, qr)', () => {
+    expect(PAYMENT_METHODS).toEqual(['cash', 'qr']);
   });
 
   it('methodLabel devuelve label en español o el código crudo', () => {
     expect(methodLabel('cash')).toBe('Efectivo');
-    expect(methodLabel('qr_yape')).toBe('Yape');
+    expect(methodLabel('qr')).toBe('QR');
     expect(methodLabel('desconocido')).toBe('desconocido');
   });
 
   it('methodIcon devuelve emoji o fallback para métodos desconocidos', () => {
-    expect(methodIcon('card')).toBe('💳');
+    expect(methodIcon('qr')).toBe('📱');
     expect(methodIcon('nope')).toBe('💰');
   });
 
