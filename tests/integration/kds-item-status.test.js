@@ -168,4 +168,61 @@ describe('KDS item status persistence', () => {
     const r = await api(`/api/orders/${orderId}`, { token: meseroToken });
     expect(r.json?.order?.status).toBe('served');
   });
+
+  it('P0-FIX: pedido mixto — un módulo ready NO saca el pedido del KDS del otro módulo', async () => {
+    // Pedido mixto nuevo (1 bar + 1 cocina) en su PROPIA mesa throwaway
+    // (la mesa 92 del beforeAll sigue con pedido activo hasta el afterAll)
+    const mkTable = await api('/api/tables', {
+      method: 'POST', token: adminToken,
+      body: { number: 93, capacity: 4, section: 'e2e' },
+    });
+    const table = mkTable.json?.table;
+    const menu = await api('/api/menu/items');
+    const items = menu.json?.items?.filter(i => i.price != null);
+    const bar = items.find(i => i.area === 'bar');
+    const cocina = items.find(i => i.area === 'cocina' || !i.area);
+    const create = await api('/api/orders', {
+      method: 'POST', token: meseroToken,
+      body: { table_id: table.id, items: [
+        { menu_item_id: bar.id, quantity: 1 },
+        { menu_item_id: cocina.id, quantity: 1 },
+      ] },
+    });
+    const oid = create.json?.order?.id;
+    await api(`/api/orders/${oid}/submit`, { method: 'PATCH', token: meseroToken });
+    await api(`/api/orders/${oid}/confirm`, { method: 'PATCH', token: meseroToken });
+
+    const kds = await api(`/api/orders/kds/kds`, { token: kdsToken });
+    const order = kds.json?.orders?.find(o => o.id === oid);
+    const barItem = order?.items?.find(i => i.kds_module === 'bar');
+    const cocinaItem = order?.items?.find(i => i.kds_module === 'cocina');
+
+    // Bartender marca SU item ready (el de bar) — el pedido NO debe cerrarse
+    await api(`/api/orders/${oid}/items/${barItem.id}/status`, {
+      method: 'PATCH', token: kdsToken, body: { status: 'ready' },
+    });
+
+    // 1) El pedido sigue activo (confirmed/preparing/ready) — no served/cerrado
+    const after = await api(`/api/orders/${oid}`, { token: meseroToken });
+    expect(['confirmed', 'preparing', 'ready'].includes(after.json?.order?.status)).toBe(true);
+    // El item de bar está ready, el de cocina sigue pending
+    const barAfter = after.json?.order?.items?.find(i => i.id === barItem.id);
+    const cocinaAfter = after.json?.order?.items?.find(i => i.id === cocinaItem.id);
+    expect(barAfter?.status).toBe('ready');
+    expect(cocinaAfter?.status).toBe('pending');
+
+    // 2) El KDS de COCINA sigue viendo el pedido (con su item pending)
+    const kdsCocina = await api(`/api/orders/kds/cocina`, { token: kdsToken });
+    const cocinaView = kdsCocina.json?.orders?.find(o => o.id === oid);
+    expect(cocinaView).toBeDefined();
+    expect(cocinaView?.items?.every(i => i.kds_module === 'cocina')).toBe(true);
+
+    // Cleanup
+    const { getDb } = await import('../../server/db/index.js');
+    const db = getDb();
+    db.prepare('DELETE FROM payments WHERE order_id = ?').run(oid);
+    db.prepare('DELETE FROM order_items WHERE order_id = ?').run(oid);
+    db.prepare('DELETE FROM orders WHERE id = ?').run(oid);
+    if (table?.id) db.prepare('DELETE FROM tables WHERE id = ?').run(table.id);
+  });
 });

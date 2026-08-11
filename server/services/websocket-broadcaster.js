@@ -30,6 +30,7 @@ export const KDSEventType = Object.freeze({
   STATUS_CHANGE: 'status_change',
   ITEM_READY: 'item_ready',
   ORDER_COMPLETE: 'order_complete',
+  MODULE_READY: 'module_ready',
 });
 
 /** WebSocket readyState.OPEN === 1 */

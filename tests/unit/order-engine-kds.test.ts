@@ -94,6 +94,47 @@ describe('OrderEngine.applyKDSEvent', () => {
     expect(engine.getOrder('order-1')!.status).toBe('preparing');
   });
 
+  it('P0-FIX: status_change with itemId touches ONLY the item, never the order status', () => {
+    const engine = new OrderEngine();
+    engine.applyKDSEvent(makeOrderEvent({
+      items: [makeItem('item-cocina'), makeItem('item-bar')],
+    }));
+
+    // El server emite status_change con itemId para estados de ITEM no-ready
+    // (ej: bartender marca su item delivered). El engine NO debe pisar
+    // order.status con un valor de item ('delivered' no es OrderStatus).
+    const applied = engine.applyKDSEvent(makeOrderEvent({
+      type: 'status_change',
+      itemId: 'item-bar',
+      status: 'delivered',
+    }));
+
+    expect(applied).toBe(true);
+    const order = engine.getOrder('order-1')!;
+    const bar = order.items.find(i => i.id === 'item-bar')!;
+    const cocina = order.items.find(i => i.id === 'item-cocina')!;
+    expect(bar.status).toBe('delivered');
+    expect(cocina.status).toBe('pending');
+    expect(order.status).toBe('confirmed'); // ← NO pisado por el item status
+  });
+
+  it('P0-FIX: status_change with itemId delivering one module keeps the order in KDS view', () => {
+    const engine = new OrderEngine();
+    engine.applyKDSEvent(makeOrderEvent({
+      items: [makeItem('item-cocina'), makeItem('item-bar')],
+    }));
+
+    engine.applyKDSEvent(makeOrderEvent({
+      type: 'status_change',
+      itemId: 'item-bar',
+      status: 'delivered',
+    }));
+
+    // El pedido sigue visible para el KDS (confirmed) — NO 'delivered' inválido
+    const order = engine.getOrder('order-1')!;
+    expect(['confirmed', 'preparing', 'ready'].includes(order.status)).toBe(true);
+  });
+
   it('applies item_ready to a single item', () => {
     const engine = new OrderEngine();
     engine.applyKDSEvent(makeOrderEvent());

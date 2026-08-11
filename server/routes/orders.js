@@ -24,7 +24,7 @@ import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { logger } from '../utils/logger.js'; // S1/T2: errores de pedidos al log diario
-import { broadcastOrderCreated, broadcastOrderStatusChange, broadcastOrderComplete, isOrderFullyReady } from '../services/order-broadcaster.js';
+import { broadcastOrderCreated, broadcastOrderStatusChange, broadcastOrderComplete, isOrderFullyReady, isModuleFullyReady, broadcastModuleReady } from '../services/order-broadcaster.js';
 import { broadcaster, buildKDSEvent, KDSEventType } from '../services/websocket-broadcaster.js';
 import { computeTotals, round2 } from '../../src/core/config/iva.js';
 import { resolveModifierAdjustment, recalcOrder } from '../services/order-pricing.js';
@@ -754,6 +754,20 @@ router.patch('/:id/items/:itemId/status', requireAuth, requireRole('admin', 'kds
     // Persistir estado del item
     db.prepare("UPDATE order_items SET status = ? WHERE id = ?")
       .run(canonical, req.params.itemId);
+
+    // P0-FIX (2026-08-11 flujo mixto): aviso PARCIAL por módulo. Cuando el
+    // bartender marca SU item (bar), y ese módulo completa TODOS sus items,
+    // el mesero recibe "barra lista" — SIN cerrar el pedido de cocina. El
+    // circuito se cierra (order_complete) solo cuando TODOS los módulos
+    // terminaron (isOrderFullyReady más abajo). ANTES, un item de un módulo
+    // con status no-ready ('delivered') pisaba el status del pedido en el
+    // engine del otro módulo → el pedido desaparecía del KDS como cerrado.
+    const moduleSnapshot = buildOrder(db, req.params.id);
+    const changedItem = moduleSnapshot.items.find((i) => i.id === req.params.itemId);
+    const changedModule = changedItem?.kds_module || 'cocina';
+    if (isModuleFullyReady(moduleSnapshot, changedModule)) {
+      broadcastModuleReady(moduleSnapshot, changedModule);
+    }
 
     // ¿Todos los items en estado terminal (delivered/cancelled)? → pedido served
     const remaining = db.prepare(

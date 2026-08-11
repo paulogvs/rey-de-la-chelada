@@ -346,6 +346,30 @@ class OrderEngine {
       case 'status_change': {
         const existing = this.orders.get(event.orderId);
         if (!existing) return false;
+        // P0-FIX (2026-08-11): el server emite `status_change` en DOS
+        // situaciones distintas y ANTES el engine las confundía:
+        //   1) Cambio de status del PEDIDO (PATCH /:id/status) → SIN itemId
+        //   2) Cambio de status de un ITEM no-ready (PATCH items/status,
+        //      ej: bartender marca 'delivered') → CON itemId
+        // Antes, un item 'delivered' pisaba order.status con un valor de
+        // ITEM ('delivered' no es OrderStatus) → el pedido salía del KDS
+        // del otro módulo como si estuviera terminado. Ahora: si viene
+        // itemId, se actualiza SOLO ese item.
+        if (event.itemId) {
+          const item = existing.items.find(i => i.id === event.itemId);
+          if (!item) return false;
+          item.status = (event.status as KDSStatus) || item.status;
+          existing.updatedAt = event.timestamp || new Date().toISOString();
+          this._notify();
+          this._fireKDSEvent({
+            type: 'status_change',
+            orderId: existing.id,
+            tableNumber: existing.tableNumber,
+            items: [item],
+            timestamp: existing.updatedAt,
+          });
+          return true;
+        }
         if (event.status) {
           existing.status = event.status as OrderStatus;
         }
@@ -391,6 +415,22 @@ class OrderEngine {
           tableNumber: existing.tableNumber,
           items: existing.items,
           timestamp: existing.updatedAt,
+        });
+        return true;
+      }
+
+      case 'module_ready': {
+        // Aviso parcial: UN módulo (bar|cocina) terminó su parte. No cambia
+        // el status del pedido (sigue abierto hasta que todos terminen) —
+        // solo notifica a los listeners (meseros) para el aviso parcial.
+        const existing = this.orders.get(event.orderId);
+        if (!event.module) return false;
+        this._fireKDSEvent({
+          type: 'module_ready',
+          orderId: event.orderId,
+          tableNumber: event.tableNumber ?? existing?.tableNumber ?? 0,
+          items: existing?.items ?? [],
+          timestamp: event.timestamp || new Date().toISOString(),
         });
         return true;
       }

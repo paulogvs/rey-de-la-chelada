@@ -101,3 +101,38 @@ export function isOrderFullyReady(order) {
     i.status === 'ready' || i.status === 'delivered' || i.status === 'cancelled'
   );
 }
+
+/**
+ * True when TODOS los items de UN módulo (bar | cocina) están en estado
+ * terminal-for-kitchen. El circuito se cierra SOLO cuando TODOS los módulos
+ * del pedido están listos (isOrderFullyReady); este helper permite avisar
+ * por módulo: "barra lista" y "cocina lista" son avisos SEPARADOS al mesero.
+ *
+ * FIX 2026-08-11 (flujo mixto): antes, marcar la barra lista hacía que el
+ * pedido entero pareciera listo (order_complete) o desapareciera del otro
+ * módulo KDS. Ahora cada módulo completa su parte de forma independiente.
+ */
+export function isModuleFullyReady(order, module) {
+  if (!order.items || order.items.length === 0) return false;
+  const moduleItems = order.items.filter((i) => (i.kds_module || 'cocina') === module);
+  if (moduleItems.length === 0) return false;
+  return moduleItems.every((i) =>
+    i.status === 'ready' || i.status === 'delivered' || i.status === 'cancelled'
+  );
+}
+
+/**
+ * Emit a `module_ready` event to meseros: UN módulo del pedido (bar o
+ * cocina) terminó TODOS sus items → el mesero puede recoger esa parte.
+ * No es order_complete: el pedido sigue abierto hasta que TODOS los
+ * módulos terminen (broadcastOrderComplete).
+ */
+export function broadcastModuleReady(order, module) {
+  if (!order || !module || !['bar', 'cocina'].includes(module)) return;
+  broadcaster.broadcastMeseros(buildKDSEvent(KDSEventType.MODULE_READY, {
+    orderId: order.id,
+    tableNumber: order.table_number,
+    module,
+    status: order.status || 'confirmed',
+  }));
+}

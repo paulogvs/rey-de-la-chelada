@@ -58,6 +58,17 @@ function MeserosApp() {
     module: 'meseros',
     enabled: !!token,
     onEvent: event => {
+      // P0-FIX (2026-08-11 flujo mixto): aviso PARCIAL por módulo — barra
+      // lista y cocina lista son avisos SEPARADOS al mesero. El circuito se
+      // cierra (order_complete) solo cuando TODOS los módulos terminaron.
+      if (event.type === 'module_ready') {
+        const label = event.module === 'bar' ? '🍺 Barra lista' : '🍳 Cocina lista';
+        addToast({
+          type: 'success',
+          message: `Mesa ${event.tableNumber ?? ''} — ${label} — listo para recoger`,
+          duration: 4000,
+        });
+      }
       if (event.type === 'order_complete') {
         addToast({
           type: 'success',

@@ -20,7 +20,7 @@ import { orderEngine } from '@/core/engine';
 import { KDSOrderCard, KDSOrderCardSkeleton } from '@/ui/components/KDSOrderCard';
 import { Badge } from '@/ui/components/Badge';
 import { EmptyState } from '@/ui/components/EmptyState';
-import { filterItemsByModule, type KDSModule } from './filter';
+import { filterItemsByModule, itemsForModule, type KDSModule } from './filter';
 import type { Order, KDSEvent, KDSStatus } from '@/core/types';
 import './KDSBoard.css';
 
@@ -216,10 +216,13 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
   }, [token]);
 
   // Handle order acknowledge (confirmed → preparing)
+  // P0-FIX (2026-08-11 flujo mixto): SOLO los items del módulo actual.
+  // ANTES marcaba TODOS los items del pedido → el bartender "aceptaba"
+  // también los items de cocina.
   const handleAcknowledge = useCallback((orderId: string) => {
     const order = orderEngine.getOrder(orderId);
     if (order && order.status === 'confirmed') {
-      order.items.forEach(item => {
+      itemsForModule(order.items, module).forEach(item => {
         if (item.status === 'pending') {
           orderEngine.updateItemStatus(orderId, item.id, 'preparing');
         }
@@ -230,13 +233,16 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
         return updated;
       });
     }
-  }, []);
+  }, [module]);
 
-  // Handle order reject (pending → cancelled) — FASE 2: persistir igual
+  // Handle order reject (pending → cancelled) — FASE 2: persistir igual.
+  // P0-FIX (2026-08-11 flujo mixto): SOLO los items del módulo actual.
+  // ANTES cancelaba TODOS los items pending del pedido (incluidos los de
+  // cocina) y los persistía — un rechazo del bar cerraba la cocina.
   const handleReject = useCallback((orderId: string) => {
     const order = orderEngine.getOrder(orderId);
     if (!order) return;
-    order.items.forEach(item => {
+    itemsForModule(order.items, module).forEach(item => {
       if (item.status === 'pending') {
         orderEngine.updateItemStatus(orderId, item.id, 'cancelled');
         if (token) {
@@ -248,7 +254,7 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
         }
       }
     });
-  }, [token]);
+  }, [token, module]);
 
   // Toggle audio
   const toggleAudio = useCallback(() => {

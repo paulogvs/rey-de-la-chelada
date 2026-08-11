@@ -241,7 +241,7 @@ export interface CashClosing {
 
 /** KDS Event (WebSocket message) */
 export interface KDSEvent {
-  type: 'new_order' | 'status_change' | 'item_ready' | 'order_complete' | 'urgent' | 'cancelled';
+  type: 'new_order' | 'status_change' | 'item_ready' | 'order_complete' | 'module_ready' | 'urgent' | 'cancelled';
   orderId: string;
   tableNumber: number;
   items: OrderLineItem[];
@@ -253,7 +253,7 @@ export interface KDSEvent {
  * Items are already normalized to client shape by the parsing layer.
  */
 export interface KDSIncomingEvent {
-  type: 'new_order' | 'status_change' | 'item_ready' | 'order_complete';
+  type: 'new_order' | 'status_change' | 'item_ready' | 'order_complete' | 'module_ready';
   orderId: string;
   tableNumber?: number;
   tableId?: string;
@@ -261,6 +261,7 @@ export interface KDSIncomingEvent {
   waiterName?: string;
   items?: OrderLineItem[];
   itemId?: string;
+  module?: 'bar' | 'cocina';
   status?: OrderStatus | KDSStatus;
   previousStatus?: string;
   timestamp?: string;

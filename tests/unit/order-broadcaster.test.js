@@ -22,7 +22,7 @@ vi.mock('../../server/services/websocket-broadcaster.js', () => ({
     broadcastToModule: (...args) => broadcastToModuleMock(...args),
   },
   buildKDSEvent: (type, fields) => ({ type, timestamp: '2026-08-01T00:00:00.000Z', ...fields }),
-  KDSEventType: { NEW_ORDER: 'new_order', STATUS_CHANGE: 'status_change', ITEM_READY: 'item_ready', ORDER_COMPLETE: 'order_complete' },
+  KDSEventType: { NEW_ORDER: 'new_order', STATUS_CHANGE: 'status_change', ITEM_READY: 'item_ready', ORDER_COMPLETE: 'order_complete', MODULE_READY: 'module_ready' },
 }));
 
 describe('Order Broadcaster — broadcastOrderCreated', () => {
@@ -236,5 +236,60 @@ describe('Order Broadcaster — caja real-time (S2-D)', () => {
     expect(isOrderFullyReady({ items: [{ status: 'ready' }, { status: 'delivered' }] })).toBe(true);
     expect(isOrderFullyReady({ items: [{ status: 'ready' }, { status: 'pending' }] })).toBe(false);
     expect(isOrderFullyReady({ items: [] })).toBe(false);
+  });
+});
+
+describe('Order Broadcaster — aviso parcial por módulo (bar/cocina separados)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('isModuleFullyReady: true cuando TODOS los items de ESE módulo están terminales', async () => {
+    const { isModuleFullyReady } = await import('../../server/services/order-broadcaster.js');
+    const order = {
+      items: [
+        { id: 'i1', status: 'ready', kds_module: 'bar' },
+        { id: 'i2', status: 'delivered', kds_module: 'bar' },
+        { id: 'i3', status: 'pending', kds_module: 'cocina' },
+      ],
+    };
+    expect(isModuleFullyReady(order, 'bar')).toBe(true);
+    expect(isModuleFullyReady(order, 'cocina')).toBe(false);
+  });
+
+  it('isModuleFullyReady: cancelled cuenta como terminal', async () => {
+    const { isModuleFullyReady } = await import('../../server/services/order-broadcaster.js');
+    const order = {
+      items: [
+        { id: 'i1', status: 'cancelled', kds_module: 'bar' },
+        { id: 'i2', status: 'ready', kds_module: 'bar' },
+      ],
+    };
+    expect(isModuleFullyReady(order, 'bar')).toBe(true);
+  });
+
+  it('isModuleFullyReady: módulo sin items NO está listo', async () => {
+    const { isModuleFullyReady } = await import('../../server/services/order-broadcaster.js');
+    expect(isModuleFullyReady({ items: [] }, 'bar')).toBe(false);
+    expect(isModuleFullyReady({ items: [{ id: 'i1', status: 'ready', kds_module: 'cocina' }] }, 'bar')).toBe(false);
+  });
+
+  it('broadcastModuleReady emite module_ready a MESEROS con el módulo', async () => {
+    const { broadcastModuleReady } = await import('../../server/services/order-broadcaster.js');
+    const order = { id: 'ord-m1', table_number: 7, status: 'confirmed', items: [] };
+    broadcastModuleReady(order, 'bar');
+    expect(broadcastMeserosMock).toHaveBeenCalledTimes(1);
+    const [event] = broadcastMeserosMock.mock.calls[0];
+    expect(event.type).toBe('module_ready');
+    expect(event.orderId).toBe('ord-m1');
+    expect(event.tableNumber).toBe(7);
+    expect(event.module).toBe('bar');
+  });
+
+  it('broadcastModuleReady es no-op con order null o módulo inválido', async () => {
+    const { broadcastModuleReady } = await import('../../server/services/order-broadcaster.js');
+    expect(() => broadcastModuleReady(null, 'bar')).not.toThrow();
+    expect(() => broadcastModuleReady({ id: 'x', items: [] }, 'no-existe')).not.toThrow();
+    expect(broadcastMeserosMock).not.toHaveBeenCalled();
   });
 });

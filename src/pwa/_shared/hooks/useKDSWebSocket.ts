@@ -38,6 +38,7 @@ export const KDS_EVENT_TYPES = new Set([
   'status_change',
   'item_ready',
   'order_complete',
+  'module_ready',
 ]);
 
 /**
@@ -71,6 +72,7 @@ export function parseKDSMessage(raw: string): KDSIncomingEvent | null {
   if (typeof msg.waiterId === 'string') event.waiterId = msg.waiterId;
   if (typeof msg.waiterName === 'string') event.waiterName = msg.waiterName;
   if (typeof msg.itemId === 'string') event.itemId = msg.itemId;
+  if (msg.module === 'bar' || msg.module === 'cocina') event.module = msg.module;
   if (typeof msg.status === 'string') {
     event.status = msg.status as OrderStatus | KDSStatus;
   }

@@ -15,8 +15,19 @@ export type KDSModule = 'cocina' | 'bar';
 type KDSAwareItem = OrderLineItem & { kds_module?: string };
 
 /** Area de un item: kds_module del item, con fallback 'cocina' (legacy). */
-function itemModule(item: KDSAwareItem): string {
+export function itemModule(item: KDSAwareItem): string {
   return item.kds_module || 'cocina';
+}
+
+/**
+ * P0-FIX (2026-08-11 flujo mixto): filtra SOLO los items del módulo actual.
+ * Lo usan handleAcknowledge/handleReject del KDSBoard para que el bartender
+ * acepte/rechace SOLO su parte — ANTES marcaban TODOS los items del pedido
+ * (incluidos los de cocina) y el pedido entero se cerraba con una sola
+ * acción de un módulo.
+ */
+export function itemsForModule(items: OrderLineItem[], module: KDSModule): OrderLineItem[] {
+  return items.filter(i => itemModule(i) === module);
 }
 
 /**
