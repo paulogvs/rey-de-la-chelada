@@ -91,7 +91,6 @@ rey-de-la-chelada/
 │   │   ├── orders/         ← Pedidos, KDS
 │   │   ├── menu/           ← Productos, precios
 │   │   ├── payments/       ← QR, efectivo, POS
-│   │   ├── inventory/      ← Stock, recetas
 │   │   ├── staff/          ← Roles, turnos
 │   │   ├── reports/        ← Corte de caja
 │   │   └── sync/           ← Offline sync

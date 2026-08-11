@@ -189,7 +189,7 @@ export const PWA_REGISTRY: Record<PwaModuleId, PwaRegistration> = {
     manifest: {
       name: `${brandName} · Admin`,
       short_name: 'RdlC · Admin',
-      description: 'Panel de administración: configuración, reportes, inventario.',
+      description: 'Panel de administración: configuración, reportes.',
       start_url: '/admin/',
       scope: '/admin/',
       display: 'standalone',
@@ -206,7 +206,7 @@ export const PWA_REGISTRY: Record<PwaModuleId, PwaRegistration> = {
     serviceWorker: {
       cachePrefix: 'rdlc-admin',
       precacheAssets: ['/admin/', '/admin/index.html'],
-      networkFirst: ['/api/admin/', '/api/reports/', '/api/inventory/'],
+      networkFirst: ['/api/admin/', '/api/reports/'],
       cacheFirst: ['/icons/', '/fonts/'],
       offlineFallback: '/admin/offline.html',
     },

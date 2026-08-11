@@ -235,33 +235,6 @@ export interface CashClosing {
   isReconciled: boolean;
 }
 
-/** Inventory item */
-export interface InventoryItem {
-  id: string;
-  name: string;
-  unit: string;             // 'unidad' | 'kg' | 'litro' | 'caja' | 'bolsa'
-  unitPrice: number;
-  currentStock: number;
-  minStock: number;         // Alert threshold
-  supplierId: string | null;
-  category: string;         // 'insumos' | 'bebidas' | 'limpieza' | etc.
-  lastRestockedAt: string | null;
-  updatedAt: string;
-}
-
-/** Recipe (links menu items to inventory) */
-export interface Recipe {
-  id: string;
-  menuItemId: string;
-  ingredients: {
-    inventoryItemId: string;
-    quantity: number;
-    unit: string;
-  }[];
-  yield: number;            // How many portions this recipe makes
-  preparationInstructions: string;
-}
-
 // ============================================================
 // API & EVENT TYPES
 // ============================================================

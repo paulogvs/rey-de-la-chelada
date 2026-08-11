@@ -54,10 +54,6 @@ export enum Capability {
   MANAGE_STAFF         = 'manage:staff',
   VIEW_SHIFTS          = 'view:shifts',
 
-  // 📦 INVENTARIO
-  VIEW_INVENTORY       = 'view:inventory',
-  MANAGE_INVENTORY     = 'manage:inventory',
-
   // ⚙️ ADMIN
   MANAGE_CONFIG        = 'manage:config',
   VIEW_LOGS            = 'view:logs',
@@ -157,8 +153,6 @@ export const MODULE_CAPABILITIES: Record<PwaModuleId, Capability[]> = {
     Capability.CLOSE_CASH,
     Capability.MANAGE_STAFF,
     Capability.VIEW_SHIFTS,
-    Capability.VIEW_INVENTORY,
-    Capability.MANAGE_INVENTORY,
     Capability.MANAGE_CONFIG,
     Capability.VIEW_LOGS,
     Capability.MANAGE_MODULES,
