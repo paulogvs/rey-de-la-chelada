@@ -7,6 +7,16 @@
 
 import { apiFetch, type ApiResult } from './apiFetch';
 
+/** Estado de un módulo del pedido activo (FASE 4.5 — alertas de salón) */
+export type TableModuleState = 'ready' | 'preparing';
+
+/** Resumen del pedido activo de la mesa (SSOT server, derivado de items) */
+export interface ActiveOrderSummary {
+  id: string;
+  status: string | null;
+  modules: Partial<Record<'bar' | 'cocina', TableModuleState>>;
+}
+
 /** Server table row (snake_case) */
 export interface ServerTable {
   id: string;
@@ -18,6 +28,7 @@ export interface ServerTable {
   section: string;
   position: number;
   notes?: string;
+  active_order?: ActiveOrderSummary | null;
 }
 
 export interface Table {
@@ -30,6 +41,7 @@ export interface Table {
   section: string;
   position: number;
   notes: string;
+  activeOrder: ActiveOrderSummary | null;
 }
 
 export interface TablesResult extends ApiResult<{ tables: ServerTable[] }> {
@@ -47,6 +59,7 @@ function normalizeTable(t: ServerTable): Table {
     section: t.section,
     position: t.position,
     notes: t.notes ?? '',
+    activeOrder: t.active_order ?? null,
   };
 }
 

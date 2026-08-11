@@ -27,15 +27,6 @@ import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
 import { computeTotals } from '@/core/config/iva';
 
-/** Badge de estado de un item del pedido (S2-B) */
-const ITEM_STATUS_BADGE: Record<string, { variant: 'pending' | 'preparing' | 'ready' | 'paid' | 'cancelled' | 'info'; label: string }> = {
-  pending:   { variant: 'pending',   label: 'Pendiente' },
-  preparing: { variant: 'preparing', label: 'En prep.' },
-  ready:     { variant: 'ready',     label: 'Listo' },
-  delivered: { variant: 'paid',      label: 'Entregado' },
-  cancelled: { variant: 'cancelled', label: 'Cancelado' },
-};
-
 /** Badge de estado del pedido (S2-B) */
 const ORDER_STATUS_BADGE: Record<string, { variant: 'pending' | 'preparing' | 'ready' | 'paid' | 'cancelled' | 'info'; label: string }> = {
   draft:      { variant: 'info',      label: 'Borrador' },
@@ -385,68 +376,76 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
               </Badge>
             </div>
 
-            {/* Items agrupados por RONDA → módulo (FASE 4B) */}
+            {/* FASE 4.5: cards minimalistas por MÓDULO+RONDA.
+                🍳/🍺 verde = listo para entregar · amarillo = en proceso.
+                Cada card es independiente: entregar una no toca las otras. */}
             {rounds.map(round => {
               const roundItems = activeOrder.items.filter(i => (i.round ?? 1) === round);
               const modsInRound = [...new Set(roundItems.map(i => i.kdsModule || 'cocina'))];
-              return (
-                <div key={round} className="order-panel__round">
-                  <div className="order-panel__round-header">
-                    <span className="order-panel__round-title">
-                      {round === 1 ? 'Ronda 1' : `Ronda ${round} 🆕`}
-                    </span>
-                    <span className="order-panel__round-total">
-                      Bs. {roundItems.reduce((s, i) => s + i.subtotal, 0).toFixed(2)}
-                    </span>
-                  </div>
+              return modsInRound.map(mod => {
+                const modKey = (mod === 'bar' ? 'bar' : 'cocina') as 'bar' | 'cocina';
+                const modItems = roundItems.filter(i => (i.kdsModule || 'cocina') === mod);
+                const hasReady = modItems.some(i => i.status === 'ready');
+                const inProgress = modItems.some(i => i.status === 'pending' || i.status === 'preparing');
+                const cardState = hasReady ? 'ready' : inProgress ? 'preparing' : 'done';
+                const modTotal = modItems.reduce((s, i) => s + i.subtotal, 0);
+                return (
+                  <div
+                    key={`${round}-${mod}`}
+                    className={`order-panel__mod-card order-panel__mod-card--${cardState}`}
+                  >
+                    <div className="order-panel__mod-card-header">
+                      <span className="order-panel__mod-card-title">
+                        {modLabel(mod)}
+                        {round > 1 && <span className="order-panel__mod-card-round"> · Ronda {round} 🆕</span>}
+                      </span>
+                      <span className="order-panel__mod-card-state">
+                        {cardState === 'ready' ? '✓ Listo' : cardState === 'preparing' ? 'En proceso…' : '✓ Entregado'}
+                      </span>
+                    </div>
 
-                  {modsInRound.map(mod => {
-                    const modKey = (mod === 'bar' ? 'bar' : 'cocina') as 'bar' | 'cocina';
-                    const modItems = roundItems.filter(i => (i.kdsModule || 'cocina') === mod);
-                    const modHasReady = modItems.some(i => i.status === 'ready');
-                    return (
-                      <div key={`${round}-${mod}`} className="order-panel__mod">
-                        <div className="order-panel__mod-label">{modLabel(mod)}</div>
-                        {modItems.map(item => {
-                          const badge = ITEM_STATUS_BADGE[item.status] || { variant: 'info' as const, label: item.status };
-                          const canRemove = canEditOrder && ['pending', 'preparing'].includes(item.status);
-                          return (
-                            <div key={item.id} className="order-panel__active-item">
-                              <span className="order-panel__active-item-qty">{item.quantity}x</span>
-                              <span className="order-panel__active-item-name">{item.menuItemName}</span>
-                              <Badge variant={badge.variant}>{badge.label}</Badge>
-                              <span className="order-panel__active-item-price">Bs. {item.subtotal.toFixed(2)}</span>
-                              {canRemove && (
-                                <button
-                                  className="order-panel__active-item-remove"
-                                  onClick={() => handleRemoveItem(item.id)}
-                                  disabled={removingItemId === item.id}
-                                  aria-label={`Quitar ${item.menuItemName}`}
-                                  title="Quitar item"
-                                >
-                                  {removingItemId === item.id ? '…' : '🗑️'}
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                        {modHasReady && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="order-panel__mod-deliver"
-                            onClick={() => handleDeliver(modKey, round)}
-                            loading={delivering}
-                            disabled={delivering}
-                          >
-                            ✅ Entregar {modLabel(mod)}
-                          </Button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
+                    <div className="order-panel__mod-card-items">
+                      {modItems.map(item => {
+                        const canRemove = canEditOrder && ['pending', 'preparing'].includes(item.status);
+                        return (
+                          <div key={item.id} className="order-panel__active-item">
+                            <span className="order-panel__active-item-qty">{item.quantity}x</span>
+                            <span className="order-panel__active-item-name">{item.menuItemName}</span>
+                            <span className="order-panel__active-item-price">Bs. {item.subtotal.toFixed(2)}</span>
+                            {canRemove && (
+                              <button
+                                className="order-panel__active-item-remove"
+                                onClick={() => handleRemoveItem(item.id)}
+                                disabled={removingItemId === item.id}
+                                aria-label={`Quitar ${item.menuItemName}`}
+                                title="Quitar item"
+                              >
+                                {removingItemId === item.id ? '…' : '🗑️'}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="order-panel__mod-card-footer">
+                      <span className="order-panel__mod-card-total">Bs. {modTotal.toFixed(2)}</span>
+                      {cardState === 'ready' && (
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          className="order-panel__mod-card-deliver"
+                          onClick={() => handleDeliver(modKey, round)}
+                          loading={delivering}
+                          disabled={delivering}
+                        >
+                          ✅ Entregado
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              });
             })}
 
             <PriceDisplay

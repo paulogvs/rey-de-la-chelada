@@ -1,12 +1,19 @@
 /**
  * TablesView — API-driven table grid (meseros PWA)
  *
- * Reads tables from the server (via useTables), NOT from the
- * in-memory tableEngine. Reuses the TableGrid.css visual classes.
+ * FASE 4.5: alertas de salón PERMANENTES por módulo, derivadas del pedido
+ * activo de cada mesa (SSOT server → GET /api/tables → table.activeOrder):
+ *   - 🍳 / 🍺 VERDE  = ese módulo tiene items LISTOS para entregar
+ *   - 🍳 / 🍺 AMARILLO = ese módulo está EN PROCESO (cocina/bar trabajando)
+ *   - 💰 "Por cobrar" = TODO entregado (served)
+ *
+ * La alerta vive mientras el pedido tenga trabajo de ese módulo (sin TTL):
+ * desaparece al entregar o al pagar. El polling (15s) + WS la mantienen al día.
  */
 
 import React from 'react';
 import type { Table } from '@/core/types';
+import { tableAlertState } from './tableAlerts';
 import '@/modules/salon/components/TableGrid.css';
 
 /** Status → CSS variable mapping (zero hardcoded colors) */
@@ -19,20 +26,23 @@ const STATUS_VARS: Record<string, { border: string; label: string }> = {
   closed:   { border: 'var(--status-delivered)',  label: 'Cerrada' },
 };
 
+const MODULE_ICON: Record<string, string> = { bar: '🍺', cocina: '🍳' };
+
 interface TablesViewProps {
   tables: Table[];
   loading: boolean;
   error: string | null;
   onTableSelect: (table: Table) => void;
   onRefresh: () => void;
-  /** S2-A: números de mesa con pedido listo para servir (badge "🍴 Listo") */
-  readyTableNumbers?: ReadonlySet<number>;
 }
 
-export function TablesView({ tables, loading, error, onTableSelect, onRefresh, readyTableNumbers }: TablesViewProps) {
+export function TablesView({ tables, loading, error, onTableSelect, onRefresh }: TablesViewProps) {
   const freeCount = tables.filter(t => t.status === 'free').length;
   const occupiedCount = tables.length - freeCount;
-  const readyCount = tables.filter(t => readyTableNumbers?.has(t.number)).length;
+  const chargeCount = tables.filter(t => t.activeOrder?.status === 'served').length;
+  const deliverableCount = tables.filter(t =>
+    t.activeOrder && ['bar', 'cocina'].some(m => t.activeOrder!.modules[m as 'bar' | 'cocina'] === 'ready')
+  ).length;
 
   return (
     <div className="table-grid-wrapper">
@@ -49,7 +59,8 @@ export function TablesView({ tables, loading, error, onTableSelect, onRefresh, r
         </div>
         <span className="table-grid__count">
           {loading ? 'Cargando…' : `${freeCount} libres / ${occupiedCount} ocupadas`}
-          {readyCount > 0 && <span className="table-grid__ready-count"> · {readyCount} listas 🍴</span>}
+          {deliverableCount > 0 && <span className="table-grid__ready-count"> · {deliverableCount} para entregar 🍽️</span>}
+          {chargeCount > 0 && <span className="table-grid__charge-count"> · {chargeCount} por cobrar 💰</span>}
         </span>
       </div>
 
@@ -61,22 +72,40 @@ export function TablesView({ tables, loading, error, onTableSelect, onRefresh, r
       <div className="table-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(112px, 1fr))' }}>
         {tables.map(table => {
           const statusStyle = STATUS_VARS[table.status] || STATUS_VARS.free;
-          const isReady = readyTableNumbers?.has(table.number) === true;
+          const { served, modules } = tableAlertState(table.activeOrder);
+          const hasModuleAlerts = modules.length > 0;
           return (
             <button
               key={table.id}
-              className={`table-card${isReady ? ' table-card--ready' : ''}`}
+              className={`table-card${served ? ' table-card--charge' : ''}${hasModuleAlerts ? ' table-card--alert' : ''}`}
               onClick={() => onTableSelect(table)}
               style={{ borderColor: statusStyle.border }}
-              aria-label={`Mesa ${table.number} — ${statusStyle.label}${isReady ? ' — pedido listo para servir' : ''}`}
+              aria-label={`Mesa ${table.number} — ${statusStyle.label}${served ? ' — todo entregado, por cobrar' : ''}`}
             >
               <span className="table-card__number">{table.number}</span>
               <span className="table-card__status" style={{ color: statusStyle.border }}>
                 {statusStyle.label}
               </span>
               <span className="table-card__capacity">{table.capacity} pers.</span>
-              {isReady && (
-                <span className="table-card__ready-badge">🍴 Listo</span>
+
+              {/* FASE 4.5: alertas por módulo (verde = listo, amarillo = en proceso) */}
+              {!served && hasModuleAlerts && (
+                <span className="table-card__modules">
+                  {modules.map(({ module, state }) => (
+                    <span
+                      key={module}
+                      className={`table-card__module table-card__module--${state}`}
+                      title={state === 'ready' ? `${module === 'bar' ? 'Barra' : 'Cocina'} lista — entregar` : `${module === 'bar' ? 'Barra' : 'Cocina'} en proceso`}
+                    >
+                      {MODULE_ICON[module]}
+                    </span>
+                  ))}
+                </span>
+              )}
+
+              {/* FASE 4.5: todo entregado → por cobrar */}
+              {served && (
+                <span className="table-card__charge-badge">💰 Por cobrar</span>
               )}
             </button>
           );

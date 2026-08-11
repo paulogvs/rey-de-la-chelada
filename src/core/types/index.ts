@@ -51,6 +51,13 @@ export interface Table {
   notes: string;
   createdAt: string;
   updatedAt: string;
+  /** FASE 4.5: resumen del pedido activo (alertas de salón por módulo).
+   *  { id, status, modules: { bar?: 'ready'|'preparing', cocina?: ... } } */
+  activeOrder?: {
+    id: string;
+    status: string | null;
+    modules: Partial<Record<'bar' | 'cocina', 'ready' | 'preparing'>>;
+  } | null;
 }
 
 /** Table configuration (admin-editable, not hardcoded) */

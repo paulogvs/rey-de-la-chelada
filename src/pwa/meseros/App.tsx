@@ -20,7 +20,6 @@ import { useKDSWebSocket } from '../_shared/hooks/useKDSWebSocket';
 import { useStaffAuth } from '../_shared/hooks/useStaffAuth';
 import { useTables } from '../_shared/hooks/useTables';
 import { useWaiterCalls } from '../_shared/hooks/useWaiterCalls';
-import { useReadyTables } from './useReadyTables';
 import { LoginScreen } from '../_shared/components/LoginScreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { ToastProvider, useToast } from '@/ui/components/Toast';
@@ -50,8 +49,10 @@ function MeserosApp() {
   // crítico en tiempo real y reduce ~40% del polling de meseros)
   const waiterCalls = useWaiterCalls({ token, pollMs: 30000 });
 
-  // S2-A: mesas con pedido listo para servir (badge "🍴 Listo")
-  const readyTables = useReadyTables();
+  // FASE 4.5: las alertas de salón (🍳/🍺 verde/amarillo + 💰 Por cobrar)
+  // se DERIVAN de tables[].activeOrder (SSOT server) — el polling de mesas
+  // (15s) + los eventos WS la mantienen al día. Sin TTL: la alerta vive
+  // mientras el pedido tenga trabajo de ese módulo.
 
   // Real-time: KDS marks an order complete → notify waiter + refresh tables
   useKDSWebSocket({
@@ -76,9 +77,7 @@ function MeserosApp() {
           duration: 4000,
         });
       }
-      // S2-A: actualiza el badge de mesas listas
-      readyTables.handleEvent(event);
-      // Any order event → refresh table statuses
+      // Any order event → refresh table statuses (actualiza las alertas)
       tables.wsEvent(event);
     },
   });
@@ -86,9 +85,9 @@ function MeserosApp() {
   const handleTableSelect = useCallback((table: Table) => {
     setSelectedTable(table);
     setView('order-panel');
-    // Al abrir la mesa el badge deja de tener sentido
-    readyTables.clearTable(table.number);
-  }, [readyTables]);
+    // Refrescar para que el detalle vea el pedido activo actualizado
+    tables.refresh();
+  }, [tables]);
 
   const handleBackToTables = useCallback(() => {
     setSelectedTable(null);
@@ -211,12 +210,12 @@ function MeserosApp() {
             <TablesView
               // tablesApi.Table es un subconjunto estructural de core Table (sin
               // createdAt/updatedAt, que el server no expone en GET /api/tables).
+              // FASE 4.5: activeOrder llega en cada mesa → alertas por módulo.
               tables={tables.tables as Table[]}
               loading={tables.loading}
               error={tables.error}
               onTableSelect={handleTableSelect}
               onRefresh={tables.refresh}
-              readyTableNumbers={readyTables.readyTableNumbers}
             />
           )}
 

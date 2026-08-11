@@ -39,6 +39,66 @@ const TABLE_STATUS_MAP = {
 };
 
 // ============================================================
+// Helpers — resumen del pedido activo por módulo (FASE 4.5)
+//
+// La alerta de la mesa en el salón ("🍳/🍺 verde = listo, amarillo = en
+// proceso, 💰 Por cobrar = served") se DERIVA de los items del pedido
+// activo — el server es la fuente de verdad, sin eventos perdidos.
+// ============================================================
+
+/**
+ * Adjunta a cada mesa `active_order` = { id, status, modules } donde
+ * modules es { bar?: 'ready'|'preparing', cocina?: ... }:
+ *   - 'ready'     → hay items READY de ese módulo (se puede entregar ya)
+ *   - 'preparing' → hay items pending/preparing (en proceso)
+ *   - ausente     → sin items activos de ese módulo (no mostrar alerta)
+ * Prioridad por módulo: ready > preparing (si hay listos, se entrega ya).
+ */
+function attachActiveOrderSummary(db, tables) {
+  const activeOrders = db.prepare(`
+    SELECT o.id as order_id, o.table_id, o.status,
+           mi.area as module,
+           SUM(CASE WHEN oi.status = 'ready' THEN 1 ELSE 0 END) as ready_count,
+           SUM(CASE WHEN oi.status IN ('pending','preparing') THEN 1 ELSE 0 END) as in_progress
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.id
+    JOIN menu_items mi ON oi.menu_item_id = mi.id
+    WHERE o.status NOT IN ('paid','cancelled')
+    GROUP BY o.id, mi.area
+  `).all();
+
+  const byTable = new Map();
+  for (const row of activeOrders) {
+    const mod = row.module === 'bar' ? 'bar' : 'cocina';
+    const state = Number(row.ready_count) > 0 ? 'ready'
+      : Number(row.in_progress) > 0 ? 'preparing' : null;
+    if (!state) continue;
+    let entry = byTable.get(row.table_id);
+    if (!entry) {
+      entry = { id: row.order_id, status: row.status, modules: {} };
+      byTable.set(row.table_id, entry);
+    }
+    entry.modules[mod] = state;
+  }
+
+  for (const table of tables) {
+    if (!table.current_order_id) {
+      table.active_order = null;
+      continue;
+    }
+    let entry = byTable.get(table.id);
+    if (!entry) {
+      // Pedido sin items activos (p.ej. served — todo entregado): el status
+      // real sigue importando → el salón muestra "💰 Por cobrar".
+      const ord = db.prepare('SELECT id, status FROM orders WHERE id = ?').get(table.current_order_id);
+      entry = { id: table.current_order_id, status: ord?.status ?? null, modules: {} };
+    }
+    table.active_order = entry;
+  }
+  return tables;
+}
+
+// ============================================================
 // GET /api/tables — Listar todas las mesas
 // ============================================================
 
@@ -49,6 +109,7 @@ router.get('/', requireAuth, (req, res) => {
       SELECT id, number, capacity, status, current_order_id, assigned_waiter_id, section, position, notes
       FROM tables ORDER BY number ASC
     `).all();
+    attachActiveOrderSummary(db, tables);
     res.json({
       success: true,
       tables,
@@ -72,6 +133,7 @@ router.get('/:id', requireAuth, (req, res) => {
     if (!table) {
       return res.status(404).json({ success: false, error: 'Mesa no encontrada', code: 'TABLE_NOT_FOUND' });
     }
+    attachActiveOrderSummary(db, [table]);
     res.json({ success: true, table });
   } catch (err) {
     console.error('[Tables] Get error:', err.message);

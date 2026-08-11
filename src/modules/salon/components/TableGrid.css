@@ -118,7 +118,62 @@
   color: var(--text-faint);
 }
 
-/* ---- Ready — pulso elegante, no badge chillón ---- */
+/* ── FASE 4.5: alertas por módulo (verde = listo, amarillo = en proceso) ── */
+.table-card__modules {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.table-card__module {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font-size: 14px;
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  line-height: 1;
+}
+
+.table-card__module--ready {
+  border-color: var(--status-delivered);
+  background: color-mix(in srgb, var(--status-delivered) 14%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--status-delivered) 35%, transparent);
+}
+
+.table-card__module--preparing {
+  border-color: var(--status-preparing);
+  background: color-mix(in srgb, var(--status-preparing) 14%, transparent);
+}
+
+.table-card--alert {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--dorado-rey) 18%, transparent), var(--shadow-card);
+}
+
+/* ── FASE 4.5: todo entregado → "Por cobrar" ── */
+.table-card--charge {
+  border-color: var(--dorado-rey);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dorado-rey) 30%, transparent), var(--shadow-card);
+}
+
+.table-card__charge-badge {
+  margin-top: 4px;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-inverse);
+  background: var(--dorado-rey);
+  border-radius: var(--radius-full);
+  padding: 3px 8px;
+  letter-spacing: 0.04em;
+  animation: ready-pulse 2.2s var(--ease-in-out) infinite;
+}
+
+/* ---- Ready — pulso elegante, no badge chillón (legacy, sin uso) ---- */
 .table-card__ready-badge {
   position: absolute;
   top: 8px;
