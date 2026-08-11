@@ -22,6 +22,8 @@ export interface ServerOrderItem {
   created_at: string;
   item_name?: string;
   kds_module?: string;
+  /** FASE 4B: ronda ("segunda comanda") — el server lo incluye desde v7 */
+  round?: number;
 }
 
 /** Server order row (snake_case) */
@@ -62,6 +64,9 @@ export interface OrderLineItem {
   status: string;
   preparationNotes: string;
   kdsModule?: string;
+  /** FASE 4B: ronda ("segunda comanda") — items agregados a un pedido con
+   *  platos ya procesados entran en una ronda nueva (max+1). */
+  round?: number;
 }
 
 export interface Order {
@@ -134,6 +139,7 @@ function normalizeItem(item: ServerOrderItem): OrderLineItem {
     status: item.status,
     preparationNotes: item.preparation_notes,
     kdsModule: item.kds_module,
+    round: typeof item.round === 'number' ? item.round : 1,
   };
 }
 
@@ -283,15 +289,89 @@ export async function fetchPendingOrders(
   return { ...result, data: { orders: result.data.orders }, orders: result.data.orders.map(normalizeOrder) };
 }
 
-/** PATCH /api/orders/:id/deliver — mesero entrega los items listos (S2-B) */
+/** PATCH /api/orders/:id/deliver — mesero entrega items listos (S2-B).
+ *  FASE 4C: filtro opcional { module?, round? } → entrega SOLO la ronda de
+ *  ese módulo (botón "Pedido Entregado" por ronda). Sin filtro → todos. */
 export async function deliverOrder(
   token: string,
   orderId: string,
+  opts?: { module?: 'bar' | 'cocina'; round?: number },
   fetchImpl: typeof fetch = fetch
 ): Promise<ApiResult<{ success: boolean; status?: string }>> {
   return apiFetch<{ success: boolean; status?: string }>(`/api/orders/${orderId}/deliver`, {
     method: 'PATCH',
     token,
+    body: opts && (opts.module || opts.round) ? opts : undefined,
+    fetchImpl,
+  });
+}
+
+/** PUT /api/orders/:id — actualizar pedido INCREMENTAL (FASE 2/4B):
+ *  items con id → update; sin id → insert (ronda asignada por el server);
+ *  remove_item_ids → delete explícito; no mencionados → se conservan. */
+export async function updateOrder(
+  token: string,
+  orderId: string,
+  payload: { items?: OrderItemPayload[]; remove_item_ids?: string[]; notes?: string },
+  fetchImpl: typeof fetch = fetch
+): Promise<OrderResult> {
+  const result = await apiFetch<{ success: boolean; order?: ServerOrder }>(`/api/orders/${orderId}`, {
+    method: 'PUT',
+    token,
+    body: payload,
+    fetchImpl,
+  });
+
+  if (!result.ok || !result.data?.order) {
+    return { ...result, data: null, order: null } as OrderResult;
+  }
+
+  const order = normalizeOrder(result.data.order);
+  return { ...result, data: { order: result.data.order }, order };
+}
+
+/** POST /api/orders/:id/items — agregar UN item a pedido existente (FASE 4B) */
+export async function addOrderItem(
+  token: string,
+  orderId: string,
+  item: OrderItemPayload,
+  fetchImpl: typeof fetch = fetch
+): Promise<ApiResult<{ success: boolean; status?: string }>> {
+  return apiFetch<{ success: boolean; status?: string }>(`/api/orders/${orderId}/items`, {
+    method: 'POST',
+    token,
+    body: item,
+    fetchImpl,
+  });
+}
+
+/** DELETE /api/orders/:id/items/:itemId — quitar item del pedido (FASE 4A) */
+export async function removeOrderItem(
+  token: string,
+  orderId: string,
+  itemId: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<ApiResult<{ success: boolean }>> {
+  return apiFetch<{ success: boolean }>(`/api/orders/${orderId}/items/${itemId}`, {
+    method: 'DELETE',
+    token,
+    fetchImpl,
+  });
+}
+
+/** PATCH /api/orders/:id/kds-status — FASE 4C: flujo KDS 2 CLICKS por
+ *  tarjeta (pedido completo de un módulo+ronda). 'preparing' = Iniciar,
+ *  'ready' = Listo (llama al mesero). Rol: kds/admin. */
+export async function kdsSetStatus(
+  token: string,
+  orderId: string,
+  body: { status: 'preparing' | 'ready'; module?: 'bar' | 'cocina'; round?: number },
+  fetchImpl: typeof fetch = fetch
+): Promise<ApiResult<{ success: boolean; status?: string; round?: number }>> {
+  return apiFetch<{ success: boolean; status?: string; round?: number }>(`/api/orders/${orderId}/kds-status`, {
+    method: 'PATCH',
+    token,
+    body,
     fetchImpl,
   });
 }
@@ -305,4 +385,8 @@ export default {
   fetchOrderById,
   fetchPendingOrders,
   deliverOrder,
+  updateOrder,
+  addOrderItem,
+  removeOrderItem,
+  kdsSetStatus,
 };

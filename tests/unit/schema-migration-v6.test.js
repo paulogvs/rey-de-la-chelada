@@ -56,8 +56,8 @@ function seedMiniWorld(db) {
 }
 
 describe('Migración v6 — sin propina, solo cash|qr, received/change', () => {
-  it('SCHEMA_VERSION ahora es 6', () => {
-    expect(SCHEMA_VERSION).toBe(6);
+  it('SCHEMA_VERSION ahora es 7', () => {
+    expect(SCHEMA_VERSION).toBe(7);
   });
 
   it('DB nueva: payments SIN columna tip, CON received/change y CHECK cash|qr', () => {
@@ -66,10 +66,14 @@ describe('Migración v6 — sin propina, solo cash|qr, received/change', () => {
     expect(hasColumn(db, 'payments', 'tip')).toBe(false);
     expect(hasColumn(db, 'payments', 'received')).toBe(true);
     expect(hasColumn(db, 'payments', 'change')).toBe(true);
-    expect(currentVersion(db)).toBe(6);
+    expect(currentVersion(db)).toBe(7);
     // El CHECK solo acepta cash|qr
     const ddl = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='payments'").get().sql;
     expect(ddl).toMatch(/method\s+TEXT NOT NULL CHECK\(method IN \('cash','qr'\)\)/);
+    // v7: order_items tiene columna round (default 1)
+    expect(hasColumn(db, 'order_items', 'round')).toBe(true);
+    const itemsDdl = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='order_items'").get().sql;
+    expect(itemsDdl).toMatch(/round\s+INTEGER NOT NULL DEFAULT 1/);
     db.close();
   });
 
@@ -106,7 +110,7 @@ describe('Migración v6 — sin propina, solo cash|qr, received/change', () => {
     applySchema(db);
 
     expect(hasColumn(db, 'payments', 'tip')).toBe(false);
-    expect(currentVersion(db)).toBe(6);
+    expect(currentVersion(db)).toBe(7);
     // Métodos consolidados → qr; amount absorbe el tip (70+2=72)
     const qr = db.prepare('SELECT * FROM payments WHERE id = ?').get('legacy-qr');
     expect(qr.method).toBe('qr');
@@ -133,7 +137,48 @@ describe('Migración v6 — sin propina, solo cash|qr, received/change', () => {
     expect(p.method).toBe('cash');
     expect(p.received).toBe(50);
     expect(p.change).toBe(15.5);
-    expect(currentVersion(db)).toBe(6);
+    expect(currentVersion(db)).toBe(7);
+    db.close();
+  });
+
+  it('upgrade v6→v7: ADD COLUMN round en order_items preserva items existentes (round=1)', () => {
+    const db = new Database(':memory:');
+    // Simular DB v6 (order_items SIN round) + 1 item existente
+    db.prepare(`
+      CREATE TABLE schema_version (
+        version INTEGER PRIMARY KEY,
+        applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`).run();
+    db.prepare('INSERT INTO schema_version (version) VALUES (6)').run();
+    db.exec(`
+      CREATE TABLE staff (id TEXT PRIMARY KEY, pin_hash TEXT NOT NULL, role TEXT NOT NULL, display_name TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1, current_shift TEXT, last_login_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')));
+      CREATE TABLE tables (id TEXT PRIMARY KEY, number INTEGER NOT NULL UNIQUE, capacity INTEGER NOT NULL DEFAULT 4);
+      CREATE TABLE orders (id TEXT PRIMARY KEY, table_id TEXT NOT NULL, table_number INTEGER NOT NULL,
+        waiter_id TEXT NOT NULL, waiter_name TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'draft', total REAL NOT NULL DEFAULT 0);
+      CREATE TABLE order_items (
+        id TEXT PRIMARY KEY, order_id TEXT NOT NULL, menu_item_id TEXT NOT NULL, menu_item_name TEXT NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1, unit_price REAL NOT NULL, modifiers_json TEXT, subtotal REAL NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','preparing','ready','delivered','cancelled')),
+        preparation_notes TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE);
+    `);
+    seedMiniWorld(db);
+    db.prepare(`
+      INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity, unit_price, subtotal, status)
+      VALUES ('it1', 'o1', 'm1', 'Chelada Clásica', 2, 15, 30, 'delivered')
+    `).run();
+
+    applySchema(db);
+
+    expect(hasColumn(db, 'order_items', 'round')).toBe(true);
+    expect(currentVersion(db)).toBe(7);
+    // El item existente queda en ronda 1 (no destructivo)
+    const item = db.prepare('SELECT * FROM order_items WHERE id = ?').get('it1');
+    expect(item.round).toBe(1);
+    expect(item.menu_item_name).toBe('Chelada Clásica');
+    expect(item.status).toBe('delivered');
     db.close();
   });
 });

@@ -15,13 +15,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useKDSWebSocket } from '@/pwa/_shared/hooks/useKDSWebSocket';
 import { useFullscreen } from '@/pwa/_shared/hooks/useFullscreen';
-import { fetchKDSOrders, updateKDSItemStatus } from '@/pwa/_shared/api/kdsApi';
+import { fetchKDSOrders } from '@/pwa/_shared/api/kdsApi';
+import { kdsSetStatus } from '@/pwa/_shared/api/ordersApi';
 import { orderEngine } from '@/core/engine';
 import { KDSOrderCard, KDSOrderCardSkeleton } from '@/ui/components/KDSOrderCard';
 import { Badge } from '@/ui/components/Badge';
 import { EmptyState } from '@/ui/components/EmptyState';
-import { filterItemsByModule, itemsForModule, type KDSModule } from './filter';
-import type { Order, KDSEvent, KDSStatus } from '@/core/types';
+import { filterItemsByModule, type KDSModule } from './filter';
+import type { Order, KDSEvent } from '@/core/types';
 import './KDSBoard.css';
 
 // ---- Audio System (Web Audio API) ----
@@ -197,77 +198,91 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
     return unsubscribe;
   }, []);
 
-  // Handle item status change — FASE 2: optimista local + persistencia
-  // server-side (PATCH item status) para que el circuito cerrado funcione:
-  // el servidor guarda y hace broadcast a meseros/otros KDS.
-  const handleItemStatusChange = useCallback((orderId: string, itemId: string, status: KDSStatus) => {
-    const success = orderEngine.updateItemStatus(orderId, itemId, status);
-    if (!success) return;
-    if (status === 'ready') {
-      kdsAudio.completed();
-    }
-    if (token) {
-      void updateKDSItemStatus(token, orderId, itemId, status).then(result => {
-        if (!result.ok) {
-          console.warn(`[KDS] Item status persist failed (${itemId} → ${status}): ${result.code}`);
-        }
-      });
-    }
-  }, [token]);
-
-  // Handle order acknowledge (confirmed → preparing)
-  // P0-FIX (2026-08-11 flujo mixto): SOLO los items del módulo actual.
-  // ANTES marcaba TODOS los items del pedido → el bartender "aceptaba"
-  // también los items de cocina.
-  const handleAcknowledge = useCallback((orderId: string) => {
-    const order = orderEngine.getOrder(orderId);
-    if (order && order.status === 'confirmed') {
-      itemsForModule(order.items, module).forEach(item => {
-        if (item.status === 'pending') {
-          orderEngine.updateItemStatus(orderId, item.id, 'preparing');
-        }
-      });
-      setNewOrderIds(prev => {
-        const updated = new Set(prev);
-        updated.delete(orderId);
-        return updated;
-      });
-    }
-  }, [module]);
-
-  // Handle order reject (pending → cancelled) — FASE 2: persistir igual.
-  // P0-FIX (2026-08-11 flujo mixto): SOLO los items del módulo actual.
-  // ANTES cancelaba TODOS los items pending del pedido (incluidos los de
-  // cocina) y los persistía — un rechazo del bar cerraba la cocina.
-  const handleReject = useCallback((orderId: string) => {
+  // FASE 4C — Click 1: "▶ Iniciar" → toda la tarjeta (módulo+ronda) a
+  // 'preparing'. Optimista en el engine + persistencia server (kds-status).
+  const handleStart = useCallback((orderId: string, round: number) => {
     const order = orderEngine.getOrder(orderId);
     if (!order) return;
-    itemsForModule(order.items, module).forEach(item => {
-      if (item.status === 'pending') {
-        orderEngine.updateItemStatus(orderId, item.id, 'cancelled');
-        if (token) {
-          void updateKDSItemStatus(token, orderId, item.id, 'cancelled').then(result => {
-            if (!result.ok) {
-              console.warn(`[KDS] Item reject persist failed (${item.id}): ${result.code}`);
-            }
-          });
-        }
-      }
+    // Optimista local: todos los items pending del módulo+ronda → preparing
+    order.items
+      .filter(i => (i.kds_module || 'cocina') === module && (i.round ?? 1) === round && i.status === 'pending')
+      .forEach(i => orderEngine.updateItemStatus(orderId, i.id, 'preparing'));
+    setNewOrderIds(prev => {
+      const updated = new Set(prev);
+      updated.delete(orderId);
+      return updated;
     });
+    // Persistir + broadcast (el server recalcula status derivado)
+    if (token) {
+      void kdsSetStatus(token, orderId, { status: 'preparing', module, round }).then(result => {
+        if (!result.ok) {
+          console.warn(`[KDS] Iniciar persist failed (${orderId} r${round}): ${result.code}`);
+        }
+      });
+    }
   }, [token, module]);
+
+  // FASE 4C — Click 2: "✓ Listo" → toda la tarjeta a 'ready' → llama al
+  // mesero (module_ready / order_complete del server).
+  const handleReady = useCallback((orderId: string, round: number) => {
+    const order = orderEngine.getOrder(orderId);
+    if (!order) return;
+    order.items
+      .filter(i => (i.kds_module || 'cocina') === module && (i.round ?? 1) === round && ['pending', 'preparing'].includes(i.status))
+      .forEach(i => orderEngine.updateItemStatus(orderId, i.id, 'ready'));
+    if (audioRef.current) kdsAudio.completed();
+    if (token) {
+      void kdsSetStatus(token, orderId, { status: 'ready', module, round }).then(result => {
+        if (!result.ok) {
+          console.warn(`[KDS] Listo persist failed (${orderId} r${round}): ${result.code}`);
+        }
+      });
+    }
+  }, [token, module, audioRef]);
 
   // Toggle audio
   const toggleAudio = useCallback(() => {
     setAudioEnabled(prev => !prev);
   }, []);
 
-  // Sort: urgent first, then oldest
-  const sortedOrders = [...orders].sort((a, b) => {
-    const aUrgent = urgentOrderIds.has(a.id);
-    const bUrgent = urgentOrderIds.has(b.id);
+  // FASE 4B: estado de una tarjeta (derivado de sus items)
+  const cardState = useCallback((items: Order['items']) => {
+    if (items.some(i => i.status === 'pending')) return 'pending';
+    if (items.some(i => i.status === 'preparing')) return 'preparing';
+    return 'ready';
+  }, []);
+
+  // FASE 4B: dividir cada pedido en TARJETAS POR RONDA (solo rondas con
+  // trabajo activo: pending/preparing/ready — las entregadas desaparecen).
+  const buildRoundCards = useCallback((orders: Order[]) => {
+    const cards: Array<{ order: Order; round: number }> = [];
+    for (const order of orders) {
+      const moduleItems = order.items.filter(i => (i.kds_module || 'cocina') === module);
+      const rounds = [...new Set(moduleItems.map(i => i.round ?? 1))].sort((a, b) => a - b);
+      for (const round of rounds) {
+        const items = moduleItems.filter(i => (i.round ?? 1) === round);
+        const active = items.some(i => ['pending', 'preparing', 'ready'].includes(i.status));
+        if (!active) continue;
+        cards.push({ order: { ...order, items }, round });
+      }
+    }
+    return cards;
+  }, [module]);
+
+  // Prioridad (FASE 4B): urgente primero → no-iniciado (pending) → preparando
+  // → listo; dentro del mismo estado, RONDA MÁS ALTA primero (lo nuevo).
+  const roundCards = buildRoundCards(orders);
+  const sortedCards = [...roundCards].sort((a, b) => {
+    const aUrgent = urgentOrderIds.has(a.order.id);
+    const bUrgent = urgentOrderIds.has(b.order.id);
     if (aUrgent && !bUrgent) return -1;
     if (!aUrgent && bUrgent) return 1;
-    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    const aState = cardState(a.order.items);
+    const bState = cardState(b.order.items);
+    const rank = { pending: 1, preparing: 2, ready: 3 } as const;
+    if (rank[aState] !== rank[bState]) return rank[aState] - rank[bState];
+    if (a.round !== b.round) return b.round - a.round; // ronda nueva primero
+    return new Date(a.order.createdAt).getTime() - new Date(b.order.createdAt).getTime();
   });
 
   return (
@@ -284,7 +299,7 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
         </div>
         <div className="kds-header__right">
           <Badge variant="info" large>
-            {sortedOrders.length} pedidos
+            {sortedCards.length} pedidos
           </Badge>
           {urgentOrderIds.size > 0 && (
             <Badge variant="warning" large>
@@ -321,7 +336,7 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
           </div>
         )}
 
-        {!loading && sortedOrders.length === 0 && (
+        {!loading && sortedCards.length === 0 && (
           <EmptyState
             icon={icon}
             title="Todos los pedidos completados"
@@ -329,22 +344,22 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
           />
         )}
 
-        {!loading && sortedOrders.length > 0 && (
+        {!loading && sortedCards.length > 0 && (
           <div
             className="kds-orders__grid"
             style={{
-              gridTemplateColumns: `repeat(${Math.min(sortedOrders.length, 4)}, 1fr)`,
+              gridTemplateColumns: `repeat(${Math.min(sortedCards.length, 4)}, 1fr)`,
             }}
           >
-            {sortedOrders.map(order => (
+            {sortedCards.map(card => (
               <KDSOrderCard
-                key={order.id}
-                order={order}
-                isUrgent={urgentOrderIds.has(order.id)}
-                isNew={newOrderIds.has(order.id)}
-                onItemStatusChange={handleItemStatusChange}
-                onAcknowledge={handleAcknowledge}
-                onReject={handleReject}
+                key={`${card.order.id}-r${card.round}`}
+                order={card.order}
+                round={card.round}
+                isUrgent={urgentOrderIds.has(card.order.id)}
+                isNew={newOrderIds.has(card.order.id)}
+                onStart={handleStart}
+                onReady={handleReady}
                 variant={module}
               />
             ))}
@@ -355,13 +370,13 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
       {/* Footer stats */}
       <footer className="kds-footer">
         <span className="kds-footer__stat">
-          Activos: {sortedOrders.length}
+          Activos: {sortedCards.length}
         </span>
         <span className="kds-footer__stat">
           Urgentes: {urgentOrderIds.size}
         </span>
         <span className="kds-footer__stat kds-footer__stat--hint">
-          Tap item → cambiar estado
+          Iniciar → Listo (por pedido)
         </span>
       </footer>
     </div>

@@ -97,7 +97,9 @@ function MeserosApp() {
     tables.refresh();
   }, [tables]);
 
-  // Order confirmed → go to payment view with the server order id
+  // FASE 4A: la orden se crea CONFIRMADA en 1 llamada (el server la
+  // envía al KDS al instante). Tras crear → volver al SALÓN (no al cobro):
+  // el mesero cobra cuando el cliente pide la cuenta (botón 💰 en la mesa).
   const handleOrderPlaced = useCallback(
     (orderId: string) => {
       setActiveOrderId(orderId);
@@ -106,11 +108,17 @@ function MeserosApp() {
         message: `Pedido enviado a cocina — Mesa ${selectedTable?.number}`,
         duration: 3000,
       });
-      setView('payment-panel');
-      tables.refresh();
+      handleBackToTables();
     },
-    [selectedTable, addToast, tables]
+    [selectedTable, addToast, handleBackToTables]
   );
+
+  // FASE 4C: el mesero cobra desde la mesa (solo cuando served — el
+  // OrderPanel lo habilita). Ir al PaymentPanel con el pedido activo.
+  const handleRequestPayment = useCallback((orderId: string) => {
+    setActiveOrderId(orderId);
+    setView('payment-panel');
+  }, []);
 
   const handlePaymentComplete = useCallback(() => {
     addToast({
@@ -170,7 +178,7 @@ function MeserosApp() {
             )}
             <h1 className="meseros-header__title">
               {view === 'tables' && 'Mesas'}
-              {view === 'order-panel' && `Mesa ${selectedTable?.number} — Nuevo Pedido`}
+              {view === 'order-panel' && `Mesa ${selectedTable?.number}`}
               {view === 'payment-panel' && `Mesa ${selectedTable?.number} — Pago`}
               {view === 'waiter-calls' && 'Llamadas de clientes'}
             </h1>
@@ -219,6 +227,7 @@ function MeserosApp() {
               onOrderPlaced={handleOrderPlaced}
               onCancel={handleOrderCancelled}
               onBack={handleBackToTables}
+              onRequestPayment={handleRequestPayment}
             />
           )}
 

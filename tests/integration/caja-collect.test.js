@@ -28,7 +28,6 @@ let cajaToken;
 let kdsToken;
 let tableId;
 let orderId;
-let draftOrderId;
 let total;
 
 async function api(p, { method = 'GET', body, token } = {}) {
@@ -84,7 +83,8 @@ describe('S2-C — caja: pending list + cobro', () => {
     const bar = items.find(i => i.area === 'bar');
     const cocina = items.find(i => i.area === 'cocina' || !i.area);
 
-    // Pedido que se cobrará (confirmado → KDS lo marca ready → mesero entrega)
+    // FASE 4A: POST /api/orders crea la orden DIRECTAMENTE 'confirmed'
+    // (1 sola llamada — adiós draft→submit→confirm). El KDS la ve al instante.
     const create = await api('/api/orders', {
       method: 'POST', token: meseroToken,
       body: {
@@ -97,15 +97,15 @@ describe('S2-C — caja: pending list + cobro', () => {
     });
     orderId = create.json?.order?.id;
     total = create.json?.order?.total;
-    await api(`/api/orders/${orderId}/submit`, { method: 'PATCH', token: meseroToken });
-    await api(`/api/orders/${orderId}/confirm`, { method: 'PATCH', token: meseroToken });
+    expect(create.json?.order?.status).toBe('confirmed');
 
-    // Pedido en draft — NO debe aparecer en pending (no se envió a cocina)
-    const draft = await api('/api/orders', {
+    // Contrato SSOT: NO puede haber 2º pedido activo en la misma mesa
+    const dup = await api('/api/orders', {
       method: 'POST', token: meseroToken,
       body: { table_id: tableId, guest_count: 1, items: [{ menu_item_id: bar.id, quantity: 1 }] },
     });
-    draftOrderId = draft.json?.order?.id;
+    expect(dup.status).toBe(409);
+    expect(dup.json?.code).toBe('TABLE_HAS_ACTIVE_ORDER');
 
     // KDS marca items ready → mesero entrega → served (listo para cobrar)
     const kds = await api(`/api/orders/kds/kds`, { token: kdsToken });
@@ -141,8 +141,6 @@ describe('S2-C — caja: pending list + cobro', () => {
     expect(target.total).toBeGreaterThan(0);
     expect(target.paid_amount).toBe(0);
     expect(Array.isArray(target.items)).toBe(true);
-    // El draft NO debe estar en la lista de pendientes
-    expect(pending.some(o => o.id === draftOrderId)).toBe(false);
   });
 
   it('caja cobra el pedido completo → paid y mesa libre', async () => {
@@ -157,19 +155,14 @@ describe('S2-C — caja: pending list + cobro', () => {
     const pending = await api('/api/orders?pending=1', { token: cajaToken });
     expect(pending.json?.orders?.some(o => o.id === orderId)).toBe(false);
 
-    // El pedido está paid y la mesa quedó libre (el draft era de la misma mesa
-    // → al pagar este pedido la mesa NO se libera si el draft sigue activo;
-    // verificamos que el pedido pagado quedó paid).
+    // El pedido quedó paid
     const order = await api(`/api/orders/${orderId}`, { token: cajaToken });
     expect(order.json?.order?.status).toBe('paid');
     expect(order.json?.order?.is_paid).toBe(1);
   });
 
   it('mesa queda libre cuando NO hay otros pedidos activos', async () => {
-    // Cancelar el draft → la mesa queda sin activos → se libera
-    await api(`/api/orders/${draftOrderId}/status`, {
-      method: 'PATCH', token: meseroToken, body: { status: 'cancelled' },
-    });
+    // Sin otros pedidos activos → la mesa se libera al pagar
     const tables = await api('/api/tables', { token: adminToken });
     const table = tables.json?.tables?.find(t => t.id === tableId);
     expect(table?.status).toBe('free');

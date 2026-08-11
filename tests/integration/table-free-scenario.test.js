@@ -106,7 +106,8 @@ describe('2.4 — la mesa se libera server-side (sin force-free del cliente)', (
   it('un pedido pagado → mesa free (el server la libera)', async () => {
     const tableId = await ensureTable(++tableCounter);
     const { orderId, total } = await createOrderOnTable(tableId);
-    expect(await tableStatus(tableId)).toBe('occupied');
+    // FASE 4A: POST crea directo 'confirmed' → mesa 'ordered' (no 'occupied')
+    expect(await tableStatus(tableId)).toBe('ordered');
 
     const pay = await api('/api/payments', {
       method: 'POST', token: meseroToken,
@@ -121,7 +122,7 @@ describe('2.4 — la mesa se libera server-side (sin force-free del cliente)', (
   it('P1-1: NO se puede crear un 2º pedido en una mesa con pedido activo (409) → pagar 1 libera', async () => {
     const tableId = await ensureTable(++tableCounter);
     const a = await createOrderOnTable(tableId);
-    expect(await tableStatus(tableId)).toBe('occupied');
+    expect(await tableStatus(tableId)).toBe('ordered');
 
     // P1-1 (2026-08-11): contrato SSOT "1 pedido activo por mesa" — el mesero
     // NO puede abrir un 2º pedido en la misma mesa (debe editar con PUT).
@@ -133,7 +134,7 @@ describe('2.4 — la mesa se libera server-side (sin force-free del cliente)', (
     });
     expect(second.status).toBe(409);
     expect(second.json.code).toBe('TABLE_HAS_ACTIVE_ORDER');
-    expect(await tableStatus(tableId)).toBe('occupied');
+    expect(await tableStatus(tableId)).toBe('ordered');
 
     // Pagar el único pedido → ya no quedan activos → la mesa se libera
     const payA = await api('/api/payments', {

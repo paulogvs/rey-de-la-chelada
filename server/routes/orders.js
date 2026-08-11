@@ -28,6 +28,7 @@ import { broadcastOrderCreated, broadcastOrderStatusChange, broadcastOrderComple
 import { broadcaster, buildKDSEvent, KDSEventType } from '../services/websocket-broadcaster.js';
 import { computeTotals, round2 } from '../../src/core/config/iva.js';
 import { resolveModifierAdjustment, recalcOrder } from '../services/order-pricing.js';
+import { recalcOrderStatus, resolveRound } from '../services/order-status.js';
 
 const router = Router();
 
@@ -203,7 +204,7 @@ router.get('/kds/:module', requireAuth, requireRole('admin', 'kds'), (req, res) 
       let itemSql = `
         SELECT oi.id, oi.menu_item_id, mi.name as item_name, oi.quantity,
                oi.unit_price, oi.preparation_notes as item_notes, oi.status as item_status,
-               oi.modifiers_json, oi.created_at, mi.area as kds_module
+               oi.modifiers_json, oi.created_at, oi.round, mi.area as kds_module
         FROM order_items oi
         JOIN menu_items mi ON oi.menu_item_id = mi.id
         WHERE oi.order_id = ?
@@ -338,6 +339,9 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
     const { subtotal: baseSubtotal, iva, total } = computeTotals(subtotal);
     const orderId = randomUUID();
 
+    // FASE 4A: el mesero crea la orden en UNA llamada → status 'confirmed'
+    // directo (adiós draft→called→confirm). El broadcast new_order al KDS
+    // se emite aquí (status real). Los items nuevos van a la RONDA 1.
     db.prepare(`
       INSERT INTO orders (id, table_id, table_number, waiter_id, waiter_name, status,
                           subtotal, iva_amount, discount, discount_reason, total,
@@ -346,24 +350,26 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
     `).run(
       orderId, table_id, table.number, req.user.sub,
       req.user.displayName || req.user.username,
-      'draft', baseSubtotal, iva, total,
+      'confirmed', baseSubtotal, iva, total,
       notes || '', guest_count || 1, local_id || orderId
     );
 
     const insertItem = db.prepare(`
       INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
-                               unit_price, modifiers_json, subtotal, status, preparation_notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               unit_price, modifiers_json, subtotal, status, round, preparation_notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const oi of orderItems) {
       insertItem.run(oi.id, orderId, oi.menu_item_id, oi.menu_item_name, oi.quantity,
-                     oi.unit_price, oi.modifiers_json, oi.subtotal, oi.status, oi.preparation_notes);
+                     oi.unit_price, oi.modifiers_json, oi.subtotal, oi.status, 1, oi.preparation_notes);
     }
 
-    // Mark table as occupied
-    db.prepare("UPDATE tables SET status = 'occupied', current_order_id = ? WHERE id = ?").run(orderId, table_id);
+    // Mark table as ordered (pedido confirmado en cocina/bar)
+    db.prepare("UPDATE tables SET status = 'ordered', current_order_id = ? WHERE id = ?").run(orderId, table_id);
 
     const order = buildOrder(db, orderId);
+    // FASE 4A: broadcast inmediato — el KDS ve la orden nueva al instante
+    broadcastOrderCreated(order);
     res.status(201).json({ success: true, order });
   } catch (err) {
     logger.error('[Orders] Create error:', err.message);
@@ -465,9 +471,17 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
           `);
           const insertItem = db.prepare(`
             INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
-                                     unit_price, modifiers_json, subtotal, status, preparation_notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+                                     unit_price, modifiers_json, subtotal, status, round, preparation_notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
           `);
+
+          // FASE 4B: los items NUEVOS de esta tanda van a la MISMA ronda.
+          // resolveRound se calcula UNA vez (antes de insertar) para que los
+          // nuevos de la misma petición compartan ronda: si la orden aún tiene
+          // trabajo sin procesar → misma ronda; si todo ya se procesó → ronda
+          // nueva (max+1) → el KDS la ve como tarjeta separada prioritaria.
+          let newItemsRound = null;
+          let insertedNew = false;
 
           for (const item of items) {
             const menuItem = getMenuItem.get(item.menu_item_id);
@@ -486,20 +500,37 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
               updateItem.run(quantity, unitPrice, modifiersJson, itemSubtotal, notesField, item.id, req.params.id);
             } else {
               // sin id, o id que no pertenece a este pedido → nuevo
+              if (newItemsRound === null) newItemsRound = resolveRound(db, req.params.id);
               insertItem.run(item.id || randomUUID(), req.params.id, menuItem.id, menuItem.name,
-                             quantity, unitPrice, modifiersJson, itemSubtotal, notesField);
+                             quantity, unitPrice, modifiersJson, itemSubtotal, newItemsRound, notesField);
+              insertedNew = true;
             }
           }
+          return { insertedNew };
         }
+        return { insertedNew: false };
       });
-      runUpdate();
+      const { insertedNew } = runUpdate();
 
       // 3) Recalcular siempre que cambió algo (SSOT)
       recalcOrder(db, req.params.id);
+      // FASE 4B: estados derivados — si la orden estaba served/ready y se
+      // agregó una ronda nueva, vuelve a 'confirmed' (el KDS la ve de nuevo).
+      const derived = recalcOrderStatus(db, req.params.id);
+      // FASE 4B: broadcast — ronda nueva → new_order al KDS (tarjeta
+      // separada); solo updates/removes → status_change.
+      const updated = buildOrder(db, req.params.id);
+      if (insertedNew) {
+        broadcastOrderCreated(updated);
+      } else {
+        broadcastOrderStatusChange(updated, existing.status);
+      }
+      res.json({ success: true, order: updated, status: derived });
+    } else {
+      const updated = buildOrder(db, req.params.id);
+      broadcastOrderStatusChange(updated, existing.status);
+      res.json({ success: true, order: updated });
     }
-
-    const updated = buildOrder(db, req.params.id);
-    res.json({ success: true, order: updated });
   } catch (err) {
     logger.error('[Orders] Update error:', err.message);
     res.status(500).json({ success: false, error: 'Error al actualizar pedido', code: 'ORDER_UPDATE_ERROR' });
@@ -706,16 +737,24 @@ router.post('/:id/items', requireAuth, requireRole('admin', 'mesero'), (req, res
     const unitPrice = round2((menuItem.price || 0) + adjustment);
     const itemSubtotal = round2(unitPrice * qty);
 
+    // FASE 4B: ronda — misma si hay trabajo sin procesar, nueva si todo se procesó
+    const round = resolveRound(db, req.params.id);
     db.prepare(`
       INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
-                               unit_price, modifiers_json, subtotal, status, preparation_notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+                               unit_price, modifiers_json, subtotal, status, round, preparation_notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
     `).run(randomUUID(), req.params.id, menuItem.id, menuItem.name, qty, unitPrice,
-           modifiers ? JSON.stringify(modifiers) : null, itemSubtotal, notes || '');
+           modifiers ? JSON.stringify(modifiers) : null, itemSubtotal, round, notes || '');
 
     recalcOrder(db, req.params.id);
+    // FASE 4B: estados derivados (reactiva a 'confirmed' si estaba served/ready)
+    const derived = recalcOrderStatus(db, req.params.id);
 
-    res.status(201).json({ success: true, message: 'Item agregado al pedido' });
+    // FASE 4B: broadcast new_order → el KDS ve la ronda nueva al instante
+    const updated = buildOrder(db, req.params.id);
+    broadcastOrderCreated(updated);
+
+    res.status(201).json({ success: true, message: 'Item agregado al pedido', status: derived });
   } catch (err) {
     logger.error('[Orders] Add item error:', err.message);
     res.status(500).json({ success: false, error: 'Error al agregar item', code: 'ORDER_ADD_ITEM_ERROR' });
@@ -769,24 +808,10 @@ router.patch('/:id/items/:itemId/status', requireAuth, requireRole('admin', 'kds
       broadcastModuleReady(moduleSnapshot, changedModule);
     }
 
-    // ¿Todos los items en estado terminal (delivered/cancelled)? → pedido served
-    const remaining = db.prepare(
-      "SELECT COUNT(*) as n FROM order_items WHERE order_id = ? AND status NOT IN ('delivered','cancelled')"
-    ).get(req.params.id);
-    if (Number(remaining.n) === 0) {
-      db.prepare("UPDATE orders SET status = 'served', updated_at = datetime('now') WHERE id = ? AND status NOT IN ('paid','cancelled')")
-        .run(req.params.id);
-    } else {
-      // P2-1 (2026-08-11): pedido completo para servir (todos los items
-      // 'ready') pero aún no entregado → orders.status = 'ready' (el KDS
-      // marca item a item; ANTES la DB seguía en 'confirmed' mientras el
-      // evento order_complete decía 'ready' — estado inconsistente).
-      const orderSnapshot = buildOrder(db, req.params.id);
-      if (isOrderFullyReady(orderSnapshot) && orderSnapshot.status !== 'ready') {
-        db.prepare("UPDATE orders SET status = 'ready', updated_at = datetime('now') WHERE id = ? AND status NOT IN ('paid','cancelled','served')")
-          .run(req.params.id);
-      }
-    }
+    // FASE 4B: estados derivados — el status global se computa SOLO de los
+    // items (pending→confirmed, preparing→preparing, ready→ready, todos
+    // terminales→served). Reemplaza la lógica manual served/ready anterior.
+    recalcOrderStatus(db, req.params.id);
 
     // Broadcast real-time: item_ready cuando queda listo, status_change en el resto
     const orderForWs = buildOrder(db, req.params.id);
@@ -826,6 +851,126 @@ router.patch('/:id/items/:itemId/status', requireAuth, requireRole('admin', 'kds
 });
 
 // ============================================================
+// PATCH /api/orders/:id/kds-status — FASE 4C: flujo KDS 2 CLICKS
+//
+// La tarjeta KDS (cocina/bar) es el PEDIDO COMPLETO de UN módulo+ronda.
+// El cocinero/bartender NO toca items individuales — solo 2 botones:
+//
+//   Click 1 — "▶ Iniciar"    → { status: 'preparing' } → TODOS los items
+//            pending de (order, module, round) pasan a 'preparing'.
+//   Click 2 — "✓ Listo"      → { status: 'ready' } → TODOS los items
+//            pending/preparing de (order, module, round) pasan a 'ready'
+//            → llama al mesero (module_ready) y cierra el ciclo.
+//
+// body: { status: 'preparing' | 'ready', module?: 'bar'|'cocina', round?: number }
+//   - module: obligatorio en la práctica (el KDS sabe qué módulo es);
+//     si falta → aplica a TODOS los módulos (defensivo).
+//   - round: la tarjeta que el KDS está procesando; si falta → la ronda
+//     MÁS ALTA con items activos (defensivo).
+// Roles: kds o admin.
+// ============================================================
+
+router.patch('/:id/kds-status', requireAuth, requireRole('admin', 'kds'), (req, res) => {
+  try {
+    const { status, module, round } = req.body || {};
+    const canonical = status === 'preparing' ? 'preparing' : status === 'ready' ? 'ready' : null;
+    if (!canonical) {
+      return res.status(400).json({
+        success: false,
+        error: "Estado inválido. Use: 'preparing' o 'ready'",
+        code: 'INVALID_KDS_STATUS',
+      });
+    }
+
+    const db = getDb();
+    const order = db.prepare('SELECT id, status FROM orders WHERE id = ?').get(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, error: 'Pedido no encontrado', code: 'ORDER_NOT_FOUND' });
+    }
+    if (['paid', 'cancelled'].includes(order.status)) {
+      return res.status(409).json({ success: false, error: 'Pedido cerrado', code: 'ORDER_CLOSED' });
+    }
+
+    // Resolver la ronda objetivo: la pasada o la más alta con items activos
+    const moduleFilter = module && ['bar', 'cocina'].includes(module)
+      ? `AND mi.area = ?` : '';
+    const moduleParams = moduleFilter ? [module] : [];
+
+    let targetRound = round;
+    if (!targetRound) {
+      const active = db.prepare(`
+        SELECT COALESCE(MAX(oi.round), 1) as r
+        FROM order_items oi
+        LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+        WHERE oi.order_id = ? AND oi.status IN ('pending','preparing')
+          ${moduleFilter}
+      `).get(req.params.id, ...moduleParams);
+      targetRound = Number(active?.r || 1);
+    }
+
+    // Items objetivo de la tarjeta (módulo + ronda)
+    const roundFilter = 'AND oi.round = ?';
+    const where = `WHERE oi.order_id = ? ${moduleFilter} ${roundFilter}`;
+    const params = [req.params.id, ...moduleParams, targetRound];
+
+    // Transición forward-only por estado objetivo
+    const fromStatuses = canonical === 'preparing' ? ['pending'] : ['pending', 'preparing'];
+    const placeholders = fromStatuses.map(() => '?').join(',');
+    const targets = db.prepare(`
+      SELECT oi.id FROM order_items oi
+      LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+      ${where} AND oi.status IN (${placeholders})
+    `).all(...params, ...fromStatuses);
+
+    if (targets.length === 0) {
+      return res.status(409).json({
+        success: false,
+        error: `No hay items en estado procesable para '${canonical}' en esa tarjeta`,
+        code: 'NO_PROCESSABLE_ITEMS',
+      });
+    }
+
+    const ids = targets.map(t => t.id);
+    const idPlaceholders = ids.map(() => '?').join(',');
+    db.prepare(`UPDATE order_items SET status = ? WHERE id IN (${idPlaceholders})`)
+      .run(canonical, ...ids);
+
+    // FASE 4B: estados derivados — el status global se computa de los items
+    const derived = recalcOrderStatus(db, req.params.id);
+
+    // Broadcasts real-time
+    const orderForWs = buildOrder(db, req.params.id);
+    const moduleForBroadcast = module && ['bar', 'cocina'].includes(module) ? module : null;
+
+    broadcaster.broadcastKDS(buildKDSEvent(KDSEventType.STATUS_CHANGE, {
+      orderId: req.params.id,
+      tableNumber: orderForWs.table_number,
+      status: derived,
+      module: moduleForBroadcast,
+      round: targetRound,
+      items: orderForWs.items.filter(i =>
+        i.round === targetRound && (!moduleForBroadcast || (i.kds_module || 'cocina') === moduleForBroadcast)
+      ),
+    }));
+
+    if (canonical === 'ready') {
+      // "✓ Listo" → llamar al mesero: aviso por módulo + order_complete si todo listo
+      if (moduleForBroadcast && isModuleFullyReady(orderForWs, moduleForBroadcast)) {
+        broadcastModuleReady(orderForWs, moduleForBroadcast);
+      }
+      if (isOrderFullyReady(orderForWs)) {
+        broadcastOrderComplete(orderForWs);
+      }
+    }
+
+    res.json({ success: true, status: derived, round: targetRound, itemsUpdated: ids.length });
+  } catch (err) {
+    logger.error('[Orders] KDS status error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al procesar tarjeta KDS', code: 'ORDER_KDS_STATUS_ERROR' });
+  }
+});
+
+// ============================================================
 // DELETE /api/orders/:id/items/:itemId — Quitar item
 // ============================================================
 
@@ -839,6 +984,10 @@ router.delete('/:id/items/:itemId', requireAuth, requireRole('admin', 'mesero'),
 
     db.prepare('DELETE FROM order_items WHERE id = ?').run(req.params.itemId);
     recalcOrder(db, req.params.id);
+    // FASE 4B: estados derivados (al quitar items el status se recalcula)
+    recalcOrderStatus(db, req.params.id);
+    const updated = buildOrder(db, req.params.id);
+    broadcastOrderStatusChange(updated, updated.status);
 
     res.json({ success: true, message: 'Item eliminado del pedido' });
   } catch (err) {
@@ -848,19 +997,24 @@ router.delete('/:id/items/:itemId', requireAuth, requireRole('admin', 'mesero'),
 });
 
 // ============================================================
-// PATCH /api/orders/:id/deliver — mesero entrega los items listos
+// PATCH /api/orders/:id/deliver — mesero entrega items listos
 //
 // S2-B (Gap 4): el mesero NO podía marcar entregado (PATCH items/status
 // es admin|kds → 403). Esta ruta dedicada (admin|mesero):
 //   1. Exige que el pedido NO esté cerrado (paid/cancelled/served).
 //   2. Exige al menos un item en 'ready' (no se entrega lo que no está).
-//   3. Marca TODOS los items 'ready' → 'delivered'.
-//   4. Si no quedan items activos → pedido 'served' (lista para cobro).
+//   3. Marca los items 'ready' → 'delivered'.
+//      FASE 4C: filtro opcional { module?, round? } → entrega SOLO la
+//      ronda de ese módulo (botón "Pedido Entregado" por ronda). Sin
+//      filtro → entrega TODOS los ready (retrocompat).
+//   4. FASE 4B: estados derivados → si no quedan items activos → 'served'
+//      (lista para cobro); el KDS deja de mostrar la tarjeta.
 //   5. Broadcast status_change (KDS + caja) para refrescar pantallas.
 // ============================================================
 
 router.patch('/:id/deliver', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
   try {
+    const { module, round } = req.body || {};
     const db = getDb();
     const existing = db.prepare('SELECT id, status, table_id FROM orders WHERE id = ?').get(req.params.id);
     if (!existing) {
@@ -876,35 +1030,41 @@ router.patch('/:id/deliver', requireAuth, requireRole('admin', 'mesero'), (req, 
       });
     }
 
-    const readyCount = db.prepare(
-      "SELECT COUNT(*) as n FROM order_items WHERE order_id = ? AND status = 'ready'"
-    ).get(req.params.id);
+    // Filtro de items a entregar: { module, round } o TODOS los ready.
+    // SQLite NO permite JOIN con alias en UPDATE → subquery para el módulo.
+    const moduleWhere = module ? 'AND menu_item_id IN (SELECT id FROM menu_items WHERE area = ?)' : '';
+    const moduleParams = module ? [module] : [];
+    const roundWhere = round ? 'AND round = ?' : '';
+    const roundParams = round ? [round] : [];
+
+    const readyCount = db.prepare(`
+      SELECT COUNT(*) as n FROM order_items oi
+      LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+      WHERE oi.order_id = ? AND oi.status = 'ready'
+        ${moduleWhere} ${roundWhere}
+    `).get(req.params.id, ...moduleParams, ...roundParams);
     if (Number(readyCount.n) === 0) {
       return res.status(409).json({
         success: false,
-        error: 'No hay items listos para entregar',
+        error: 'No hay items listos para entregar en esa ronda/módulo',
         code: 'NO_READY_ITEMS',
       });
     }
 
-    // Marcar los items listos como entregados
-    db.prepare("UPDATE order_items SET status = 'delivered' WHERE order_id = ? AND status = 'ready'")
-      .run(req.params.id);
+    // Marcar los items listos (filtrados) como entregados
+    db.prepare(`
+      UPDATE order_items SET status = 'delivered'
+      WHERE order_id = ? AND status = 'ready'
+        ${moduleWhere} ${roundWhere}
+    `).run(req.params.id, ...moduleParams, ...roundParams);
 
-    // ¿Quedan items activos? Si no → pedido served (mismo criterio que el
-    // endpoint KDS de items, SSOT).
-    const remaining = db.prepare(
-      "SELECT COUNT(*) as n FROM order_items WHERE order_id = ? AND status NOT IN ('delivered','cancelled')"
-    ).get(req.params.id);
-    if (Number(remaining.n) === 0) {
-      db.prepare("UPDATE orders SET status = 'served', updated_at = datetime('now') WHERE id = ? AND status NOT IN ('paid','cancelled')")
-        .run(req.params.id);
-    }
+    // FASE 4B: estados derivados — 'served' si no quedan items activos
+    const derived = recalcOrderStatus(db, req.params.id);
 
     const orderForWs = buildOrder(db, req.params.id);
     broadcastOrderStatusChange(orderForWs, existing.status);
 
-    res.json({ success: true, status: orderForWs.status, message: 'Pedido marcado como entregado' });
+    res.json({ success: true, status: derived, message: 'Pedido marcado como entregado' });
   } catch (err) {
     logger.error('[Orders] Deliver error:', err.message);
     res.status(500).json({ success: false, error: 'Error al marcar pedido entregado', code: 'ORDER_DELIVER_ERROR' });

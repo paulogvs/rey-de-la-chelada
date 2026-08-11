@@ -1,44 +1,54 @@
 /**
  * KDSOrderCard — Large format order card for kitchen/bar display
  *
- * - Order number in 48px font
+ * FASE 4C — FLUJO 2 CLICKS por tarjeta (pedido completo de un módulo+ronda):
+ *   - La tarjeta es el PEDIDO COMPLETO de UN módulo+ronda (cocina o bar).
+ *   - Click 1 "▶ Iniciar"  → toda la tarjeta pasa a 'preparando' (onStart).
+ *   - Click 2 "✓ Listo"    → toda la tarjeta pasa a 'listo' → llama al mesero
+ *     (onReady). Ahí termina el ciclo de cocina/bar.
+ *   - Los items se VEN en la lista (para saber qué cocinar) pero NO se
+ *     tocan individualmente (sin margen de error).
+ *   - NO hay botón Rechazar: las cancelaciones las maneja el mesero (quitar
+ *     item desde su PWA).
+ *
+ * - Order number in 48px font + Ronda N
  * - Timer counting up (elapsed minutes)
  * - Status-colored left border (4px)
- * - Item list with checkboxes
  * - Urgent mode (red pulse after 15 minutes)
- * - Touch-friendly tap to mark items
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Badge } from '../Badge/Badge';
 import type { Order, KDSStatus } from '@/core/types';
 import './KDSOrderCard.css';
 
 export interface KDSOrderCardProps {
+  /** Pedido con items YA filtrados a (módulo, ronda) */
   order: Order;
+  /** Número de ronda que representa esta tarjeta (FASE 4B) */
+  round: number;
   /** Elapsed minutes (calculated externally or by timer) */
   elapsedMinutes?: number;
   /** Is this order urgent (> 15 min)? */
   isUrgent?: boolean;
   /** Is this a new order (flash animation)? */
   isNew?: boolean;
-  /** Callback when an item status changes */
-  onItemStatusChange?: (orderId: string, itemId: string, status: KDSStatus) => void;
-  /** Callback to acknowledge/reject the order */
-  onAcknowledge?: (orderId: string) => void;
-  onReject?: (orderId: string) => void;
+  /** Click 1 — Iniciar: toda la tarjeta (módulo+ronda) → 'preparing' */
+  onStart?: (orderId: string, round: number) => void;
+  /** Click 2 — Listo: toda la tarjeta → 'ready' → llama al mesero */
+  onReady?: (orderId: string, round: number) => void;
   /** Force KDS module variant (cocina, bar, or kds for unified) */
   variant?: 'cocina' | 'bar' | 'kds';
 }
 
 export function KDSOrderCard({
   order,
+  round,
   elapsedMinutes: externalMinutes,
   isUrgent = false,
   isNew = false,
-  onItemStatusChange,
-  onAcknowledge,
-  onReject,
+  onStart,
+  onReady,
   variant = 'cocina',
 }: KDSOrderCardProps) {
   const [elapsed, setElapsed] = useState(externalMinutes ?? 0);
@@ -62,26 +72,22 @@ export function KDSOrderCard({
   const isOrderUrgent = isUrgent || elapsed >= 15;
   const timerColor = elapsed < 10 ? 'var(--kds-completed)' : elapsed < 15 ? 'var(--kds-warning)' : 'var(--kds-urgent)';
 
-  const handleItemClick = useCallback((itemId: string, currentStatus: KDSStatus) => {
-    if (!onItemStatusChange) return;
-    const nextStatus: Record<KDSStatus, KDSStatus> = {
-      pending: 'preparing',
-      preparing: 'ready',
-      ready: 'delivered',
-      delivered: 'delivered',
-      cancelled: 'cancelled',
-    };
-    onItemStatusChange(order.id, itemId, nextStatus[currentStatus] || 'preparing');
-  }, [order.id, onItemStatusChange]);
+  // Estado de la tarjeta (derivado de sus items — la tarjeta es la unidad)
+  const hasPending = order.items.some(i => i.status === 'pending');
+  const hasPreparing = order.items.some(i => i.status === 'preparing');
+  const allDone = order.items.length > 0 && order.items.every(i =>
+    i.status === 'ready' || i.status === 'delivered' || i.status === 'cancelled'
+  );
 
-  const allReady = order.items.every(i => i.status === 'delivered' || i.status === 'cancelled');
+  const cardState: KDSStatus = hasPending ? 'pending' : hasPreparing ? 'preparing' : 'ready';
+  const cardBadgeVariant = cardState === 'preparing' ? 'preparing' : cardState === 'ready' ? 'ready' : 'pending';
 
   const classes = [
     'kds-order',
     `kds-order--${variant}`,
     isOrderUrgent ? 'kds-order--urgent' : '',
     isNew ? 'kds-order--new' : '',
-    allReady ? 'kds-order--complete' : '',
+    allDone ? 'kds-order--complete' : '',
   ].filter(Boolean).join(' ');
 
   const formatTime = (mins: number): string => {
@@ -91,38 +97,34 @@ export function KDSOrderCard({
   };
 
   return (
-    <div className={classes} role="article" aria-label={`Orden #${order.tableNumber}`}>
+    <div className={classes} role="article" aria-label={`Mesa ${order.tableNumber} · Ronda ${round}`}>
       {/* Header */}
       <div className="kds-order__header">
         <div className="kds-order__number" style={{ color: timerColor }}>
           #{order.tableNumber}
         </div>
         <div className="kds-order__meta">
+          <div className="kds-order__round">
+            {round === 1 ? 'Ronda 1' : `Ronda ${round} 🆕`}
+          </div>
           <div className="kds-order__timer" style={{ color: timerColor }}>
             {formatTime(elapsed)}
           </div>
           <div className="kds-order__waiter">
             {order.waiterName}
           </div>
-          <Badge
-            // 2.7 (A5): badge honra el status REAL. 'called' (pedido del
-            // cliente aún sin confirmar) se muestra como 'pending' — NUNCA
-            // como 'ready' (fallback anterior). El filtro KDS (getKDSOrders)
-            // ya excluye 'called', esto es defensivo.
-            variant={order.status === 'called' || order.status === 'confirmed' ? 'pending' : order.status === 'preparing' ? 'preparing' : 'ready'}
-            large
-          />
+          <Badge variant={cardBadgeVariant} large>
+            {cardState === 'preparing' ? 'En prep.' : cardState === 'ready' ? 'Listo' : 'Nuevo'}
+          </Badge>
         </div>
       </div>
 
-      {/* Items */}
+      {/* Items — solo lectura (NO tocables, FASE 4C) */}
       <div className="kds-order__items">
         {order.items.map(item => (
-          <button
+          <div
             key={item.id}
             className={`kds-order__item ${item.status === 'ready' ? 'kds-order__item--ready' : ''} ${item.status === 'delivered' ? 'kds-order__item--done' : ''} ${item.status === 'cancelled' ? 'kds-order__item--cancelled' : ''}`}
-            onClick={() => handleItemClick(item.id, item.status)}
-            disabled={item.status === 'delivered' || item.status === 'cancelled'}
           >
             <span className="kds-order__item-check" aria-hidden="true">
               {item.status === 'ready' || item.status === 'delivered' ? '✓' : item.status === 'cancelled' ? '✕' : item.status === 'preparing' ? '○' : '·'}
@@ -137,32 +139,29 @@ export function KDSOrderCard({
             {item.preparationNotes && (
               <span className="kds-order__item-notes">{item.preparationNotes}</span>
             )}
-            <span className={`kds-order__item-status ${item.status === 'ready' ? 'kds-order__item-status--ready' : ''}`}>
-              {item.status === 'ready' ? 'LISTO' : item.status === 'delivered' ? 'ENTREGADO' : item.status === 'preparing' ? '...' : ''}
-            </span>
-          </button>
+          </div>
         ))}
       </div>
 
-      {/* Actions */}
+      {/* Acciones — FASE 4C: 2 clicks por tarjeta */}
       <div className="kds-order__actions">
-        {order.status === 'confirmed' && onAcknowledge && (
+        {hasPending && onStart && (
           <button
-            className="kds-order__action kds-order__action--accept"
-            onClick={() => onAcknowledge(order.id)}
+            className="kds-order__action kds-order__action--start"
+            onClick={() => onStart(order.id, round)}
           >
-            Aceptar Pedido
+            ▶ Iniciar
           </button>
         )}
-        {order.status === 'confirmed' && onReject && (
+        {!hasPending && hasPreparing && onReady && (
           <button
-            className="kds-order__action kds-order__action--reject"
-            onClick={() => onReject(order.id)}
+            className="kds-order__action kds-order__action--ready"
+            onClick={() => onReady(order.id, round)}
           >
-            Rechazar
+            ✓ Listo
           </button>
         )}
-        {order.status !== 'confirmed' && allReady && (
+        {allDone && (
           <div className="kds-order__complete-badge">✓ COMPLETADO</div>
         )}
       </div>

@@ -20,7 +20,10 @@
 //   - payments.tip eliminada; payments.received/change REAL DEFAULT 0 — efectivo al centavo:
 //     received = lo que el cliente ENTREGA, change = vuelto (received - amount).
 //     Migración: métodos legacy → 'qr'; amount' = amount + tip (no falsear históricos).
-const SCHEMA_VERSION = 6;
+// v7 (Fase 4 — flujo cerrado): order_items.round INTEGER NOT NULL DEFAULT 1 — "segunda
+//   comanda": al agregar items a un pedido con platos ya procesados, entran en una RONDA
+//   nueva (max+1) → el KDS los muestra como tarjeta separada prioritaria ("Mesa 4 · Ronda 2").
+const SCHEMA_VERSION = 7;
 
 const CREATE_TABLES = [
   // ── Staff / Users (v5: 4 roles — admin, mesero, kds, caja) ─────
@@ -142,6 +145,9 @@ const CREATE_TABLES = [
   )`,
 
   // ── Order Line Items ──────────────────────────────────
+  // v7: columna `round` — "segunda comanda". Items agregados a un pedido con
+  // platos ya procesados entran en una ronda nueva (max+1) para que el KDS
+  // los muestre como tarjeta separada (orden de prioridades).
   `CREATE TABLE IF NOT EXISTS order_items (
     id              TEXT PRIMARY KEY,
     order_id        TEXT NOT NULL,
@@ -152,6 +158,7 @@ const CREATE_TABLES = [
     modifiers_json  TEXT,  -- JSON array of {groupName, optionName, priceAdjustment}
     subtotal        REAL NOT NULL,
     status          TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','preparing','ready','delivered','cancelled')),
+    round           INTEGER NOT NULL DEFAULT 1,
     preparation_notes TEXT NOT NULL DEFAULT '',
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
@@ -291,6 +298,13 @@ function applySchema(db) {
       if (!hasColumn(db, 'payments', 'received')) {
         migratePaymentsV6(db);
         console.log('[DB] Migration v6: payments sin propina, métodos cash|qr, +received/change');
+      }
+      // v7 (Fase 4): order_items.round — "segunda comanda". ADD COLUMN es no
+      // destructivo (los items existentes quedan round=1). Disparador: falta
+      // la columna (pre-v7).
+      if (!hasColumn(db, 'order_items', 'round')) {
+        db.exec(`ALTER TABLE order_items ADD COLUMN round INTEGER NOT NULL DEFAULT 1`);
+        console.log('[DB] Migration v7: order_items.round (segunda comanda)');
       }
       // v5a: staff con rol 'caja' — recrear SOLO si el CHECK viejo no lo acepta
       if (!staffAcceptsCajaRole(db)) {

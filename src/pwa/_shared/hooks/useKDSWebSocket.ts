@@ -158,6 +158,8 @@ export function normalizeServerItem(raw: unknown): OrderLineItem | null {
     preparationNotes: typeof src.item_notes === 'string' ? src.item_notes : '',
     createdAt: typeof src.created_at === 'string' ? src.created_at : new Date().toISOString(),
     ...(typeof src.kds_module === 'string' ? { kds_module: src.kds_module } : {}),
+    // FASE 4B: ronda ("segunda comanda") — el server la incluye desde v7
+    ...(typeof src.round === 'number' ? { round: src.round } : { round: 1 }),
   };
 }
 

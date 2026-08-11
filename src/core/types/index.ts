@@ -137,6 +137,13 @@ export interface OrderLineItem {
   status: KDSStatus;
   preparationNotes: string;
   createdAt: string;
+  /** Área KDS (cocina/bar) — camelCase (ordersApi) o snake_case (KDS WS). */
+  kdsModule?: string;
+  /** Área KDS en snake_case (server DB mi.area vía KDS WS). */
+  kds_module?: string;
+  /** FASE 4B: ronda ("segunda comanda") — items agregados a un pedido con
+   *  platos ya procesados entran en una ronda nueva (max+1). */
+  round?: number;
 }
 
 /** Customer order */

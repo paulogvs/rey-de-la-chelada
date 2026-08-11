@@ -22,7 +22,7 @@ import { Loader } from '@/ui/components/Loader';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { PriceDisplay } from '@/ui/components/PriceDisplay';
 import { fetchMenuCategories, fetchMenuItems, fetchMenuItemDetail, type MenuItem } from '../_shared/api/menuApi';
-import { createOrder, submitOrder, confirmOrder, fetchOrderById, deliverOrder, type Order } from '../_shared/api/ordersApi';
+import { createOrder, fetchOrderById, deliverOrder, addOrderItem, removeOrderItem, type Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
 import { computeTotals } from '@/core/config/iva';
@@ -62,6 +62,8 @@ interface OrderPanelProps {
   onOrderPlaced: (orderId: string) => void;
   onCancel: () => void;
   onBack: () => void;
+  /** FASE 4C: cobrar el pedido (solo habilitado cuando served — TODO entregado) */
+  onRequestPayment: (orderId: string) => void;
 }
 
 interface CartItem {
@@ -86,7 +88,7 @@ interface DetailGroup {
   options: DetailModifier[];
 }
 
-export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, onBack }: OrderPanelProps) {
+export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, onBack, onRequestPayment }: OrderPanelProps) {
   const { addToast } = useToast();
   const [categories, setCategories] = useState<{ id: string; name: string; emoji: string }[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -105,7 +107,10 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [loadingActive, setLoadingActive] = useState(false);
   const [delivering, setDelivering] = useState(false);
+  const [removingItemId, setRemovingItemId] = useState<string | null>(null);
   const [activeOrderTick, setActiveOrderTick] = useState(0);
+  // FASE 4A: modo edición del pedido activo (agregar items → nueva ronda)
+  const [editMode, setEditMode] = useState(false);
 
   // Si la mesa ya tiene currentOrderId, cargar el pedido y mostrar su estado
   // en lugar de crear uno nuevo (el mesero ve items/listos y puede entregar).
@@ -136,19 +141,20 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
     return () => { disposed = true; };
   }, [table.currentOrderId, token, activeOrderTick]);
 
-  // S2-B: entregar los items listos → served → la caja puede cobrar
-  const handleDeliver = useCallback(async () => {
+  // FASE 4C: entregar por ronda+módulo — el botón "Pedido Entregado"
+  // entrega TODA la ronda de ESE módulo de una vez (cocina / bar).
+  const handleDeliver = useCallback(async (module: 'bar' | 'cocina', round: number) => {
     if (!activeOrder) return;
     setDelivering(true);
     try {
-      const result = await deliverOrder(token, activeOrder.id);
+      const result = await deliverOrder(token, activeOrder.id, { module, round });
       if (!result.ok) {
-        addToast({ type: 'error', message: result.error || 'No se pudo marcar el pedido como entregado', duration: 5000 });
+        addToast({ type: 'error', message: result.error || 'No se pudo marcar como entregado', duration: 5000 });
         return;
       }
       addToast({
         type: 'success',
-        message: `Mesa ${table.number} — Pedido entregado ✓`,
+        message: `Mesa ${table.number} — Ronda ${round} ${module === 'bar' ? '🍺 barra' : '🍳 cocina'} entregada ✓`,
         duration: 3000,
       });
       setActiveOrderTick(t => t + 1);
@@ -160,9 +166,66 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
     }
   }, [activeOrder, token, table.number, addToast]);
 
-  const canDeliver = !!activeOrder &&
-    !['paid', 'cancelled', 'served'].includes(activeOrder.status) &&
-    activeOrder.items.some(i => i.status === 'ready');
+  // FASE 4A: quitar item del pedido activo (cancelación vía mesero)
+  const handleRemoveItem = useCallback(async (itemId: string) => {
+    if (!activeOrder) return;
+    setRemovingItemId(itemId);
+    try {
+      const result = await removeOrderItem(token, activeOrder.id, itemId);
+      if (!result.ok) {
+        addToast({ type: 'error', message: result.error || 'No se pudo quitar el item', duration: 5000 });
+        return;
+      }
+      addToast({ type: 'success', message: 'Item quitado del pedido', duration: 2500 });
+      setActiveOrderTick(t => t + 1);
+    } catch (err) {
+      console.error('[OrderPanel] remove item error:', err);
+      addToast({ type: 'error', message: 'Error al quitar el item', duration: 5000 });
+    } finally {
+      setRemovingItemId(null);
+    }
+  }, [activeOrder, token, addToast]);
+
+  // FASE 4A: agregar items al pedido activo (ronda nueva si ya se procesó)
+  const handleAddItemsToActiveOrder = useCallback(async () => {
+    if (!activeOrder) return;
+    if (cart.length === 0) {
+      addToast({ type: 'warning', message: 'Agrega items al pedido', duration: 3000 });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      for (const ci of cart) {
+        const res = await addOrderItem(token, activeOrder.id, {
+          menu_item_id: ci.menuItem.id,
+          quantity: ci.quantity,
+          notes: ci.notes || undefined,
+          modifiers: ci.selectedModifiers.map(m => ({
+            groupName: (detailGroups.find(g => g.options.some(o => o.option_id === m.id))?.name) || '',
+            optionName: m.name,
+            priceAdjustment: m.priceAdjustment ?? 0,
+          })),
+        });
+        if (!res.ok) {
+          addToast({ type: 'error', message: res.error || `No se pudo agregar ${ci.menuItem.name}`, duration: 5000 });
+          return;
+        }
+      }
+      addToast({
+        type: 'success',
+        message: `Mesa ${table.number} — items agregados (${cart.length}) — enviados a cocina/bar`,
+        duration: 3500,
+      });
+      setCart([]);
+      setEditMode(false);
+      setActiveOrderTick(t => t + 1);
+    } catch (err) {
+      console.error('[OrderPanel] add items error:', err);
+      addToast({ type: 'error', message: 'Error al agregar items al pedido', duration: 5000 });
+    } finally {
+      setSubmitting(false);
+    }
+  }, [activeOrder, cart, token, table.number, detailGroups, addToast]);
 
   // Load menu (public endpoints)
   useEffect(() => {
@@ -249,7 +312,8 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
     setCart(prev => prev.map((ci, i) => (i === index ? { ...ci, quantity } : ci)));
   }, []);
 
-  // Place order via API: create (draft) → submit (called) → confirm (confirmed)
+  // FASE 4A: crear pedido en UNA llamada — POST /api/orders crea directo
+  // 'confirmed' y el server lo envía al KDS al instante (adiós submit/confirm).
   const placeOrder = useCallback(async () => {
     if (cart.length === 0) {
       addToast({ type: 'warning', message: 'Agrega items al pedido', duration: 3000 });
@@ -279,20 +343,6 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
         return;
       }
 
-      // draft → called (client sends to mesero queue)
-      const submitted = await submitOrder(token, created.order.id);
-      if (!submitted.ok) {
-        addToast({ type: 'error', message: submitted.error || 'No se pudo enviar el pedido', duration: 5000 });
-        return;
-      }
-
-      // called → confirmed (mesero accepts → KDS gets it)
-      const confirmed = await confirmOrder(token, created.order.id);
-      if (!confirmed.ok) {
-        addToast({ type: 'error', message: confirmed.error || 'No se pudo confirmar el pedido', duration: 5000 });
-        return;
-      }
-
       onOrderPlaced(created.order.id);
     } catch (err) {
       console.error('[OrderPanel] placeOrder error:', err);
@@ -302,12 +352,25 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
     }
   }, [cart, table, token, detailGroups, addToast, onOrderPlaced]);
 
+  // FASE 4B: rondas del pedido activo (items agrupados por round)
+  const rounds = activeOrder
+    ? [...new Set(activeOrder.items.map(i => i.round ?? 1))].sort((a, b) => a - b)
+    : [];
+
+  const modLabel = (mod: string) => (mod === 'bar' ? '🍺 Barra' : '🍳 Cocina');
+
+  // ¿Se puede editar el pedido? (agregar/quitar) — no si está cerrado
+  const canEditOrder = !!activeOrder && !['paid', 'cancelled'].includes(activeOrder.status);
+
+  // FASE 4C: cobro SOLO cuando TODO el pedido está entregado (served)
+  const canCharge = !!activeOrder && activeOrder.status === 'served';
+
   return (
     <div className="order-panel">
       {/* ── S2-B: Pedido en curso (mesa con order activo) ── */}
       {loadingActive && <Loader variant="block" label="Cargando pedido…" />}
 
-      {!loadingActive && activeOrder && (
+      {!loadingActive && activeOrder && !editMode && (
         <div className="order-panel__active">
           <Card className="order-panel__active-summary">
             <div className="order-panel__active-header">
@@ -322,19 +385,69 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
               </Badge>
             </div>
 
-            <div className="order-panel__active-items">
-              {activeOrder.items.map(item => {
-                const badge = ITEM_STATUS_BADGE[item.status] || { variant: 'info' as const, label: item.status };
-                return (
-                  <div key={item.id} className="order-panel__active-item">
-                    <span className="order-panel__active-item-qty">{item.quantity}x</span>
-                    <span className="order-panel__active-item-name">{item.menuItemName}</span>
-                    <Badge variant={badge.variant}>{badge.label}</Badge>
-                    <span className="order-panel__active-item-price">Bs. {item.subtotal.toFixed(2)}</span>
+            {/* Items agrupados por RONDA → módulo (FASE 4B) */}
+            {rounds.map(round => {
+              const roundItems = activeOrder.items.filter(i => (i.round ?? 1) === round);
+              const modsInRound = [...new Set(roundItems.map(i => i.kdsModule || 'cocina'))];
+              return (
+                <div key={round} className="order-panel__round">
+                  <div className="order-panel__round-header">
+                    <span className="order-panel__round-title">
+                      {round === 1 ? 'Ronda 1' : `Ronda ${round} 🆕`}
+                    </span>
+                    <span className="order-panel__round-total">
+                      Bs. {roundItems.reduce((s, i) => s + i.subtotal, 0).toFixed(2)}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
+
+                  {modsInRound.map(mod => {
+                    const modKey = (mod === 'bar' ? 'bar' : 'cocina') as 'bar' | 'cocina';
+                    const modItems = roundItems.filter(i => (i.kdsModule || 'cocina') === mod);
+                    const modHasReady = modItems.some(i => i.status === 'ready');
+                    return (
+                      <div key={`${round}-${mod}`} className="order-panel__mod">
+                        <div className="order-panel__mod-label">{modLabel(mod)}</div>
+                        {modItems.map(item => {
+                          const badge = ITEM_STATUS_BADGE[item.status] || { variant: 'info' as const, label: item.status };
+                          const canRemove = canEditOrder && ['pending', 'preparing'].includes(item.status);
+                          return (
+                            <div key={item.id} className="order-panel__active-item">
+                              <span className="order-panel__active-item-qty">{item.quantity}x</span>
+                              <span className="order-panel__active-item-name">{item.menuItemName}</span>
+                              <Badge variant={badge.variant}>{badge.label}</Badge>
+                              <span className="order-panel__active-item-price">Bs. {item.subtotal.toFixed(2)}</span>
+                              {canRemove && (
+                                <button
+                                  className="order-panel__active-item-remove"
+                                  onClick={() => handleRemoveItem(item.id)}
+                                  disabled={removingItemId === item.id}
+                                  aria-label={`Quitar ${item.menuItemName}`}
+                                  title="Quitar item"
+                                >
+                                  {removingItemId === item.id ? '…' : '🗑️'}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {modHasReady && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="order-panel__mod-deliver"
+                            onClick={() => handleDeliver(modKey, round)}
+                            loading={delivering}
+                            disabled={delivering}
+                          >
+                            ✅ Entregar {modLabel(mod)}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
 
             <PriceDisplay
               priceWithIVA={activeOrder.total}
@@ -347,23 +460,26 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
             <Button variant="secondary" onClick={onBack}>
               ← Volver a mesas
             </Button>
-            {canDeliver && (
-              <Button
-                variant="primary"
-                onClick={handleDeliver}
-                loading={delivering}
-                disabled={delivering}
-                fullWidth
-              >
-                {delivering ? 'Entregando…' : '✅ Pedido Entregado'}
+            {canEditOrder && (
+              <Button variant="secondary" onClick={() => setEditMode(true)}>
+                ➕ Agregar items
               </Button>
             )}
-            {!canDeliver && activeOrder.status === 'served' && (
+            {canCharge && (
+              <Button
+                variant="primary"
+                onClick={() => onRequestPayment(activeOrder.id)}
+                fullWidth
+              >
+                💰 Cobrar Mesa {table.number}
+              </Button>
+            )}
+            {!canCharge && activeOrder.status === 'served' && (
               <p className="order-panel__active-hint">
-                Pedido servido — listo para el cobro en caja 💰
+                Pedido servido — todo entregado. El botón 💰 Cobrar aparecerá al refrescar la mesa.
               </p>
             )}
-            {!canDeliver && !['paid', 'cancelled', 'served'].includes(activeOrder.status) && (
+            {!canCharge && !['paid', 'cancelled', 'served'].includes(activeOrder.status) && (
               <p className="order-panel__active-hint">
                 Esperando a que cocina/bar marquen los items como listos 🍽️
               </p>
@@ -372,9 +488,19 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
         </div>
       )}
 
-      {/* ── Flujo de creación (sin pedido activo) ── */}
-      {!loadingActive && !activeOrder && (
+      {/* ── Flujo de creación / edición (sin pedido activo o editMode) ── */}
+      {!loadingActive && (!activeOrder || editMode) && (
       <>
+      {editMode && (
+        <div className="order-panel__edit-banner">
+          Agregando items al pedido de la Mesa {table.number}
+          {activeOrder && (
+            <button className="order-panel__edit-cancel" onClick={() => { setEditMode(false); setCart([]); }}>
+              Cancelar edición
+            </button>
+          )}
+        </div>
+      )}
       {/* Category bar */}
       <nav className="order-panel__categories">
         <button
@@ -423,7 +549,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
         {/* Cart */}
         <div className="order-panel__cart">
           <h3 className="order-panel__cart-title">
-            Pedido actual ({cart.length} items)
+            {editMode ? `Agregar al pedido de Mesa ${table.number} (${cart.length} items)` : `Pedido actual (${cart.length} items)`}
           </h3>
 
           {cart.length === 0 && (
@@ -478,8 +604,8 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
           )}
 
           <div className="order-panel__actions">
-            <Button variant="secondary" onClick={onBack}>
-              Cancelar
+            <Button variant="secondary" onClick={editMode ? () => { setEditMode(false); setCart([]); } : onBack}>
+              {editMode ? 'Cancelar edición' : 'Cancelar'}
             </Button>
             <Button
               variant="secondary"
@@ -488,15 +614,27 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
             >
               🖨️ Imprimir
             </Button>
-            <Button
-              variant="primary"
-              onClick={placeOrder}
-              disabled={cart.length === 0 || submitting}
-              loading={submitting}
-              fullWidth
-            >
-              {submitting ? 'Enviando…' : 'Confirmar Pedido'}
-            </Button>
+            {editMode ? (
+              <Button
+                variant="primary"
+                onClick={handleAddItemsToActiveOrder}
+                disabled={cart.length === 0 || submitting}
+                loading={submitting}
+                fullWidth
+              >
+                {submitting ? 'Agregando…' : '➕ Agregar al Pedido'}
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                onClick={placeOrder}
+                disabled={cart.length === 0 || submitting}
+                loading={submitting}
+                fullWidth
+              >
+                {submitting ? 'Enviando…' : 'Confirmar Pedido'}
+              </Button>
+            )}
           </div>
         </div>
       </div>

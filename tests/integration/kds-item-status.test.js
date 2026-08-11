@@ -96,8 +96,7 @@ describe('KDS item status persistence', () => {
       },
     });
     orderId = create.json?.order?.id;
-    await api(`/api/orders/${orderId}/submit`, { method: 'PATCH', token: meseroToken });
-    await api(`/api/orders/${orderId}/confirm`, { method: 'PATCH', token: meseroToken });
+    // FASE 4A: POST crea directo 'confirmed' (1 llamada)
 
     const kds = await api(`/api/orders/kds/kds`, { token: kdsToken });
     const order = kds.json?.orders?.find(o => o.id === orderId);
@@ -189,8 +188,7 @@ describe('KDS item status persistence', () => {
       ] },
     });
     const oid = create.json?.order?.id;
-    await api(`/api/orders/${oid}/submit`, { method: 'PATCH', token: meseroToken });
-    await api(`/api/orders/${oid}/confirm`, { method: 'PATCH', token: meseroToken });
+    // FASE 4A: POST crea directo 'confirmed'
 
     const kds = await api(`/api/orders/kds/kds`, { token: kdsToken });
     const order = kds.json?.orders?.find(o => o.id === oid);

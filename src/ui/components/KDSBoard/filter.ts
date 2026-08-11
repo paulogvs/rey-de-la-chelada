@@ -12,11 +12,11 @@ import type { Order, OrderLineItem } from '@/core/types';
 export type KDSModule = 'cocina' | 'bar';
 
 /** Item con kds_module opcional (server DB snake_case → mi.area). */
-type KDSAwareItem = OrderLineItem & { kds_module?: string };
+type KDSAwareItem = OrderLineItem;
 
-/** Area de un item: kds_module del item, con fallback 'cocina' (legacy). */
+/** Area de un item: kds_module (KDS WS) o kdsModule (ordersApi), con fallback 'cocina'. */
 export function itemModule(item: KDSAwareItem): string {
-  return item.kds_module || 'cocina';
+  return item.kds_module || item.kdsModule || 'cocina';
 }
 
 /**
