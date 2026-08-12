@@ -376,18 +376,17 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
             </Badge>
           </div>
 
-          {/* FASE 4.5: CADA RONDA es un Card independiente (con borde propio),
+          {/* FASE 4.5: CADA RONDA es un bloque independiente (con borde propio),
               apilados hacia abajo — el scroll de la página muestra todas.
               Dentro: cards de módulo lado a lado (🍺 Barra | 🍳 Cocina).
-              - Ronda con 2 módulos → 2 columnas
-              - Ronda con 1 módulo → ancho completo
-              Cada card de módulo es independiente: entregar una no toca otras. */}
+              Nota: NO usamos <Card> porque .card { overflow:hidden } recorta
+              el contenido cuando el layout flex comprime — usamos div nativo. */}
           {rounds.map(round => {
             const roundItems = activeOrder.items.filter(i => (i.round ?? 1) === round);
             const modsInRound = [...new Set(roundItems.map(i => i.kdsModule || 'cocina'))];
             const roundTotal = roundItems.reduce((s, i) => s + i.subtotal, 0);
             return (
-              <Card key={round} padded={false} className="order-panel__round-group">
+              <div key={round} className="order-panel__round-group">
                 <div className="order-panel__round-group-header">
                   <span className="order-panel__round-group-title">
                     {round === 1 ? 'Ronda 1' : `Ronda ${round} 🆕`}
@@ -464,7 +463,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                     );
                   })}
                 </div>
-              </Card>
+              </div>
             );
           })}
 

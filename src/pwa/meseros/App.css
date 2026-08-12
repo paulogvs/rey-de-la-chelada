@@ -665,10 +665,16 @@
   border-radius: var(--radius-md);
 }
 
-/* ── FASE 4.5: CADA RONDA es un Card independiente (borde propio) ── */
+/* ── FASE 4.5: CADA RONDA es un bloque independiente (estilo card propio).
+      NO usamos .card porque overflow:hidden recorta el contenido en flex.
+      Estos estilos replican la apariencia de .card sin el overflow. ── */
 .order-panel__round-group {
   margin-bottom: var(--space-4);
   padding: var(--space-3);
+  background: linear-gradient(180deg, var(--surface) 0%, color-mix(in srgb, var(--surface) 98%, var(--dorado-rey-soft)) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 }
 
 .order-panel__round-group-header {
