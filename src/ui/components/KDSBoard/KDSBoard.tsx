@@ -92,7 +92,9 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
   const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set());
   const [urgentOrderIds, setUrgentOrderIds] = useState<Set<string>>(new Set());
   const [audioEnabled, setAudioEnabled] = useState(true);
-  const [isConnected, setIsConnected] = useState(true);
+  // Capa 2: init honesto en false — antes mentía "Conectado" aunque el WS
+  // nunca abriera (el badge se corregía solo tras el primer evento WS).
+  const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const prevOrderIdsRef = useRef<Set<string>>(new Set());
@@ -102,7 +104,8 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
 
   audioRef.current = audioEnabled;
 
-  // WebSocket — real-time del módulo + polling fallback.
+  // WebSocket — real-time del módulo (inmediatez) + polling 10s SIEMPRE
+  // activo como red de seguridad (ver useEffect de polling abajo).
   const ws = useKDSWebSocket({
     module,
     onFallback: () => loadOrdersRef.current(),
@@ -173,20 +176,44 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
     setIsConnected(ws.isConnected);
   }, [ws.isConnected]);
 
-  // Subscribe to engine changes + polling fallback
+  // Subscribe to engine changes + polling PERIÓDICO SIEMPRE ACTIVO (10s).
+  // Capa 1: el WS es el canal de inmediatez, pero puede fallar EN SILENCIO
+  // (firewall bloqueando el upgrade, idle-timeout del router sin keep-alive)
+  // mientras el badge muestra "Conectado". El poll incondicional trae datos
+  // frescos del server cada 10s SIEMPRE — es la red de seguridad que antes
+  // solo se activaba tras 5 fallos de conexión (shouldFallback), que no
+  // detecta "conectado pero sin mensajes".
+  // El flag `fetching` evita solapar requests si uno tarda más de 10s.
   useEffect(() => {
     loadOrders();
     const unsubscribe = orderEngine.onChange(loadOrders);
 
-    let interval: ReturnType<typeof setInterval> | null = null;
-    if (ws.shouldFallback) {
-      interval = setInterval(loadOrders, 30000);
-    }
+    let fetching = false;
+    const interval = setInterval(async () => {
+      if (!token || fetching) return;
+      fetching = true;
+      try {
+        const result = await fetchKDSOrders(token, module);
+        if (result.ok) {
+          result.orders.forEach(order => orderEngine.importOrder(order));
+          // importOrder dispara onChange → loadOrders síncrono; el call
+          // explícito cubre cualquier caso sin doble audio (prevOrderIdsRef
+          // ya quedó actualizado por la primera invocación).
+          loadOrders();
+        }
+      } catch {
+        // Silencioso — el engine conserva el último snapshot; el próximo
+        // tick reintenta.
+      } finally {
+        fetching = false;
+      }
+    }, 10000);
+
     return () => {
       unsubscribe();
-      if (interval) clearInterval(interval);
+      clearInterval(interval);
     };
-  }, [loadOrders, ws.shouldFallback]);
+  }, [loadOrders, token, module]);
 
   // Subscribe to KDS events (audio alerts)
   useEffect(() => {
@@ -293,8 +320,8 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
           <h1 className="kds-header__title">
             <span aria-hidden="true">{icon}</span> {title}
           </h1>
-          <Badge variant={isConnected ? 'ready' : 'cancelled'}>
-            {isConnected ? 'Conectado' : 'Sin conexión'}
+          <Badge variant={isConnected && !ws.shouldFallback ? 'ready' : 'cancelled'}>
+            {isConnected && !ws.shouldFallback ? 'Conectado' : 'Sin conexión (polling 10s)'}
           </Badge>
         </div>
         <div className="kds-header__right">
