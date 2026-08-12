@@ -32,7 +32,7 @@ export interface StaffAuthState {
   logout: () => Promise<void>;
 }
 
-export function useStaffAuth(moduleId: string): StaffAuthState {
+export function useStaffAuth(moduleId: string, allowedRoles?: string[]): StaffAuthState {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<StaffUser | null>(null);
   const [restoring, setRestoring] = useState(true);
@@ -52,12 +52,16 @@ export function useStaffAuth(moduleId: string): StaffAuthState {
       if (!result.ok || !result.token) {
         return { ok: false, code: result.code };
       }
+      // FASE 4.5: reject login if role not allowed for this PWA
+      if (allowedRoles && result.user && !allowedRoles.includes(result.user.role)) {
+        return { ok: false, code: 'FORBIDDEN_ROLE' };
+      }
       setStoredToken(moduleId, result.token);
       setToken(result.token);
       setUser(result.user);
       return { ok: true, code: null };
     },
-    [moduleId]
+    [moduleId, allowedRoles]
   );
 
   const logout = useCallback(async () => {

@@ -36,7 +36,7 @@ type ViewState = 'tables' | 'order-panel' | 'payment-panel' | 'waiter-calls';
 
 function MeserosApp() {
   const { addToast } = useToast();
-  const { isAuthenticated, token, user, login, logout, restoring } = useStaffAuth('meseros');
+  const { isAuthenticated, token, user, login, logout, restoring } = useStaffAuth('meseros', ['admin', 'mesero']);
 
   const [view, setView] = useState<ViewState>('tables');
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);

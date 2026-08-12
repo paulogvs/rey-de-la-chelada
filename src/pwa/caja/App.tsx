@@ -40,7 +40,7 @@ const VIEW_OPTIONS: SegmentedOption[] = [
 
 function CajaApp() {
   const { addToast } = useToast();
-  const { isAuthenticated, token, user, login, logout, restoring } = useStaffAuth('caja');
+  const { isAuthenticated, token, user, login, logout, restoring } = useStaffAuth('caja', ['admin', 'caja']);
 
   const [view, setView] = useState<ViewState>('summary');
   const [refreshTick, setRefreshTick] = useState(0);

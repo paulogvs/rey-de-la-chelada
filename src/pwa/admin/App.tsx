@@ -52,7 +52,7 @@ const NAV_ITEMS: { id: AdminView; label: string; icon: string }[] = [
 
 function AdminApp() {
   const { addToast } = useToast();
-  const { isAuthenticated, token, user, login, logout, restoring } = useStaffAuth('admin');
+  const { isAuthenticated, token, user, login, logout, restoring } = useStaffAuth('admin', ['admin']);
   const [view, setView] = useState<AdminView>('dashboard');
 
   const restricted = isAuthenticated && user && user.role !== 'admin';

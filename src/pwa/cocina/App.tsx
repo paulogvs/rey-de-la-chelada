@@ -19,7 +19,7 @@ export default function App() {
   setCurrentPwaModule('cocina');
   bootstrapPwa('cocina');
 
-  const { isAuthenticated, token, login, restoring } = useStaffAuth('cocina');
+  const { isAuthenticated, token, login, restoring } = useStaffAuth('cocina', ['admin', 'kds']);
 
   if (restoring) {
     return (

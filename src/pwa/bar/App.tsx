@@ -21,7 +21,7 @@ export default function App() {
   setCurrentPwaModule('bar');
   bootstrapPwa('bar');
 
-  const { isAuthenticated, token, login, restoring } = useStaffAuth('bar');
+  const { isAuthenticated, token, login, restoring } = useStaffAuth('bar', ['admin', 'kds']);
 
   if (restoring) {
     return (

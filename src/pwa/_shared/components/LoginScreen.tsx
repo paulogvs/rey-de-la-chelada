@@ -41,9 +41,11 @@ export function LoginScreen({ title, busy = false, onLogin }: LoginScreenProps) 
         setError(
           result.code === 'INVALID_PIN'
             ? 'PIN incorrecto'
-            : result.code === 'NETWORK_ERROR'
-              ? 'Sin conexión al servidor'
-              : 'No se pudo iniciar sesión'
+            : result.code === 'FORBIDDEN_ROLE'
+              ? 'No tienes acceso a esta pantalla'
+              : result.code === 'NETWORK_ERROR'
+                ? 'Sin conexión al servidor'
+                : 'No se pudo iniciar sesión'
         );
         setPin('');
       }
