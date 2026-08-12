@@ -231,3 +231,49 @@
 @media (max-width: 480px) {
   .caja-collect__order-items { display: none; }
 }
+
+/* ── FASE 5: bloque QR estático + foto comprobante ── */
+
+.caja-collect__qr-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+
+.caja-collect__qr-image {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  background: #fff;
+  padding: var(--space-2);
+}
+
+.caja-collect__qr-hint {
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-align: center;
+  margin: 0;
+}
+
+.caja-collect__qr-disabled {
+  padding: var(--space-3);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--status-pending);
+  background: color-mix(in srgb, var(--status-pending) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-pending) 22%, transparent);
+  border-radius: var(--radius-md);
+}
+
+.caja-collect__proof-preview {
+  width: 100%;
+  max-width: 280px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}

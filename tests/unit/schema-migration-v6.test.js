@@ -56,8 +56,8 @@ function seedMiniWorld(db) {
 }
 
 describe('Migración v6 — sin propina, solo cash|qr, received/change', () => {
-  it('SCHEMA_VERSION ahora es 7', () => {
-    expect(SCHEMA_VERSION).toBe(7);
+  it('SCHEMA_VERSION ahora es 8', () => {
+    expect(SCHEMA_VERSION).toBe(8);
   });
 
   it('DB nueva: payments SIN columna tip, CON received/change y CHECK cash|qr', () => {
@@ -66,7 +66,8 @@ describe('Migración v6 — sin propina, solo cash|qr, received/change', () => {
     expect(hasColumn(db, 'payments', 'tip')).toBe(false);
     expect(hasColumn(db, 'payments', 'received')).toBe(true);
     expect(hasColumn(db, 'payments', 'change')).toBe(true);
-    expect(currentVersion(db)).toBe(7);
+    expect(hasColumn(db, 'payments', 'proof_photo')).toBe(true);
+    expect(currentVersion(db)).toBe(8);
     // El CHECK solo acepta cash|qr
     const ddl = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='payments'").get().sql;
     expect(ddl).toMatch(/method\s+TEXT NOT NULL CHECK\(method IN \('cash','qr'\)\)/);
@@ -110,7 +111,7 @@ describe('Migración v6 — sin propina, solo cash|qr, received/change', () => {
     applySchema(db);
 
     expect(hasColumn(db, 'payments', 'tip')).toBe(false);
-    expect(currentVersion(db)).toBe(7);
+    expect(currentVersion(db)).toBe(8);
     // Métodos consolidados → qr; amount absorbe el tip (70+2=72)
     const qr = db.prepare('SELECT * FROM payments WHERE id = ?').get('legacy-qr');
     expect(qr.method).toBe('qr');
@@ -137,7 +138,7 @@ describe('Migración v6 — sin propina, solo cash|qr, received/change', () => {
     expect(p.method).toBe('cash');
     expect(p.received).toBe(50);
     expect(p.change).toBe(15.5);
-    expect(currentVersion(db)).toBe(7);
+    expect(currentVersion(db)).toBe(8);
     db.close();
   });
 
@@ -173,12 +174,62 @@ describe('Migración v6 — sin propina, solo cash|qr, received/change', () => {
     applySchema(db);
 
     expect(hasColumn(db, 'order_items', 'round')).toBe(true);
-    expect(currentVersion(db)).toBe(7);
+    expect(currentVersion(db)).toBe(8);
     // El item existente queda en ronda 1 (no destructivo)
     const item = db.prepare('SELECT * FROM order_items WHERE id = ?').get('it1');
     expect(item.round).toBe(1);
     expect(item.menu_item_name).toBe('Chelada Clásica');
     expect(item.status).toBe('delivered');
+    db.close();
+  });
+
+  it('upgrade v7→v8: ADD COLUMN proof_photo en payments preserva pagos existentes', () => {
+    const db = new Database(':memory:');
+    // Simular DB v7 (payments SIN proof_photo) + 1 pago existente
+    db.prepare(`
+      CREATE TABLE schema_version (
+        version INTEGER PRIMARY KEY,
+        applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`).run();
+    db.prepare('INSERT INTO schema_version (version) VALUES (7)').run();
+    db.exec(`
+      CREATE TABLE staff (id TEXT PRIMARY KEY, pin_hash TEXT NOT NULL, role TEXT NOT NULL, display_name TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1, current_shift TEXT, last_login_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')));
+      CREATE TABLE tables (id TEXT PRIMARY KEY, number INTEGER NOT NULL UNIQUE, capacity INTEGER NOT NULL DEFAULT 4);
+      CREATE TABLE orders (id TEXT PRIMARY KEY, table_id TEXT NOT NULL, table_number INTEGER NOT NULL,
+        waiter_id TEXT NOT NULL, waiter_name TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'draft', total REAL NOT NULL DEFAULT 0);
+      CREATE TABLE payments (
+        id TEXT PRIMARY KEY, order_id TEXT NOT NULL, method TEXT NOT NULL CHECK(method IN ('cash','qr')),
+        amount REAL NOT NULL, iva_amount REAL NOT NULL DEFAULT 0, received REAL NOT NULL DEFAULT 0,
+        change REAL NOT NULL DEFAULT 0, reference TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'completed' CHECK(status IN ('pending','completed','failed','refunded')),
+        processed_by TEXT NOT NULL, processed_at TEXT NOT NULL DEFAULT (datetime('now')),
+        notes TEXT NOT NULL DEFAULT '', synced_at TEXT,
+        FOREIGN KEY (order_id) REFERENCES orders(id), FOREIGN KEY (processed_by) REFERENCES staff(id));
+    `);
+    seedMiniWorld(db);
+    db.prepare(`
+      INSERT INTO payments (id, order_id, method, amount, received, change, status, processed_by)
+      VALUES ('p-v7', 'o1', 'qr', 40, 0, 0, 'completed', 'w1')
+    `).run();
+
+    applySchema(db);
+
+    expect(hasColumn(db, 'payments', 'proof_photo')).toBe(true);
+    expect(currentVersion(db)).toBe(8);
+    // El pago existente queda con proof_photo '' (no destructivo)
+    const p = db.prepare('SELECT * FROM payments WHERE id = ?').get('p-v7');
+    expect(p.proof_photo).toBe('');
+    expect(p.method).toBe('qr');
+    expect(p.amount).toBe(40);
+    // INSERT nuevo con proof_photo funciona
+    db.prepare(`
+      INSERT INTO payments (id, order_id, method, amount, received, change, status, processed_by, proof_photo)
+      VALUES ('p-v8', 'o1', 'qr', 10, 0, 0, 'completed', 'w1', '/payment-proofs/x.jpg')
+    `).run();
+    const p2 = db.prepare('SELECT * FROM payments WHERE id = ?').get('p-v8');
+    expect(p2.proof_photo).toBe('/payment-proofs/x.jpg');
     db.close();
   });
 });

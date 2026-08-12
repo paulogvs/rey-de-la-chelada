@@ -27,8 +27,11 @@
  * ═══════════════════════════════════════════════════════════
  */
 
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { localDateStr, localDateExpr } from '../utils/date-utils.js';
@@ -37,6 +40,12 @@ import { broadcastOrderToCaja } from '../services/order-broadcaster.js'; // S2-D
 
 const router = Router();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// FASE 5: comprobantes foto de pagos QR (base64 → archivo en data/payment-proofs/)
+const PROOF_DIR = path.join(__dirname, '..', '..', 'data', 'payment-proofs');
+// Ruta de subida usa un límite propio (10 MB) — el global es 1 MB (fotos base64 grandes)
+const proofJsonParser = express.json({ limit: '10mb' });
 // ============================================================
 // Helpers
 // ============================================================
@@ -349,6 +358,84 @@ router.post('/', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res)
     }
     logger.error('[Payments] Create error:', err.message);
     res.status(500).json({ success: false, error: 'Error al procesar pago', code: 'PAYMENT_CREATE_ERROR' });
+  }
+});
+
+// ============================================================
+// POST /api/payments/:id/proof — Subir comprobante foto (SOLO QR)
+// ============================================================
+// FASE 5: el mesero/cajero toma una foto del comprobante del pago QR
+// (transferencia/billetera). Se envía como base64 en JSON:
+//   { image: "data:image/jpeg;base64,/9j/4AAQ..." }
+// Se guarda en data/payment-proofs/{paymentId}.jpg y se enlaza a la
+// transacción vía payments.proof_photo. Solo aplica a method='qr'.
+// ============================================================
+
+router.post('/:id/proof', proofJsonParser, requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res) => {
+  try {
+    const { image } = req.body || {};
+    const db = getDb();
+
+    const payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(req.params.id);
+    if (!payment) {
+      return res.status(404).json({ success: false, error: 'Pago no encontrado', code: 'PAYMENT_NOT_FOUND' });
+    }
+    if (payment.method !== 'qr') {
+      return res.status(400).json({
+        success: false,
+        error: 'El comprobante foto solo aplica a pagos QR',
+        code: 'PROOF_ONLY_QR',
+      });
+    }
+
+    // Validar base64 data URL: data:image/{jpeg|png|webp};base64,...
+    if (typeof image !== 'string' || !image.includes(';base64,')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Imagen inválida — se espera data:image/*;base64,...',
+        code: 'INVALID_PROOF_IMAGE',
+      });
+    }
+
+    const mimeMatch = image.match(/^data:image\/([a-zA-Z0-9.+-]+);base64,(.+)$/s);
+    if (!mimeMatch) {
+      return res.status(400).json({
+        success: false,
+        error: 'Formato de imagen no soportado (use jpeg, png o webp)',
+        code: 'INVALID_PROOF_MIME',
+      });
+    }
+
+    const ext = mimeMatch[1].toLowerCase() === 'png' ? 'png' : mimeMatch[1].toLowerCase() === 'webp' ? 'webp' : 'jpg';
+    const base64Data = mimeMatch[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    // Límite defensivo: ~8 MB (fotos de teléfono comprimidas)
+    if (buffer.length > 8 * 1024 * 1024) {
+      return res.status(400).json({
+        success: false,
+        error: 'La imagen supera 8 MB',
+        code: 'PROOF_TOO_LARGE',
+      });
+    }
+
+    // Asegurar directorio (idempotente)
+    fs.mkdirSync(PROOF_DIR, { recursive: true });
+    const filename = `${payment.id}.${ext}`;
+    const absPath = path.join(PROOF_DIR, filename);
+    fs.writeFileSync(absPath, buffer);
+
+    const proofUrl = `/payment-proofs/${filename}`;
+    db.prepare('UPDATE payments SET proof_photo = ?, notes = ? WHERE id = ?').run(
+      proofUrl,
+      payment.notes || 'Comprobante QR adjunto',
+      payment.id
+    );
+
+    res.json({ success: true, proof_photo: proofUrl, message: 'Comprobante guardado' });
+  } catch (err) {
+    logger.error('[Payments] Proof upload error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al guardar el comprobante', code: 'PROOF_UPLOAD_ERROR' });
   }
 });
 

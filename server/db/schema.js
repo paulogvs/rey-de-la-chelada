@@ -23,7 +23,10 @@
 // v7 (Fase 4 — flujo cerrado): order_items.round INTEGER NOT NULL DEFAULT 1 — "segunda
 //   comanda": al agregar items a un pedido con platos ya procesados, entran en una RONDA
 //   nueva (max+1) → el KDS los muestra como tarjeta separada prioritaria ("Mesa 4 · Ronda 2").
-const SCHEMA_VERSION = 7;
+// v8 (Fase 5 — cobro): payments.proof_photo TEXT NOT NULL DEFAULT '' — ruta del comprobante
+//   foto del pago QR (se sube en base64, se guarda en data/payment-proofs/). SOLO aplica a
+//   method='qr' (el efectivo no necesita foto). ADD COLUMN no destructivo.
+const SCHEMA_VERSION = 8;
 
 const CREATE_TABLES = [
   // ── Staff / Users (v5: 4 roles — admin, mesero, kds, caja) ─────
@@ -166,6 +169,7 @@ const CREATE_TABLES = [
 
   // ── Payments ──────────────────────────────────────────
   // v6 (Fase 3): SOLO cash|qr, sin propina. received/change = efectivo al centavo.
+  // v8 (Fase 5): proof_photo — comprobante foto del pago QR (base64 → data/payment-proofs/).
   `CREATE TABLE IF NOT EXISTS payments (
     id            TEXT PRIMARY KEY,
     order_id      TEXT NOT NULL,
@@ -179,6 +183,7 @@ const CREATE_TABLES = [
     processed_by  TEXT NOT NULL,
     processed_at  TEXT NOT NULL DEFAULT (datetime('now')),
     notes         TEXT NOT NULL DEFAULT '',
+    proof_photo   TEXT NOT NULL DEFAULT '',  -- v8: ruta del comprobante QR (ej. /payment-proofs/xxx.jpg)
     synced_at     TEXT,
     FOREIGN KEY (order_id) REFERENCES orders(id),
     FOREIGN KEY (processed_by) REFERENCES staff(id)
@@ -305,6 +310,12 @@ function applySchema(db) {
       if (!hasColumn(db, 'order_items', 'round')) {
         db.exec(`ALTER TABLE order_items ADD COLUMN round INTEGER NOT NULL DEFAULT 1`);
         console.log('[DB] Migration v7: order_items.round (segunda comanda)');
+      }
+      // v8 (Fase 5): payments.proof_photo — comprobante foto QR. ADD COLUMN
+      // no destructivo (pagos existentes quedan ''). Disparador: falta columna.
+      if (!hasColumn(db, 'payments', 'proof_photo')) {
+        db.exec(`ALTER TABLE payments ADD COLUMN proof_photo TEXT NOT NULL DEFAULT ''`);
+        console.log('[DB] Migration v8: payments.proof_photo (comprobante QR)');
       }
       // v5a: staff con rol 'caja' — recrear SOLO si el CHECK viejo no lo acepta
       if (!staffAcceptsCajaRole(db)) {

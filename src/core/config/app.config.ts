@@ -102,6 +102,21 @@ export interface ClientModuleConfig {
   };
 }
 
+/** Config de pagos (FASE 5 — cobro simplificado) */
+export interface PaymentsConfig {
+  /**
+   * URL de la imagen QR estática del restobar (banco/billetera).
+   * Se muestra al elegir método QR. El archivo vive en public/payment/.
+   * Ej: '/payment/qr.png'
+   */
+  qrImageUrl: string;
+  /**
+   * ¿Existe el QR configurado? Si es false, el botón QR se deshabilita
+   * hasta que el administrador suba la imagen del QR.
+   */
+  qrEnabled: boolean;
+}
+
 export interface RestaurantConfig {
   /** Información del negocio */
   business: {
@@ -152,6 +167,9 @@ export interface RestaurantConfig {
 
   /** Config del módulo clientes */
   clientModule: ClientModuleConfig;
+
+  /** Config de pagos (FASE 5) */
+  payments: PaymentsConfig;
 
   /** Capacidad del local */
   capacity: {
@@ -255,6 +273,13 @@ export const DEFAULT_CONFIG: RestaurantConfig = {
       callWaiter: true,
       requestBill: true,
     },
+  },
+
+  // FASE 5: QR estático del restobar — el administrador sube la imagen
+  // a public/payment/qr.png y pone qrEnabled=true cuando esté lista.
+  payments: {
+    qrImageUrl: '/payment/qr.png',
+    qrEnabled: false,
   },
 
   capacity: {

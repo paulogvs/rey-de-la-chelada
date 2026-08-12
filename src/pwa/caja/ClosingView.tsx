@@ -132,7 +132,7 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
               {/* C5 (SSOT): expected_cash = SOLO efectivo físico;
                   ventas QR NO van al cajón. La diferencia contra el
                   efectivo real se calcula contra este total. */}
-              <label>Efectivo esperado (ventas del día)</label>
+              <label>Efectivo esperado en cajón (solo 💵 físico — QR es digital)</label>
               <div className="caja-close__value">
                 Bs. {(closing.expected_cash ?? 0).toFixed(2)}
               </div>
@@ -216,11 +216,11 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
           <h4>Por método de pago</h4>
           <div className="caja-close__history-list">
             <div className="caja-close__history-item">
-              <span>Ventas efectivo</span>
+              <span>💵 Efectivo (físico — va al cajón)</span>
               <span className="caja-close__history-value">Bs. {(byMethod['cash'] ?? 0).toFixed(2)}</span>
             </div>
             <div className="caja-close__history-item">
-              <span>Ventas QR</span>
+              <span>📱 QR (digital — depositado, NO va al cajón)</span>
               <span className="caja-close__history-value">Bs. {qrTotal.toFixed(2)}</span>
             </div>
           </div>

@@ -76,6 +76,25 @@ export async function processPayment(
   };
 }
 
+/** POST /api/payments/:id/proof — sube el comprobante foto del pago QR (FASE 5).
+ *  `image` es un data URL: "data:image/jpeg;base64,...." (se guarda en el server). */
+export async function uploadPaymentProof(
+  token: string,
+  paymentId: string,
+  image: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<ApiResult<{ success: boolean; proof_photo?: string; message?: string }>> {
+  return apiFetch<{ success: boolean; proof_photo?: string; message?: string }>(
+    `/api/payments/${paymentId}/proof`,
+    {
+      method: 'POST',
+      token,
+      body: { image },
+      fetchImpl,
+    }
+  );
+}
+
 // ============================================================
 // Closing (Corte de Caja)
 // ============================================================
@@ -157,4 +176,4 @@ export async function closeClosing(
   });
 }
 
-export default { processPayment, fetchClosingCurrent, openClosing, closeClosing };
+export default { processPayment, uploadPaymentProof, fetchClosingCurrent, openClosing, closeClosing };

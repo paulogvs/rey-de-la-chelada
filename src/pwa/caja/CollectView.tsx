@@ -13,7 +13,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { fetchPendingOrders, type Order } from '../_shared/api/ordersApi';
-import { processPayment } from '../_shared/api/paymentsApi';
+import { processPayment, uploadPaymentProof } from '../_shared/api/paymentsApi';
 import { Card } from '@/ui/components/Card';
 import { Button } from '@/ui/components/Button';
 import { Badge } from '@/ui/components/Badge';
@@ -23,6 +23,7 @@ import { PriceDisplay } from '@/ui/components/PriceDisplay';
 import { SegmentedControl, type SegmentedOption } from '@/ui/components/SegmentedControl';
 import { useToast } from '@/ui/components/Toast';
 import { METHOD_LABELS, METHOD_ICONS, PAYMENT_METHODS } from '../_shared/utils/paymentMethods';
+import { appConfig } from '@/core/config/app.config';
 import './CollectView.css';
 
 interface CollectViewProps {
@@ -69,6 +70,22 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
   const [method, setMethod] = useState<(typeof PAYMENT_METHODS)[number]>('cash');
   const [received, setReceived] = useState(0);
   const [paying, setPaying] = useState(false);
+  // FASE 5: foto del comprobante QR (data URL) — se sube tras cobrar
+  const [proofPhoto, setProofPhoto] = useState<string | null>(null);
+  const [uploadingProof, setUploadingProof] = useState(false);
+
+  const qrEnabled = appConfig.all.payments.qrEnabled;
+  const qrImageUrl = appConfig.all.payments.qrImageUrl;
+
+  const handleTakePhoto = useCallback((file: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProofPhoto(reader.result as string);
+      addToast({ type: 'success', message: 'Foto lista — cobra para guardarla', duration: 3000 });
+    };
+    reader.readAsDataURL(file);
+  }, [addToast]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -108,6 +125,17 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
           addToast({ type: 'error', message: result.error || 'Error al procesar el pago', duration: 5000 });
           return;
         }
+
+        // FASE 5: si es QR y hay foto → subir enlazada al pago
+        if (method === 'qr' && proofPhoto && result.payment?.id) {
+          setUploadingProof(true);
+          const upload = await uploadPaymentProof(token, result.payment.id, proofPhoto);
+          setUploadingProof(false);
+          if (!upload.ok) {
+            addToast({ type: 'warning', message: upload.error || 'Pago OK pero no se guardó la foto', duration: 5000 });
+          }
+        }
+
         if (result.fullyPaid) {
           addToast({
             type: 'success',
@@ -116,6 +144,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
           });
           onPaid(order.id);
           setExpandedId(null);
+          setProofPhoto(null);
         } else {
           addToast({
             type: 'info',
@@ -131,7 +160,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
         setPaying(false);
       }
     },
-    [token, method, received, addToast, onPaid, load]
+    [token, method, received, proofPhoto, addToast, onPaid, load]
   );
 
   if (loading && orders.length === 0) {
@@ -250,6 +279,54 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                         {change > 0 && (
                           <p className="caja-collect__change">
                             Cambio: <strong>Bs. {change.toFixed(2)}</strong>
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {method === 'qr' && (
+                      <div className="caja-collect__pay-field">
+                        {qrEnabled ? (
+                          <>
+                            <div className="caja-collect__qr-box">
+                              <img
+                                src={qrImageUrl}
+                                alt="QR de pago del restobar"
+                                className="caja-collect__qr-image"
+                              />
+                              <p className="caja-collect__qr-hint">
+                                El cliente transfiere <strong>Bs. {remaining.toFixed(2)}</strong> escaneando el QR
+                              </p>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                fullWidth
+                                onClick={() => document.getElementById(`proof-${order.id}`)?.click()}
+                                loading={uploadingProof}
+                                disabled={uploadingProof || paying}
+                              >
+                                📷 {proofPhoto ? 'Cambiar comprobante' : 'Tomar foto del comprobante'}
+                              </Button>
+                              <input
+                                id={`proof-${order.id}`}
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                style={{ display: 'none' }}
+                                onChange={e => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleTakePhoto(file);
+                                  e.target.value = '';
+                                }}
+                              />
+                              {proofPhoto && (
+                                <img src={proofPhoto} alt="Comprobante" className="caja-collect__proof-preview" />
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <p className="caja-collect__qr-disabled">
+                            ⚠️ El QR de pago no está configurado
                           </p>
                         )}
                       </div>

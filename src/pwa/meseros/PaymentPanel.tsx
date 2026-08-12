@@ -1,13 +1,15 @@
 /**
- * PaymentPanel — Payment processing (API-driven)
+ * PaymentPanel — Payment processing (API-driven) — FASE 5 SIMPLIFICADO
  *
- * - Fetch the order from GET /api/orders/:id (fresh totals)
- * - Split payments (multiple methods)
- * - Cash: received (lo que entrega el cliente) → change (vuelto) — F3-2
- * - QR: QRDisplay for client scan
- * - FASE 3: propina ELIMINADA (se da directo al mesero, fuera de la app)
- * - POST /api/payments per split → when fully paid, server marks
- *   order paid + we clear the table via PUT /api/tables/:id
+ * FASE 5 (2026-08-12): 1 SOLO método de pago por pedido (sin splits).
+ *   - Monto a cobrar FIJO (order.total) — NO editable.
+ *   - cash: campo "Efectivo recibido" → calcula el cambio a devolver.
+ *          El efectivo ES dinero físico que entra al restobar (flujo de caja).
+ *   - qr:   muestra la imagen QR ESTÁTICA del restobar (appConfig.payments).
+ *          Botón 📷 "Tomar foto" del comprobante → se sube en base64 y se
+ *          enlaza a la transacción (payments.proof_photo). El QR NO es
+ *          dinero físico — va al flujo como "QR (digital)".
+ *   - POST /api/payments (1 pago) → al completar, el server libera la mesa.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -16,15 +18,16 @@ import { Button } from '@/ui/components/Button';
 import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { PriceDisplay } from '@/ui/components/PriceDisplay';
-import { QRDisplay } from '@/ui/components/QRDisplay';
 import { Loader } from '@/ui/components/Loader';
+import { SegmentedControl, type SegmentedOption } from '@/ui/components/SegmentedControl';
 import { useToast } from '@/ui/components/Toast';
 import { apiFetch } from '../_shared/api/apiFetch';
-import { processPayment } from '../_shared/api/paymentsApi';
+import { processPayment, uploadPaymentProof } from '../_shared/api/paymentsApi';
 import type { Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
-import { METHOD_LABELS, METHOD_ICONS, PAYMENT_METHODS } from '../_shared/utils/paymentMethods';
+import { METHOD_LABELS, METHOD_ICONS } from '../_shared/utils/paymentMethods';
+import { appConfig } from '@/core/config/app.config';
 
 interface PaymentPanelProps {
   orderId: string;
@@ -34,21 +37,26 @@ interface PaymentPanelProps {
   onBack: () => void;
 }
 
-interface SplitPayment {
-  method: PaymentMethod;
-  amount: number;
-  received: number;   // efectivo: lo que el cliente entrega (0 = sin especificar)
-  reference: string;
-}
+const METHOD_OPTIONS: SegmentedOption[] = [
+  { value: 'cash', label: `${METHOD_ICONS.cash} ${METHOD_LABELS.cash}` },
+  { value: 'qr', label: `${METHOD_ICONS.qr} ${METHOD_LABELS.qr}` },
+];
 
 export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack }: PaymentPanelProps) {
   const { addToast } = useToast();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loadingOrder, setLoadingOrder] = useState(true);
-  const [splitPayments, setSplitPayments] = useState<SplitPayment[]>([]);
+  const [method, setMethod] = useState<PaymentMethod>('cash');
+  const [received, setReceived] = useState<number>(0);
   const [processing, setProcessing] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
+  const [proofPhoto, setProofPhoto] = useState<string | null>(null);
+  const [uploadingProof, setUploadingProof] = useState(false);
+
+  // Config QR (FASE 5): imagen estática del restobar
+  const qrEnabled = appConfig.all.payments.qrEnabled;
+  const qrImageUrl = appConfig.all.payments.qrImageUrl;
 
   // Fetch fresh order from the server
   useEffect(() => {
@@ -61,9 +69,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
         });
         if (disposed) return;
         if (result.ok && result.data?.order) {
-          const o = result.data.order as unknown as Order;
-          setOrder(o);
-          setSplitPayments([{ method: 'cash', amount: o.total, received: 0, reference: '' }]);
+          setOrder(result.data.order as unknown as Order);
         } else {
           addToast({ type: 'error', message: result.error || 'No se pudo cargar el pedido', duration: 5000 });
         }
@@ -77,58 +83,50 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
     return () => { disposed = true; };
   }, [orderId, token, addToast]);
 
-  const totalToCollect = order?.total ?? 0;
+  const amountToCollect = order?.total ?? 0;
+  const change = method === 'cash' && received > amountToCollect
+    ? Math.round((received - amountToCollect) * 100) / 100
+    : 0;
 
-  const addSplit = useCallback(() => {
-    const remaining = totalToCollect - splitPayments.reduce((s, p) => s + p.amount, 0);
-    if (remaining <= 0) {
-      addToast({ type: 'warning', message: 'El total ya está cubierto', duration: 3000 });
-      return;
-    }
-    setSplitPayments(prev => [...prev, { method: 'cash', amount: remaining, received: 0, reference: '' }]);
-  }, [totalToCollect, splitPayments, addToast]);
+  // Tomar foto del comprobante QR (FASE 5): lee el archivo y lo guarda en
+  // estado (data URL). Se sube al server DESPUÉS de cobrar (necesita el
+  // payment.id para enlazarlo como proof_photo).
+  const handleTakePhoto = useCallback((file: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProofPhoto(reader.result as string);
+      addToast({ type: 'success', message: 'Foto lista — cobra para guardarla', duration: 3000 });
+    };
+    reader.readAsDataURL(file);
+  }, [addToast]);
 
-  const updateSplit = useCallback((index: number, updates: Partial<SplitPayment>) => {
-    setSplitPayments(prev => prev.map((sp, i) => (i === index ? { ...sp, ...updates } : sp)));
-  }, []);
-
-  const removeSplit = useCallback((index: number) => {
-    setSplitPayments(prev => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const coveredAmount = splitPayments.reduce((sum, sp) => sum + sp.amount, 0);
-  const remaining = Math.max(0, totalToCollect - coveredAmount);
-
-  // Process payment via API (one POST per split) then clear the table
+  // Procesar pago (1 solo método — FASE 5)
   const processPaymentNow = useCallback(async () => {
     if (!order) return;
-    if (remaining > 0.01) {
-      addToast({ type: 'warning', message: 'El total no está cubierto', duration: 3000 });
-      return;
-    }
-
     setProcessing(true);
     try {
-      for (let i = 0; i < splitPayments.length; i++) {
-        const split = splitPayments[i];
-        if (split.amount <= 0) continue;
-        const result = await processPayment(token, {
-          order_id: order.id,
-          amount: split.amount,
-          method: split.method,
-          reference: split.reference || undefined,
-          received: split.method === 'cash' && split.received > 0 ? split.received : undefined,
-        });
-        if (!result.ok) {
-          addToast({ type: 'error', message: result.error || 'Error al registrar el pago', duration: 5000 });
-          return;
+      const result = await processPayment(token, {
+        order_id: order.id,
+        amount: amountToCollect,
+        method,
+        received: method === 'cash' && received > 0 ? received : undefined,
+      });
+      if (!result.ok) {
+        addToast({ type: 'error', message: result.error || 'Error al registrar el pago', duration: 5000 });
+        return;
+      }
+
+      // Si es QR y se tomó foto del comprobante → subirla enlazada al pago
+      if (method === 'qr' && proofPhoto && result.payment?.id) {
+        setUploadingProof(true);
+        const upload = await uploadPaymentProof(token, result.payment.id, proofPhoto);
+        setUploadingProof(false);
+        if (!upload.ok) {
+          addToast({ type: 'warning', message: upload.error || 'Pago OK pero no se guardó la foto', duration: 5000 });
         }
       }
 
-      // A3/2.4: la mesa la libera el SERVIDOR (processPayment) SOLO si no
-      // hay otros pedidos activos. ANTES el cliente forzaba free aquí con
-      // updateTableStatus(..., 'free') — rompía el escenario de 2 pedidos
-      // en la misma mesa. El hook useTables (polling 15s) refresca el estado.
       addToast({
         type: 'success',
         message: `Pago completado — Mesa ${table.number}`,
@@ -141,7 +139,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
     } finally {
       setProcessing(false);
     }
-  }, [order, remaining, splitPayments, token, table.id, table.number, addToast, onPaymentComplete]);
+  }, [order, amountToCollect, method, received, proofPhoto, token, table.number, addToast, onPaymentComplete]);
 
   if (loadingOrder) {
     return <div className="payment-panel"><Loader block label="Cargando pedido…" /></div>;
@@ -182,90 +180,104 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
         />
       </Card>
 
-      {/* Split payments */}
+      {/* Payment (FASE 5: 1 solo método, monto FIJO no editable) */}
       <Card className="payment-panel__splits">
         <div className="payment-panel__splits-header">
           <h4>Forma de pago</h4>
-          <Button variant="ghost" size="md" onClick={addSplit} disabled={remaining <= 0}>
-            + Dividir pago
-          </Button>
         </div>
 
-        {splitPayments.map((split, index) => {
-          const change = split.method === 'cash' && split.received > split.amount
-            ? Math.round((split.received - split.amount) * 100) / 100
-            : 0;
-          return (
-            <div key={index} className="payment-panel__split">
-              <div className="payment-panel__split-row">
-                <select
-                  className="payment-panel__split-method"
-                  value={split.method}
-                  onChange={e => updateSplit(index, { method: e.target.value as PaymentMethod, received: 0 })}
-                >
-                  {PAYMENT_METHODS.map(m => (
-                    <option key={m} value={m}>
-                      {METHOD_ICONS[m]} {METHOD_LABELS[m]}
-                    </option>
-                  ))}
-                </select>
+        <SegmentedControl
+          className="payment-panel__method"
+          options={METHOD_OPTIONS}
+          value={method}
+          onChange={v => setMethod(v as PaymentMethod)}
+        />
 
-                <input
-                  type="number"
-                  className="payment-panel__split-amount"
-                  value={split.amount}
-                  min={0}
-                  step={0.01}
-                  onChange={e => updateSplit(index, { amount: parseFloat(e.target.value) || 0 })}
+        {/* Monto a cobrar — FIJO, NO editable */}
+        <div className="payment-panel__amount-fixed">
+          <span className="payment-panel__amount-label">Monto a cobrar</span>
+          <span className="payment-panel__amount-value">Bs. {amountToCollect.toFixed(2)}</span>
+        </div>
+
+        {method === 'cash' && (
+          <>
+            <div className="payment-panel__cash-fields">
+              <label htmlFor="payment-received" className="payment-panel__cash-label">
+                Efectivo recibido (Bs.) — dinero que entra al restobar
+              </label>
+              <input
+                id="payment-received"
+                type="number"
+                className="payment-panel__received"
+                value={received || ''}
+                min={amountToCollect}
+                step={0.01}
+                placeholder="Bs."
+                onChange={e => setReceived(parseFloat(e.target.value) || 0)}
+              />
+            </div>
+
+            {change > 0 && (
+              <p className="payment-panel__change">
+                Cambio a devolver: <strong className="payment-panel__change-amount">Bs. {change.toFixed(2)}</strong>
+              </p>
+            )}
+          </>
+        )}
+
+        {method === 'qr' && (
+          <div className="payment-panel__qr-block">
+            {qrEnabled ? (
+              <div className="payment-panel__split-qr">
+                {/* QR ESTÁTICO del restobar — no se genera dinámicamente */}
+                <img
+                  src={qrImageUrl}
+                  alt="QR de pago del restobar"
+                  className="payment-panel__qr-image"
                 />
+                <p className="payment-panel__qr-hint">
+                  El cliente escanea y transfiere <strong>Bs. {amountToCollect.toFixed(2)}</strong>
+                </p>
+                <p className="payment-panel__qr-cashnote">
+                  📱 El QR NO es dinero físico — se registra como depósito digital en el flujo de caja.
+                </p>
 
-                {splitPayments.length > 1 && (
-                  <button
-                    className="payment-panel__split-remove"
-                    onClick={() => removeSplit(index)}
-                    aria-label="Eliminar"
-                  >
-                    ✕
-                  </button>
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  onClick={() => document.getElementById('payment-proof-input')?.click()}
+                  loading={uploadingProof}
+                  disabled={uploadingProof || processing}
+                >
+                  📷 {proofPhoto ? 'Cambiar foto del comprobante' : 'Tomar foto del comprobante'}
+                </Button>
+                <input
+                  id="payment-proof-input"
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) handleTakePhoto(file);
+                    e.target.value = '';
+                  }}
+                />
+                {proofPhoto && (
+                  <img src={proofPhoto} alt="Comprobante" className="payment-panel__proof-preview" />
                 )}
               </div>
-
-              {split.method === 'cash' && (
-                <input
-                  type="number"
-                  className="payment-panel__split-received"
-                  placeholder="Efectivo recibido (Bs.)"
-                  value={split.received || ''}
-                  min={split.amount}
-                  step={0.01}
-                  onChange={e => updateSplit(index, { received: parseFloat(e.target.value) || 0 })}
-                />
-              )}
-
-              {change > 0 && (
-                <p className="payment-panel__change">
-                  Cambio: <strong>Bs. {change.toFixed(2)}</strong>
-                </p>
-              )}
-
-              {split.method === 'qr' && (
-                <div className="payment-panel__split-qr">
-                  <QRDisplay
-                    data={`${order.id}|${split.amount}|${split.method}`}
-                    label="Escanea para pagar"
-                    size={150}
-                  />
-                </div>
-              )}
-            </div>
-          );
-        })}
+            ) : (
+              <div className="payment-panel__qr-disabled">
+                ⚠️ El QR de pago no está configurado. El administrador debe subir la imagen del QR.
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="payment-panel__remaining">
-          <span>Por cubrir:</span>
-          <span className={remaining > 0 ? 'payment-panel__remaining-amount' : 'payment-panel__remaining-paid'}>
-            {remaining > 0 ? `Bs. ${remaining.toFixed(2)}` : '✓ Cubierto'}
-          </span>
+          <span>Total a pagar:</span>
+          <span className="payment-panel__remaining-amount">Bs. {amountToCollect.toFixed(2)}</span>
         </div>
       </Card>
 
@@ -291,10 +303,14 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
           variant="primary"
           onClick={processPaymentNow}
           loading={processing}
-          disabled={remaining > 0.01 || processing}
+          disabled={
+            processing ||
+            (method === 'cash' && received > 0 && received < amountToCollect) ||
+            (method === 'qr' && !qrEnabled)
+          }
           fullWidth
         >
-          {processing ? 'Procesando...' : `Cobrar Bs. ${totalToCollect.toFixed(2)}`}
+          {processing ? 'Procesando...' : `Cobrar Bs. ${amountToCollect.toFixed(2)}`}
         </Button>
       </div>
 

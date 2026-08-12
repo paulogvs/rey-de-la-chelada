@@ -1284,6 +1284,123 @@
   font-weight: 700;
 }
 
+/* ── FASE 5: cobro simplificado — 1 método, monto FIJO, QR estático + foto ── */
+
+.payment-panel__method {
+  margin-bottom: var(--space-3);
+}
+
+.payment-panel__amount-fixed {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--dorado-rey) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dorado-rey) 25%, transparent);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+}
+
+.payment-panel__amount-label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.payment-panel__amount-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--dorado-rey);
+}
+
+.payment-panel__cash-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.payment-panel__cash-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.payment-panel__received {
+  min-height: var(--touch-primary-action);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  text-align: right;
+  transition: border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.payment-panel__received:focus {
+  outline: none;
+  border-color: var(--dorado-rey);
+  box-shadow: var(--focus-ring);
+}
+
+.payment-panel__qr-block {
+  margin-bottom: var(--space-2);
+}
+
+.payment-panel__split-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  border-radius: var(--radius-lg);
+}
+
+.payment-panel__qr-image {
+  width: 220px;
+  height: 220px;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  background: #fff;
+  padding: var(--space-2);
+}
+
+.payment-panel__qr-hint {
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-align: center;
+  margin: 0;
+}
+
+.payment-panel__qr-cashnote {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-align: center;
+  margin: 0;
+}
+
+.payment-panel__qr-disabled {
+  padding: var(--space-4);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--status-pending);
+  background: color-mix(in srgb, var(--status-pending) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-pending) 22%, transparent);
+  border-radius: var(--radius-md);
+}
+
+.payment-panel__proof-preview {
+  width: 100%;
+  max-width: 320px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
 /* ---- Invoice ---- */
 
 .payment-panel__invoice-text {

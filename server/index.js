@@ -135,6 +135,12 @@ app.use('/menu-photos', express.static(path.join(__dirname, '..', 'public', 'men
 // App logo (brand identity)
 app.use('/logo', express.static(path.join(__dirname, '..', 'public', 'logo'), { maxAge: '30d' }));
 
+// QR de pago estático del restobar (FASE 5 — public/payment/qr.png)
+app.use('/payment', express.static(path.join(__dirname, '..', 'public', 'payment'), { maxAge: '1d' }));
+
+// Comprobantes foto de pagos QR (FASE 5 — data/payment-proofs/, se crea al subir)
+app.use('/payment-proofs', express.static(path.join(__dirname, '..', 'data', 'payment-proofs'), { maxAge: '30d' }));
+
 // Shared Vite chunks (multi-PWA build emits shared code to dist/assets root)
 app.use('/assets', express.static(path.join(DIST_DIR, 'assets'), { maxAge: '30d' }));
 
