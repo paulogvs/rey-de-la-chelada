@@ -131,7 +131,8 @@ export function SummaryView({ token, today, ivaRate, refreshTick }: SummaryViewP
             {methodEntries.map(([method, amount]) => (
               <div key={method} className="caja-methods__item">
                 <span className="caja-methods__label">
-                  {METHOD_ICONS[method] || '💰'} {METHOD_LABELS[method] || method}
+                  {METHOD_ICONS[method] || '💰'}{' '}
+                  {method === 'cash' ? 'Efectivo (físico — cajón)' : method === 'qr' ? 'QR (digital — depositado)' : (METHOD_LABELS[method] || method)}
                 </span>
                 <div className="caja-methods__bar">
                   <div
