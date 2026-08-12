@@ -669,14 +669,61 @@
   border-radius: var(--radius-md);
 }
 
+/* ── FASE 4.5: grupo de RONDA — header con total + grid de cards módulo ── */
+.order-panel__round-group {
+  margin-bottom: var(--space-4);
+}
+
+.order-panel__round-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-1) var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-2);
+}
+
+.order-panel__round-group-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-md);
+  color: var(--text-strong);
+}
+
+.order-panel__round-group-total {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* Grid lado a lado: 2 columnas (Barra | Cocina) */
+.order-panel__round-group-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+/* Ronda con 1 solo módulo → ancho completo */
+.order-panel__round-group-cards--single {
+  grid-template-columns: 1fr;
+}
+
+/* Móvil: apilar (una card por fila) */
+@media (max-width: 480px) {
+  .order-panel__round-group-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── FASE 4.5: cards minimalistas por módulo+ronda ── */
 .order-panel__mod-card {
-  margin-bottom: var(--space-3);
   padding: var(--space-3);
   border: 2px solid var(--border);
   border-left-width: 6px;
   border-radius: var(--radius-md);
   background: var(--background);
+  min-width: 0;
 }
 
 /* Amarillo = en proceso (pending/preparing) */

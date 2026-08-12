@@ -376,76 +376,95 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
               </Badge>
             </div>
 
-            {/* FASE 4.5: cards minimalistas por MÓDULO+RONDA.
-                🍳/🍺 verde = listo para entregar · amarillo = en proceso.
+            {/* FASE 4.5: cards minimalistas por MÓDULO+RONDA, agrupadas por
+                RONDA en grid lado a lado (🍺 Barra | 🍳 Cocina).
+                - Ronda con 2 módulos → 2 columnas
+                - Ronda con 1 módulo → ancho completo
                 Cada card es independiente: entregar una no toca las otras. */}
             {rounds.map(round => {
               const roundItems = activeOrder.items.filter(i => (i.round ?? 1) === round);
               const modsInRound = [...new Set(roundItems.map(i => i.kdsModule || 'cocina'))];
-              return modsInRound.map(mod => {
-                const modKey = (mod === 'bar' ? 'bar' : 'cocina') as 'bar' | 'cocina';
-                const modItems = roundItems.filter(i => (i.kdsModule || 'cocina') === mod);
-                const hasReady = modItems.some(i => i.status === 'ready');
-                const inProgress = modItems.some(i => i.status === 'pending' || i.status === 'preparing');
-                const cardState = hasReady ? 'ready' : inProgress ? 'preparing' : 'done';
-                const modTotal = modItems.reduce((s, i) => s + i.subtotal, 0);
-                return (
+              const roundTotal = roundItems.reduce((s, i) => s + i.subtotal, 0);
+              return (
+                <div key={round} className="order-panel__round-group">
+                  <div className="order-panel__round-group-header">
+                    <span className="order-panel__round-group-title">
+                      {round === 1 ? 'Ronda 1' : `Ronda ${round} 🆕`}
+                    </span>
+                    <span className="order-panel__round-group-total">
+                      Bs. {roundTotal.toFixed(2)}
+                    </span>
+                  </div>
                   <div
-                    key={`${round}-${mod}`}
-                    className={`order-panel__mod-card order-panel__mod-card--${cardState}`}
+                    className={`order-panel__round-group-cards${modsInRound.length === 1 ? ' order-panel__round-group-cards--single' : ''}`}
                   >
-                    <div className="order-panel__mod-card-header">
-                      <span className="order-panel__mod-card-title">
-                        {modLabel(mod)}
-                        {round > 1 && <span className="order-panel__mod-card-round"> · Ronda {round} 🆕</span>}
-                      </span>
-                      <span className="order-panel__mod-card-state">
-                        {cardState === 'ready' ? '✓ Listo' : cardState === 'preparing' ? 'En proceso…' : '✓ Entregado'}
-                      </span>
-                    </div>
+                    {modsInRound.map(mod => {
+                      const modKey = (mod === 'bar' ? 'bar' : 'cocina') as 'bar' | 'cocina';
+                      const modItems = roundItems.filter(i => (i.kdsModule || 'cocina') === mod);
+                      const hasReady = modItems.some(i => i.status === 'ready');
+                      const inProgress = modItems.some(i => i.status === 'pending' || i.status === 'preparing');
+                      const cardState = hasReady ? 'ready' : inProgress ? 'preparing' : 'done';
+                      const modTotal = modItems.reduce((s, i) => s + i.subtotal, 0);
+                      return (
+                        <div
+                          key={`${round}-${mod}`}
+                          className={`order-panel__mod-card order-panel__mod-card--${cardState}`}
+                        >
+                          <div className="order-panel__mod-card-header">
+                            <span className="order-panel__mod-card-title">
+                              {modLabel(mod)}
+                              {round > 1 && <span className="order-panel__mod-card-round"> · Ronda {round} 🆕</span>}
+                            </span>
+                            <span className="order-panel__mod-card-state">
+                              {cardState === 'ready' ? '✓ Listo' : cardState === 'preparing' ? 'En proceso…' : '✓ Entregado'}
+                            </span>
+                          </div>
 
-                    <div className="order-panel__mod-card-items">
-                      {modItems.map(item => {
-                        const canRemove = canEditOrder && ['pending', 'preparing'].includes(item.status);
-                        return (
-                          <div key={item.id} className="order-panel__active-item">
-                            <span className="order-panel__active-item-qty">{item.quantity}x</span>
-                            <span className="order-panel__active-item-name">{item.menuItemName}</span>
-                            <span className="order-panel__active-item-price">Bs. {item.subtotal.toFixed(2)}</span>
-                            {canRemove && (
-                              <button
-                                className="order-panel__active-item-remove"
-                                onClick={() => handleRemoveItem(item.id)}
-                                disabled={removingItemId === item.id}
-                                aria-label={`Quitar ${item.menuItemName}`}
-                                title="Quitar item"
+                          <div className="order-panel__mod-card-items">
+                            {modItems.map(item => {
+                              const canRemove = canEditOrder && ['pending', 'preparing'].includes(item.status);
+                              return (
+                                <div key={item.id} className="order-panel__active-item">
+                                  <span className="order-panel__active-item-qty">{item.quantity}x</span>
+                                  <span className="order-panel__active-item-name">{item.menuItemName}</span>
+                                  <span className="order-panel__active-item-price">Bs. {item.subtotal.toFixed(2)}</span>
+                                  {canRemove && (
+                                    <button
+                                      className="order-panel__active-item-remove"
+                                      onClick={() => handleRemoveItem(item.id)}
+                                      disabled={removingItemId === item.id}
+                                      aria-label={`Quitar ${item.menuItemName}`}
+                                      title="Quitar item"
+                                    >
+                                      {removingItemId === item.id ? '…' : '🗑️'}
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div className="order-panel__mod-card-footer">
+                            <span className="order-panel__mod-card-total">Bs. {modTotal.toFixed(2)}</span>
+                            {cardState === 'ready' && (
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                className="order-panel__mod-card-deliver"
+                                onClick={() => handleDeliver(modKey, round)}
+                                loading={delivering}
+                                disabled={delivering}
                               >
-                                {removingItemId === item.id ? '…' : '🗑️'}
-                              </button>
+                                ✅ Entregado
+                              </Button>
                             )}
                           </div>
-                        );
-                      })}
-                    </div>
-
-                    <div className="order-panel__mod-card-footer">
-                      <span className="order-panel__mod-card-total">Bs. {modTotal.toFixed(2)}</span>
-                      {cardState === 'ready' && (
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          className="order-panel__mod-card-deliver"
-                          onClick={() => handleDeliver(modKey, round)}
-                          loading={delivering}
-                          disabled={delivering}
-                        >
-                          ✅ Entregado
-                        </Button>
-                      )}
-                    </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              });
+                </div>
+              );
             })}
 
             <PriceDisplay
