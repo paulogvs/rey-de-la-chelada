@@ -1,0 +1,14 @@
+/* AppIcon — tamaño vía tokens `--icon-*` (SSOT tokens.json).
+   CSS width/height sobreescriben los atributos por defecto de lucide (24px). */
+
+.app-icon {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.app-icon--xs { width: var(--icon-xs); height: var(--icon-xs); }
+.app-icon--sm { width: var(--icon-sm); height: var(--icon-sm); }
+.app-icon--md { width: var(--icon-md); height: var(--icon-md); }
+.app-icon--lg { width: var(--icon-lg); height: var(--icon-lg); }
+.app-icon--xl { width: var(--icon-xl); height: var(--icon-xl); }

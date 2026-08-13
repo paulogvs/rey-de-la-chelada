@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react';
+import { AppIcon, type AppIconName } from '../AppIcon/AppIcon';
 import './Toast.css';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -94,19 +95,19 @@ function ToastItemComponent({ toast, onDismiss }: ToastItemProps) {
     exiting ? 'toast--exit' : 'toast--enter',
   ].join(' ');
 
-  const icons: Record<ToastType, string> = {
-    success: '✓',
-    error: '✕',
-    warning: '!',
-    info: 'i',
+  const icons: Record<ToastType, AppIconName> = {
+    success: 'check',
+    error: 'x',
+    warning: 'alert',
+    info: 'info',
   };
 
   return (
     <div className={classes} role="alert" onClick={handleDismiss}>
-      <span className="toast__icon" aria-hidden="true">{icons[toast.type]}</span>
+      <span className="toast__icon" aria-hidden="true"><AppIcon name={icons[toast.type]} size="sm" /></span>
       <span className="toast__message">{toast.message}</span>
       <button className="toast__close" aria-label="Dismiss" onClick={(e) => { e.stopPropagation(); handleDismiss(); }}>
-        ✕
+        <AppIcon name="x" size="sm" />
       </button>
     </div>
   );

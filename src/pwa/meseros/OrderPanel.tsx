@@ -21,6 +21,7 @@ import { Modal } from '@/ui/components/Modal';
 import { Loader } from '@/ui/components/Loader';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { PriceDisplay } from '@/ui/components/PriceDisplay';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { fetchMenuCategories, fetchMenuItems, fetchMenuItemDetail, type MenuItem } from '../_shared/api/menuApi';
 import { createOrder, fetchOrderById, deliverOrder, addOrderItem, removeOrderItem, type Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
@@ -81,7 +82,7 @@ interface DetailGroup {
 
 export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, onBack, onRequestPayment }: OrderPanelProps) {
   const { addToast } = useToast();
-  const [categories, setCategories] = useState<{ id: string; name: string; emoji: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -145,7 +146,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
       }
       addToast({
         type: 'success',
-        message: `Mesa ${table.number} — Ronda ${round} ${module === 'bar' ? '🍺 barra' : '🍳 cocina'} entregada ✓`,
+        message: `Mesa ${table.number} — Ronda ${round} ${module === 'bar' ? 'barra' : 'cocina'} entregada`,
         duration: 3000,
       });
       setActiveOrderTick(t => t + 1);
@@ -225,7 +226,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
       setLoadingMenu(true);
       const [cats, its] = await Promise.all([fetchMenuCategories(), fetchMenuItems()]);
       if (disposed) return;
-      if (cats.ok) setCategories(cats.categories.map(c => ({ id: c.id, name: c.name, emoji: c.emoji })));
+      if (cats.ok) setCategories(cats.categories.map(c => ({ id: c.id, name: c.name })));
       if (its.ok) setItems(its.items.filter(i => i.is_active === 1 && i.is_available === 1));
       setLoadingMenu(false);
     })();
@@ -348,7 +349,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
     ? [...new Set(activeOrder.items.map(i => i.round ?? 1))].sort((a, b) => a - b)
     : [];
 
-  const modLabel = (mod: string) => (mod === 'bar' ? '🍺 Barra' : '🍳 Cocina');
+  const modLabel = (mod: string) => (mod === 'bar' ? 'Barra' : 'Cocina');
 
   // ¿Se puede editar el pedido? (agregar/quitar) — no si está cerrado
   const canEditOrder = !!activeOrder && !['paid', 'cancelled'].includes(activeOrder.status);
@@ -389,7 +390,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
               <div key={round} className="order-panel__round-group">
                 <div className="order-panel__round-group-header">
                   <span className="order-panel__round-group-title">
-                    {round === 1 ? 'Ronda 1' : `Ronda ${round} 🆕`}
+                    {round === 1 ? 'Ronda 1' : <>Ronda {round} <Badge variant="preparing">NUEVA</Badge></>}
                   </span>
                   <span className="order-panel__round-group-total">
                     Bs. {roundTotal.toFixed(2)}
@@ -413,10 +414,10 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                         <div className="order-panel__mod-card-header">
                           <span className="order-panel__mod-card-title">
                             {modLabel(mod)}
-                            {round > 1 && <span className="order-panel__mod-card-round"> · Ronda {round} 🆕</span>}
+                            {round > 1 && <span className="order-panel__mod-card-round"> · Ronda {round}</span>}
                           </span>
                           <span className="order-panel__mod-card-state">
-                            {cardState === 'ready' ? '✓ Listo' : cardState === 'preparing' ? 'En proceso…' : '✓ Entregado'}
+                            {cardState === 'ready' ? (<><AppIcon name="check" size="sm" /> Listo</>) : cardState === 'preparing' ? 'En proceso…' : (<><AppIcon name="check" size="sm" /> Entregado</>)}
                           </span>
                         </div>
 
@@ -436,7 +437,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                                     aria-label={`Quitar ${item.menuItemName}`}
                                     title="Quitar item"
                                   >
-                                    {removingItemId === item.id ? '…' : '🗑️'}
+                                    {removingItemId === item.id ? '…' : <AppIcon name="trash" size="sm" />}
                                   </button>
                                 )}
                               </div>
@@ -455,7 +456,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                               loading={delivering}
                               disabled={delivering}
                             >
-                              ✅ Entregado
+                              <AppIcon name="check" size="sm" /> Entregado
                             </Button>
                           )}
                         </div>
@@ -475,11 +476,11 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
 
           <div className="order-panel__actions">
             <Button variant="secondary" onClick={onBack}>
-              ← Volver a mesas
+              <AppIcon name="chevron-left" size="sm" /> Volver a mesas
             </Button>
             {canEditOrder && (
               <Button variant="secondary" onClick={() => setEditMode(true)}>
-                ➕ Agregar items
+                <AppIcon name="plus" size="sm" /> Agregar items
               </Button>
             )}
             {canCharge && (
@@ -488,17 +489,17 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                 onClick={() => onRequestPayment(activeOrder.id)}
                 fullWidth
               >
-                💰 Cobrar Mesa {table.number}
+                <AppIcon name="wallet" size="sm" /> Cobrar Mesa {table.number}
               </Button>
             )}
             {!canCharge && activeOrder.status === 'served' && (
               <p className="order-panel__active-hint">
-                Pedido servido — todo entregado. El botón 💰 Cobrar aparecerá al refrescar la mesa.
+                Pedido servido — todo entregado. El botón Cobrar aparecerá al refrescar la mesa.
               </p>
             )}
             {!canCharge && !['paid', 'cancelled', 'served'].includes(activeOrder.status) && (
               <p className="order-panel__active-hint">
-                Esperando a que cocina/bar marquen los items como listos 🍽️
+                Esperando a que cocina/bar marquen los items como listos
               </p>
             )}
           </div>
@@ -532,7 +533,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
             className={`order-panel__cat-btn ${activeCategory === cat.id ? 'active' : ''}`}
             onClick={() => setActiveCategory(cat.id)}
           >
-            {cat.emoji} {cat.name}
+            {cat.name}
           </button>
         ))}
       </nav>
@@ -542,7 +543,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
         <div className="order-panel__items">
           {loadingMenu && <Loader label="Cargando menú…" />}
           {!loadingMenu && filteredItems.length === 0 && (
-            <EmptyState compact icon="🍺" message="Sin items en esta categoría" />
+            <EmptyState compact icon={<AppIcon name="beer" size="lg" />} message="Sin items en esta categoría" />
           )}
           {filteredItems.map(item => (
             <button
@@ -588,7 +589,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                     onClick={() => removeFromCart(index)}
                     aria-label="Eliminar"
                   >
-                    ✕
+                    <AppIcon name="x" size="sm" />
                   </button>
                 </div>
                 {ci.selectedModifiers.length > 0 && (
@@ -629,7 +630,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
               onClick={() => setPrintOpen(true)}
               disabled={cart.length === 0}
             >
-              🖨️ Imprimir
+              <AppIcon name="printer" size="sm" /> Imprimir
             </Button>
             {editMode ? (
               <Button
@@ -639,7 +640,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                 loading={submitting}
                 fullWidth
               >
-                {submitting ? 'Agregando…' : '➕ Agregar al Pedido'}
+                {submitting ? 'Agregando…' : (<><AppIcon name="plus" size="sm" /> Agregar al Pedido</>)}
               </Button>
             ) : (
               <Button

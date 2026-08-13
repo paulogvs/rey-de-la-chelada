@@ -120,9 +120,10 @@ describe('paymentMethods helpers', () => {
     expect(methodLabel('desconocido')).toBe('desconocido');
   });
 
-  it('methodIcon devuelve emoji o fallback para métodos desconocidos', () => {
-    expect(methodIcon('qr')).toBe('📱');
-    expect(methodIcon('nope')).toBe('💰');
+  it('methodIcon devuelve nombre de icono (AppIconName) o fallback', () => {
+    expect(methodIcon('qr')).toBe('smartphone');
+    expect(methodIcon('cash')).toBe('banknote');
+    expect(methodIcon('nope')).toBe('wallet');
   });
 
   it('tablas de label/icon cubren todos los PAYMENT_METHODS', () => {

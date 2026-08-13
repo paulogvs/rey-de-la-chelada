@@ -16,6 +16,7 @@ import { LoginScreen } from '../_shared/components/LoginScreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { Loader } from '@/ui/components/Loader';
 import { KDSBoard } from '@/ui/components/KDSBoard';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 
 export default function App() {
   setCurrentPwaModule('bar');
@@ -39,5 +40,5 @@ export default function App() {
     );
   }
 
-  return <KDSBoard module="bar" title="Barra" icon="🍺" token={token} />;
+  return <KDSBoard module="bar" title="Barra" icon={<AppIcon name="beer" size="lg" />} token={token} />;
 }

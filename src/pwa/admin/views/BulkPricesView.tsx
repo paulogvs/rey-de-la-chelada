@@ -14,6 +14,7 @@ import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
 import { Loader } from '@/ui/components/Loader';
 import { FormField } from '@/ui/components/FormField';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import {
   fetchAdminMenuItems,
   bulkUpdateItemPrices,
@@ -140,10 +141,10 @@ export function BulkPricesView({ token, onToast }: BulkPricesViewProps) {
         </p>
         <div className="admin-toolbar">
           <Button variant="primary" onClick={handleSaveAll} loading={saving} disabled={filledCount === 0}>
-            💾 Guardar {filledCount > 0 ? `${filledCount} precio(s)` : 'todo'}
+            <AppIcon name="save" size="sm" /> Guardar {filledCount > 0 ? `${filledCount} precio(s)` : 'todo'}
           </Button>
           <Button variant="secondary" size="sm" onClick={load} loading={loading}>
-            ↻ Refrescar
+            <AppIcon name="refresh" size="sm" /> Refrescar
           </Button>
         </div>
       </Card>
@@ -153,7 +154,7 @@ export function BulkPricesView({ token, onToast }: BulkPricesViewProps) {
       ) : (
         groups.map(group => (
           <Card key={group.category.id} className="admin-section">
-            <h3>{group.category.emoji} {group.category.name}
+            <h3>{group.category.name}
               <Badge variant="info">{group.items.length}</Badge>
             </h3>
             <div className="admin-bulk-grid">
@@ -178,8 +179,8 @@ export function BulkPricesView({ token, onToast }: BulkPricesViewProps) {
                         onChange={e => handleChange(item.id, e.target.value)}
                         aria-label={`Precio de ${item.name}`}
                       />
-                      {field?.saved === 'ok' && <span className="admin-bulk-item__ok">✓</span>}
-                      {field?.saved === 'err' && <span className="admin-bulk-item__err">✗</span>}
+                      {field?.saved === 'ok' && <span className="admin-bulk-item__ok"><AppIcon name="check" size="sm" /></span>}
+                      {field?.saved === 'err' && <span className="admin-bulk-item__err"><AppIcon name="x" size="sm" /></span>}
                     </div>
                   </div>
                 );

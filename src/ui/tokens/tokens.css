@@ -209,4 +209,11 @@ a,
          los valores reales los aplica theme.js desde tokens.json) ---- */
   --text-faint: rgba(232, 214, 178, 0.32);
   --dorado-rey-glow: rgba(212, 175, 55, 0.18);
+
+  /* ---- Icon sizes (SSOT tokens.json `icons`) ---- */
+  --icon-xs: 14px;
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --icon-xl: 32px;
 }

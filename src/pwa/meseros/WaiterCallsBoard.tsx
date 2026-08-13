@@ -11,6 +11,7 @@ import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { Loader } from '@/ui/components/Loader';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import type { WaiterCall } from '../_shared/api/waiterCallsApi';
 import { localTimeStr } from '../_shared/utils/localDate';
 
@@ -40,14 +41,14 @@ export function WaiterCallsBoard({
     <div className="waiter-calls">
       <div className="waiter-calls__header">
         <h2>Llamadas pendientes ({pending.length})</h2>
-        <button className="waiter-calls__refresh" onClick={onRefresh}>⟳</button>
+        <button className="waiter-calls__refresh" onClick={onRefresh} aria-label="Refrescar"><AppIcon name="refresh" size="md" /></button>
       </div>
 
       {error && <p className="waiter-calls__error">{error}</p>}
       {loading && pending.length === 0 && <Loader label="Cargando…" />}
 
       {pending.length === 0 && !loading && (
-        <EmptyState compact icon="🔔" message="Sin llamadas pendientes" />
+        <EmptyState compact icon={<AppIcon name="bell" size="lg" />} message="Sin llamadas pendientes" />
       )}
 
       {pending.map(call => (

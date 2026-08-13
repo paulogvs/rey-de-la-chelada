@@ -6,16 +6,15 @@
 
 import { useState } from 'react';
 import { Badge } from '@/ui/components/Badge';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 
 /** Category filter bar item */
 export function CategoryButton({
   label,
-  emoji,
   active,
   onClick,
 }: {
   label: string;
-  emoji?: string;
   active: boolean;
   onClick: () => void;
 }) {
@@ -24,7 +23,6 @@ export function CategoryButton({
       className={`clientes-categories__btn ${active ? 'active' : ''}`}
       onClick={onClick}
     >
-      {emoji && <span className="clientes-categories__emoji">{emoji}</span>}
       {label}
     </button>
   );
@@ -113,7 +111,7 @@ export function CustomerActions({
           className="clientes-actions__btn clientes-actions__btn--call"
           onClick={onCallWaiter}
         >
-          <span className="clientes-actions__btn--icon" aria-hidden="true">🔔</span>
+          <AppIcon name="bell" size="md" />
           Llamar Mesero
         </button>
         {canRequestBill && (
@@ -121,7 +119,7 @@ export function CustomerActions({
             className="clientes-actions__btn clientes-actions__btn--bill"
             onClick={onRequestBill}
           >
-            <span className="clientes-actions__btn--icon" aria-hidden="true">🧾</span>
+            <AppIcon name="receipt" size="md" />
             Pedir Cuenta
           </button>
         )}

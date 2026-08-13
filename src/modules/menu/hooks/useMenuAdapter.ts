@@ -79,7 +79,7 @@ export function useMenuAdapter() {
           id: catId,
           name,
           description: '',
-          emoji: '🍽',
+          emoji: '',
           sortOrder: index,
           isActive: true,
         };

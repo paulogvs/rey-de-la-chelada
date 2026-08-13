@@ -17,6 +17,7 @@
 import React, { useState } from 'react';
 import type { MenuItem } from '@/core/types';
 import { Badge } from '../Badge/Badge';
+import { AppIcon } from '../AppIcon/AppIcon';
 import './MenuItemCard.css';
 
 export interface MenuItemCardProps {
@@ -174,7 +175,7 @@ export function MenuItemCardEmpty({ onRetry }: { onRetry?: () => void }) {
   return (
     <div className="menu-item-card menu-item-card--empty">
       <div className="menu-item-card__empty-content">
-        <span className="menu-item-card__empty-icon">🍽</span>
+        <span className="menu-item-card__empty-icon"><AppIcon name="utensils" size="lg" /></span>
         <p>Menú no disponible</p>
         {onRetry && (
           <button className="menu-item-card__retry-btn" onClick={onRetry}>

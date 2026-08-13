@@ -21,6 +21,7 @@ import { orderEngine } from '@/core/engine';
 import { KDSOrderCard, KDSOrderCardSkeleton } from '@/ui/components/KDSOrderCard';
 import { Badge } from '@/ui/components/Badge';
 import { EmptyState } from '@/ui/components/EmptyState';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { filterItemsByModule, type KDSModule } from './filter';
 import type { Order, KDSEvent } from '@/core/types';
 import './KDSBoard.css';
@@ -79,8 +80,8 @@ export interface KDSBoardProps {
   module: KDSModule;
   /** Título mostrado en el header */
   title: string;
-  /** Icono del header */
-  icon: string;
+  /** Icono del header (ReactNode, e.g. <AppIcon name="flame" />) */
+  icon: React.ReactNode;
   /** JWT del staff (rol kds/admin) para el fetch inicial */
   token: string | null;
 }
@@ -339,7 +340,7 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
             onClick={toggleAudio}
             aria-label={audioEnabled ? 'Silenciar alertas' : 'Activar alertas'}
           >
-            {audioEnabled ? '🔊' : '🔇'}
+            <AppIcon name={audioEnabled ? 'volume' : 'volume-off'} size="lg" />
           </button>
           <button
             type="button"
@@ -348,7 +349,7 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
             aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Entrar en pantalla completa'}
             title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
           >
-            {isFullscreen ? '⤢' : '⛶'}
+            <AppIcon name={isFullscreen ? 'minimize' : 'maximize'} size="lg" />
           </button>
         </div>
       </header>

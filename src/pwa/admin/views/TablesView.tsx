@@ -16,6 +16,7 @@ import { Loader } from '@/ui/components/Loader';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { FormField } from '@/ui/components/FormField';
 import { QRDisplay } from '@/ui/components/QRDisplay';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { fetchTables, createTable, deleteTable, type Table } from '../../_shared/api/tablesApi';
 import { getStaticTableQrUrl } from '../../_shared/api/clientSessionsApi';
 
@@ -127,9 +128,9 @@ export function TablesView({ token, onToast }: TablesViewProps) {
       <div className="admin-toolbar">
         <Badge variant="info">{tables.length} mesas · {freeCount} libres</Badge>
         <Button variant="primary" size="sm" onClick={() => setShowAdd(s => !s)}>
-          {showAdd ? '✕ Cerrar' : '+ Agregar mesa'}
+          {showAdd ? (<><AppIcon name="x" size="sm" /> Cerrar</>) : (<><AppIcon name="plus" size="sm" /> Agregar mesa</>)}
         </Button>
-        <Button variant="secondary" size="sm" onClick={load} loading={loading}>↻ Refrescar</Button>
+        <Button variant="secondary" size="sm" onClick={load} loading={loading}><AppIcon name="refresh" size="sm" /> Refrescar</Button>
       </div>
 
       {showAdd && (
@@ -169,7 +170,7 @@ export function TablesView({ token, onToast }: TablesViewProps) {
         {loading ? (
           <Loader label="Cargando mesas…" />
         ) : tables.length === 0 ? (
-          <EmptyState compact icon="🪑" message="No hay mesas configuradas todavía" />
+          <EmptyState compact icon={<AppIcon name="armchair" size="lg" />} message="No hay mesas configuradas todavía" />
         ) : (
           <div className="admin-tables__list">
             {tables.map(t => (
@@ -195,7 +196,7 @@ export function TablesView({ token, onToast }: TablesViewProps) {
                   disabled={t.status !== 'free'}
                   title={t.status !== 'free' ? 'Solo se eliminan mesas libres' : 'Eliminar mesa'}
                 >
-                  🗑
+                  <AppIcon name="trash" size="sm" />
                 </Button>
               </div>
             ))}
@@ -208,7 +209,7 @@ export function TablesView({ token, onToast }: TablesViewProps) {
           <Card className="admin-qr-modal" onClick={e => e.stopPropagation()}>
             <div className="admin-qr-modal__head">
               <h3>QR — Mesa {qrTable.number}</h3>
-              <Button variant="ghost" size="sm" onClick={() => setQrTable(null)}>✕</Button>
+              <Button variant="ghost" size="sm" onClick={() => setQrTable(null)}><AppIcon name="x" size="sm" /></Button>
             </div>
             <p className="admin-muted">
               El cliente escanea este código para abrir el menú digital de la mesa.
@@ -233,7 +234,7 @@ export function TablesView({ token, onToast }: TablesViewProps) {
               {qrUrl}
             </div>
             <Button variant="primary" onClick={() => window.print()} disabled={!qrUrl}>
-              🖨 Imprimir QR
+              <AppIcon name="printer" size="sm" /> Imprimir QR
             </Button>
           </Card>
         </div>

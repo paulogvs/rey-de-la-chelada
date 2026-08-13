@@ -150,7 +150,7 @@ export function MenuPage({
       setDraftItems([]);
       setShowSummary(false);
     } catch {
-      setCallFeedback('❌ Error al enviar pedido');
+      setCallFeedback('Error al enviar pedido');
       setTimeout(() => setCallFeedback(null), 4000);
     } finally {
       setSending(false);
@@ -162,10 +162,10 @@ export function MenuPage({
     if (!session.canCallWaiter) return;
     try {
       await session.callWaiter();
-      setCallFeedback('✅ Mesero notificado');
+      setCallFeedback('Mesero notificado');
       setTimeout(() => setCallFeedback(null), 3000);
     } catch {
-      setCallFeedback('❌ Error al notificar');
+      setCallFeedback('Error al notificar');
       setTimeout(() => setCallFeedback(null), 3000);
     }
   }, [session]);
@@ -175,10 +175,10 @@ export function MenuPage({
     if (!session.canRequestBill) return;
     try {
       await session.requestBill();
-      setBillFeedback('✅ Cuenta solicitada');
+      setBillFeedback('Cuenta solicitada');
       setTimeout(() => setBillFeedback(null), 3000);
     } catch {
-      setBillFeedback('❌ Error al solicitar cuenta');
+      setBillFeedback('Error al solicitar cuenta');
       setTimeout(() => setBillFeedback(null), 3000);
     }
   }, [session]);
@@ -235,7 +235,6 @@ export function MenuPage({
               <CategoryButton
                 key={cat.id}
                 label={cat.name}
-                emoji={cat.emoji}
                 active={selectedCategory === cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
               />
@@ -252,7 +251,7 @@ export function MenuPage({
                 <div key={cat.id} className="clientes-category-group">
                   {selectedCategory && (
                     <h2 className="clientes-category-title">
-                      {cat.emoji} {cat.name}
+                      {cat.name}
                     </h2>
                   )}
                   <div className="clientes-items__grid">

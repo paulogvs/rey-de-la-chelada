@@ -13,6 +13,7 @@
 
 import React from 'react';
 import type { Table } from '@/core/types';
+import { AppIcon, type AppIconName } from '@/ui/components/AppIcon/AppIcon';
 import { tableAlertState } from './tableAlerts';
 import '@/modules/salon/components/TableGrid.css';
 
@@ -26,7 +27,7 @@ const STATUS_VARS: Record<string, { border: string; label: string }> = {
   closed:   { border: 'var(--status-delivered)',  label: 'Cerrada' },
 };
 
-const MODULE_ICON: Record<string, string> = { bar: '🍺', cocina: '🍳' };
+const MODULE_ICON: Record<string, AppIconName> = { bar: 'beer', cocina: 'flame' };
 
 interface TablesViewProps {
   tables: Table[];
@@ -59,8 +60,8 @@ export function TablesView({ tables, loading, error, onTableSelect, onRefresh }:
         </div>
         <span className="table-grid__count">
           {loading ? 'Cargando…' : `${freeCount} libres / ${occupiedCount} ocupadas`}
-          {deliverableCount > 0 && <span className="table-grid__ready-count"> · {deliverableCount} para entregar 🍽️</span>}
-          {chargeCount > 0 && <span className="table-grid__charge-count"> · {chargeCount} por cobrar 💰</span>}
+          {deliverableCount > 0 && <span className="table-grid__ready-count"> · {deliverableCount} para entregar</span>}
+          {chargeCount > 0 && <span className="table-grid__charge-count"> · {chargeCount} por cobrar</span>}
         </span>
       </div>
 
@@ -97,7 +98,7 @@ export function TablesView({ tables, loading, error, onTableSelect, onRefresh }:
                       className={`table-card__module table-card__module--${state}`}
                       title={state === 'ready' ? `${module === 'bar' ? 'Barra' : 'Cocina'} lista — entregar` : `${module === 'bar' ? 'Barra' : 'Cocina'} en proceso`}
                     >
-                      {MODULE_ICON[module]}
+                      <AppIcon name={MODULE_ICON[module]} size="sm" />
                     </span>
                   ))}
                 </span>
@@ -105,7 +106,7 @@ export function TablesView({ tables, loading, error, onTableSelect, onRefresh }:
 
               {/* FASE 4.5: todo entregado → por cobrar */}
               {served && (
-                <span className="table-card__charge-badge">💰 Por cobrar</span>
+                <span className="table-card__charge-badge"><AppIcon name="wallet" size="sm" /> Por cobrar</span>
               )}
             </button>
           );
@@ -113,7 +114,7 @@ export function TablesView({ tables, loading, error, onTableSelect, onRefresh }:
       </div>
 
       <button className="table-grid__refresh" onClick={onRefresh}>
-        ⟳ Refrescar
+        <AppIcon name="refresh" size="sm" /> Refrescar
       </button>
     </div>
   );

@@ -13,6 +13,7 @@ import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
 import { Loader } from '@/ui/components/Loader';
 import { FormField } from '@/ui/components/FormField';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import {
   fetchModifierOptions,
   updateModifierOptionPrice,
@@ -143,9 +144,9 @@ export function ModifierOptionsView({ token, onToast }: ModifierOptionsViewProps
         </p>
         <div className="admin-toolbar">
           <Button variant="primary" onClick={handleSaveAll} loading={saving} disabled={filledCount === 0}>
-            💾 Guardar {filledCount > 0 ? `${filledCount} tamaño(s)` : 'todo'}
+            <AppIcon name="save" size="sm" /> Guardar {filledCount > 0 ? `${filledCount} tamaño(s)` : 'todo'}
           </Button>
-          <Button variant="secondary" size="sm" onClick={load} loading={loading}>↻ Refrescar</Button>
+          <Button variant="secondary" size="sm" onClick={load} loading={loading}><AppIcon name="refresh" size="sm" /> Refrescar</Button>
           <Badge variant="info">{options.length} opciones</Badge>
         </div>
       </Card>
@@ -155,7 +156,7 @@ export function ModifierOptionsView({ token, onToast }: ModifierOptionsViewProps
       ) : (
         groups.map(group => (
           <Card key={group.itemName} className="admin-section">
-            <h3>🍕 {group.itemName}</h3>
+            <h3>{group.itemName}</h3>
             <div className="admin-bulk-grid">
               {group.options.map(opt => {
                 const field = fields[opt.id];
@@ -176,7 +177,7 @@ export function ModifierOptionsView({ token, onToast }: ModifierOptionsViewProps
                         aria-label={`Precio de ${opt.name} de ${opt.menu_item_name}`}
                       />
                       <Button variant="ghost" size="sm" onClick={() => handleSaveOne(opt)} disabled={!fields[opt.id]}>
-                        {field?.saved === 'ok' ? '✓' : field?.saved === 'err' ? '✗' : 'OK'}
+                        {field?.saved === 'ok' ? <AppIcon name="check" size="sm" /> : field?.saved === 'err' ? <AppIcon name="x" size="sm" /> : 'OK'}
                       </Button>
                     </div>
                   </div>

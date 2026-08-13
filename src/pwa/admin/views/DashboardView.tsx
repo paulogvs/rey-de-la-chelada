@@ -12,6 +12,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Card } from '@/ui/components/Card';
 import { StatCard } from '@/ui/components/StatCard';
 import { Loader } from '@/ui/components/Loader';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { fetchAdminMenuItems } from '../../_shared/api/adminApi';
 import { fetchTables } from '../../_shared/api/tablesApi';
 import { fetchClosings } from '../../_shared/api/adminApi';
@@ -113,7 +114,7 @@ export function DashboardView({ token, onToast }: DashboardViewProps) {
                 ? `${stats.nullPriceCount} sin precio`
                 : 'Todos con precio'}
               deltaTone={stats.nullPriceCount > 0 ? 'down' : 'up'}
-              icon="📊"
+              icon={<AppIcon name="dashboard" size="lg" />}
             />
 
             <StatCard
@@ -121,7 +122,7 @@ export function DashboardView({ token, onToast }: DashboardViewProps) {
               label="Precios cargados"
               value={`${pctPriced}%`}
               delta="del menú"
-              icon="🏷️"
+              icon={<AppIcon name="tag" size="lg" />}
             />
 
             <StatCard
@@ -129,7 +130,7 @@ export function DashboardView({ token, onToast }: DashboardViewProps) {
               label="Mesas"
               value={stats.tableCount}
               delta={`${stats.freeTables} libres`}
-              icon="🪑"
+              icon={<AppIcon name="armchair" size="lg" />}
             />
 
             <StatCard
@@ -138,7 +139,7 @@ export function DashboardView({ token, onToast }: DashboardViewProps) {
               value={`Bs. ${stats.revenueToday.toFixed(2)}`}
               delta={`${stats.closingsToday} corte(s) hoy`}
               deltaTone={stats.revenueToday > 0 ? 'up' : 'neutral'}
-              icon="💰"
+              icon={<AppIcon name="wallet" size="lg" />}
             />
           </div>
 

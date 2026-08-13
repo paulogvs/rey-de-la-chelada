@@ -25,6 +25,7 @@ import { PwaLayout } from '../_shared/components/PwaLayout';
 import { ToastProvider, useToast } from '@/ui/components/Toast';
 import { Loader } from '@/ui/components/Loader';
 import { IconButton } from '@/ui/components/IconButton';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import type { Table } from '@/core/types';
 import { TablesView } from './TablesView';
 import { OrderPanel } from './OrderPanel';
@@ -63,7 +64,7 @@ function MeserosApp() {
       // lista y cocina lista son avisos SEPARADOS al mesero. El circuito se
       // cierra (order_complete) solo cuando TODOS los módulos terminaron.
       if (event.type === 'module_ready') {
-        const label = event.module === 'bar' ? '🍺 Barra lista' : '🍳 Cocina lista';
+        const label = event.module === 'bar' ? 'Barra lista' : 'Cocina lista';
         addToast({
           type: 'success',
           message: `Mesa ${event.tableNumber ?? ''} — ${label} — listo para recoger`,
@@ -73,7 +74,7 @@ function MeserosApp() {
       if (event.type === 'order_complete') {
         addToast({
           type: 'success',
-          message: `Mesa ${event.tableNumber ?? ''} — Pedido listo 🍽️`,
+          message: `Mesa ${event.tableNumber ?? ''} — Pedido listo`,
           duration: 4000,
         });
       }
@@ -172,7 +173,7 @@ function MeserosApp() {
                 className="meseros-header__back"
                 onClick={handleBackToTables}
               >
-                ←
+                <AppIcon name="chevron-left" size="md" />
               </IconButton>
             )}
             <h1 className="meseros-header__title">
@@ -190,7 +191,7 @@ function MeserosApp() {
                 className="meseros-header__calls"
                 onClick={() => setView('waiter-calls')}
               >
-                🔔
+                <AppIcon name="bell" size="md" />
                 {waiterCalls.pendingCount > 0 && (
                   <span className="meseros-header__calls-badge">{waiterCalls.pendingCount}</span>
                 )}

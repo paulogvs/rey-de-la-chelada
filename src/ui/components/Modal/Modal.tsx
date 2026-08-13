@@ -7,6 +7,7 @@
  */
 
 import React, { useEffect, useCallback, type ReactNode } from 'react';
+import { AppIcon } from '../AppIcon/AppIcon';
 import './Modal.css';
 
 export interface ModalProps {
@@ -85,7 +86,7 @@ export function Modal({
               onClick={onClose}
               aria-label="Cerrar"
             >
-              ✕
+              <AppIcon name="x" size="sm" />
             </button>
           )}
         </div>

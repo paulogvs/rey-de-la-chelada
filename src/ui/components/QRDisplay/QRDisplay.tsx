@@ -6,6 +6,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { AppIcon } from '../AppIcon/AppIcon';
 import './QRDisplay.css';
 
 export interface QRDisplayProps {
@@ -79,7 +80,7 @@ export function QRDisplay({
     return (
       <div className={`qr-display qr-display--error ${className}`}>
         <div className="qr-display__placeholder" style={{ width: size, height: size }}>
-          <span>⚠</span>
+          <AppIcon name="alert" size="xl" />
         </div>
         <span className="qr-display__error-text">{error}</span>
       </div>

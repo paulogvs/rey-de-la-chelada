@@ -16,6 +16,7 @@
 
 import React, { useMemo } from 'react';
 import { ToastInline } from '@/ui/components/Toast';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { statusLabel, isTerminalStatus } from '../hooks/useClientOrder';
 import type { TrackedOrder } from '../hooks/useClientOrder';
 import './OrderTrackingPage.css';
@@ -44,7 +45,7 @@ export function OrderTrackingPage({ order, error, polling, onReset }: OrderTrack
     return (
       <div className="tracking-page tracking-page--thanks">
         <div className="tracking-hero">
-          <div className="tracking-hero__icon" aria-hidden="true">🎉</div>
+          <div className="tracking-hero__icon" aria-hidden="true"><AppIcon name="check" size="xl" /></div>
           <h1 className="tracking-hero__title">¡Gracias por tu visita!</h1>
           <p className="tracking-hero__subtitle">
             Tu pedido fue pagado. ¡Vuelve pronto, Rey de la Chelada!
@@ -68,7 +69,7 @@ export function OrderTrackingPage({ order, error, polling, onReset }: OrderTrack
     return (
       <div className="tracking-page">
         <div className="tracking-hero">
-          <div className="tracking-hero__icon" aria-hidden="true">😕</div>
+          <div className="tracking-hero__icon" aria-hidden="true"><AppIcon name="info" size="xl" /></div>
           <h1 className="tracking-hero__title">Pedido cancelado</h1>
           <p className="tracking-hero__subtitle">
             El pedido fue cancelado. Si necesitas ayuda, llama a un mesero.
@@ -99,7 +100,9 @@ export function OrderTrackingPage({ order, error, polling, onReset }: OrderTrack
 
       <section className="tracking-status" key={order.status} aria-live="polite">
         <div className="tracking-status__icon" aria-hidden="true">
-          {order.status === 'ready' ? '🍺' : order.status === 'served' ? '😋' : '⏳'}
+          {order.status === 'ready' || order.status === 'served'
+            ? <AppIcon name="check" size="xl" />
+            : <AppIcon name="clock" size="xl" />}
         </div>
         <h1 className="tracking-status__title">{statusLabel(order.status)}</h1>
         {order.status === 'called' && (
@@ -117,7 +120,7 @@ export function OrderTrackingPage({ order, error, polling, onReset }: OrderTrack
             <span
               className={`tracking-stepper__dot ${i <= currentStep ? 'done' : ''}`}
             >
-              {i < currentStep ? '✓' : i + 1}
+              {i < currentStep ? <AppIcon name="check" size="sm" /> : i + 1}
             </span>
           </React.Fragment>
         ))}

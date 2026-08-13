@@ -22,7 +22,8 @@ import { EmptyState } from '@/ui/components/EmptyState';
 import { PriceDisplay } from '@/ui/components/PriceDisplay';
 import { SegmentedControl, type SegmentedOption } from '@/ui/components/SegmentedControl';
 import { useToast } from '@/ui/components/Toast';
-import { METHOD_LABELS, METHOD_ICONS, PAYMENT_METHODS } from '../_shared/utils/paymentMethods';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
+import { METHOD_LABELS, methodIcon, PAYMENT_METHODS } from '../_shared/utils/paymentMethods';
 import { appConfig } from '@/core/config/app.config';
 import './CollectView.css';
 
@@ -52,7 +53,7 @@ const STATUS_VARIANTS: Record<string, 'pending' | 'preparing' | 'ready' | 'paid'
 /** Método de pago como opciones del SegmentedControl (Premium Minimal). */
 const PAYMENT_OPTIONS: SegmentedOption[] = PAYMENT_METHODS.map(m => ({
   value: m,
-  label: `${METHOD_ICONS[m]} ${METHOD_LABELS[m]}`,
+  label: (<><AppIcon name={methodIcon(m)} size="sm" /> {METHOD_LABELS[m]}</>),
 }));
 
 /** Saldo pendiente de un pedido (total − pagos completed). SSOT server. */
@@ -139,7 +140,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
         if (result.fullyPaid) {
           addToast({
             type: 'success',
-            message: `Mesa ${order.tableNumber} cobrada ✓`,
+            message: `Mesa ${order.tableNumber} cobrada`,
             duration: 3000,
           });
           onPaid(order.id);
@@ -181,7 +182,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
             : `${orders.length} pedido${orders.length === 1 ? '' : 's'} pendiente${orders.length === 1 ? '' : 's'} de cobro`}
         </div>
         <div className="caja-collect__summary-value">
-          {orders.length === 0 ? '🎉' : `Bs. ${pendingTotal.toFixed(2)}`}
+          {orders.length === 0 ? <AppIcon name="check" size="md" /> : `Bs. ${pendingTotal.toFixed(2)}`}
         </div>
       </Card>
 
@@ -194,7 +195,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
 
       {!error && orders.length === 0 && (
         <EmptyState
-          icon="💰"
+          icon={<AppIcon name="wallet" size="lg" />}
           message="No hay pedidos esperando cobro. Los pedidos servidos o en preparación aparecerán aquí."
         />
       )}
@@ -224,7 +225,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                   Bs. {remaining.toFixed(2)}
                 </span>
                 <span className="caja-collect__order-caret" aria-hidden="true">
-                  {isExpanded ? '▴' : '▾'}
+                  {isExpanded ? <AppIcon name="chevron-up" size="sm" /> : <AppIcon name="chevron-down" size="sm" />}
                 </span>
               </button>
 
@@ -305,7 +306,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                                 loading={uploadingProof}
                                 disabled={uploadingProof || paying}
                               >
-                                📷 {proofPhoto ? 'Cambiar comprobante' : 'Tomar foto del comprobante'}
+                                <AppIcon name="camera" size="sm" /> {proofPhoto ? 'Cambiar comprobante' : 'Tomar foto del comprobante'}
                               </Button>
                               <input
                                 id={`proof-${order.id}`}
@@ -326,7 +327,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                           </>
                         ) : (
                           <p className="caja-collect__qr-disabled">
-                            ⚠️ El QR de pago no está configurado
+                            <AppIcon name="alert" size="sm" /> El QR de pago no está configurado
                           </p>
                         )}
                       </div>

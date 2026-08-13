@@ -22,6 +22,7 @@ import { Button } from '@/ui/components/Button';
 import { StatCard } from '@/ui/components/StatCard';
 import { FormField } from '@/ui/components/FormField';
 import { useToast } from '@/ui/components/Toast';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { localDateTimeStr } from '../_shared/utils/localDate';
 
@@ -132,7 +133,7 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
               {/* C5 (SSOT): expected_cash = SOLO efectivo físico;
                   ventas QR NO van al cajón. La diferencia contra el
                   efectivo real se calcula contra este total. */}
-              <label>Efectivo esperado en cajón (solo 💵 físico — QR es digital)</label>
+              <label>Efectivo esperado en cajón (solo físico — QR es digital)</label>
               <div className="caja-close__value">
                 Bs. {(closing.expected_cash ?? 0).toFixed(2)}
               </div>
@@ -178,10 +179,10 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
           {closing ? (
             <>
               <Button variant="secondary" onClick={() => setReconciled(r => !r)}>
-                {reconciled ? 'Diferencia conciliada ✓' : 'Marcar diferencia conciliada'}
+                {reconciled ? 'Diferencia conciliada' : 'Marcar diferencia conciliada'}
               </Button>
               <Button variant="secondary" onClick={() => setPrintOpen(true)} disabled={busy}>
-                🖨️ Imprimir cierre
+                <AppIcon name="printer" size="sm" /> Imprimir cierre
               </Button>
               <Button variant="primary" onClick={handleClose} disabled={busy} fullWidth>
                 {busy ? 'Cerrando…' : 'Cerrar Día'}
@@ -216,11 +217,11 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
           <h4>Por método de pago</h4>
           <div className="caja-close__history-list">
             <div className="caja-close__history-item">
-              <span>💵 Efectivo (físico — va al cajón)</span>
+              <span><AppIcon name="banknote" size="sm" /> Efectivo (físico — va al cajón)</span>
               <span className="caja-close__history-value">Bs. {(byMethod['cash'] ?? 0).toFixed(2)}</span>
             </div>
             <div className="caja-close__history-item">
-              <span>📱 QR (digital — depositado, NO va al cajón)</span>
+              <span><AppIcon name="smartphone" size="sm" /> QR (digital — depositado, NO va al cajón)</span>
               <span className="caja-close__history-value">Bs. {qrTotal.toFixed(2)}</span>
             </div>
           </div>

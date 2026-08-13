@@ -21,6 +21,7 @@ import { PwaLayout } from '../_shared/components/PwaLayout';
 import { Badge } from '@/ui/components/Badge';
 import { Loader } from '@/ui/components/Loader';
 import { ToastProvider, useToast } from '@/ui/components/Toast';
+import { AppIcon, type AppIconName } from '@/ui/components/AppIcon/AppIcon';
 import { DashboardView } from './views/DashboardView';
 import { PriceEditorView } from './views/PriceEditorView';
 import { BulkPricesView } from './views/BulkPricesView';
@@ -40,14 +41,14 @@ type AdminView =
   | 'tables'
   | 'closings';
 
-const NAV_ITEMS: { id: AdminView; label: string; icon: string }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-  { id: 'prices', label: 'Precios', icon: '💲' },
-  { id: 'bulk', label: 'Carga Masiva', icon: '📦' },
-  { id: 'modifiers', label: 'Tamaños', icon: '🍕' },
-  { id: 'staff', label: 'Personal', icon: '👥' },
-  { id: 'tables', label: 'Mesas', icon: '🪑' },
-  { id: 'closings', label: 'Cortes', icon: '🧾' },
+const NAV_ITEMS: { id: AdminView; label: string; icon: AppIconName }[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+  { id: 'prices', label: 'Precios', icon: 'cash' },
+  { id: 'bulk', label: 'Carga Masiva', icon: 'package' },
+  { id: 'modifiers', label: 'Tamaños', icon: 'sliders' },
+  { id: 'staff', label: 'Personal', icon: 'users' },
+  { id: 'tables', label: 'Mesas', icon: 'armchair' },
+  { id: 'closings', label: 'Cortes', icon: 'receipt' },
 ];
 
 function AdminApp() {
@@ -101,7 +102,7 @@ function AdminApp() {
         {/* Sidebar */}
         <nav className="admin-sidebar">
           <div className="admin-sidebar__header">
-            <h2>👑 Admin</h2>
+            <h2><AppIcon name="crown" size="md" /> Admin</h2>
             <p className="admin-sidebar__subtitle">Rey de la Chelada</p>
           </div>
           <div className="admin-sidebar__nav">
@@ -111,7 +112,7 @@ function AdminApp() {
                 className={`admin-sidebar__btn ${view === item.id ? 'active' : ''}`}
                 onClick={() => setView(item.id)}
               >
-                <span className="admin-sidebar__icon">{item.icon}</span>
+                <span className="admin-sidebar__icon"><AppIcon name={item.icon} size="md" /></span>
                 <span className="admin-sidebar__label">{item.label}</span>
               </button>
             ))}
@@ -133,7 +134,7 @@ function AdminApp() {
               <Badge variant="info">Admin</Badge>
               {user && (
                 <button className="admin-topbar__logout" onClick={handleLogout} title="Cerrar sesión">
-                  ⏻ Salir
+                  <AppIcon name="logout" size="sm" /> Salir
                 </button>
               )}
             </div>

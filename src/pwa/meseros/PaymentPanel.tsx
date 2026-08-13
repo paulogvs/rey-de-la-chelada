@@ -21,12 +21,13 @@ import { PriceDisplay } from '@/ui/components/PriceDisplay';
 import { Loader } from '@/ui/components/Loader';
 import { SegmentedControl, type SegmentedOption } from '@/ui/components/SegmentedControl';
 import { useToast } from '@/ui/components/Toast';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { apiFetch } from '../_shared/api/apiFetch';
 import { processPayment, uploadPaymentProof } from '../_shared/api/paymentsApi';
 import type { Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
-import { METHOD_LABELS, METHOD_ICONS } from '../_shared/utils/paymentMethods';
+import { METHOD_LABELS, methodIcon } from '../_shared/utils/paymentMethods';
 import { appConfig } from '@/core/config/app.config';
 
 interface PaymentPanelProps {
@@ -38,8 +39,8 @@ interface PaymentPanelProps {
 }
 
 const METHOD_OPTIONS: SegmentedOption[] = [
-  { value: 'cash', label: `${METHOD_ICONS.cash} ${METHOD_LABELS.cash}` },
-  { value: 'qr', label: `${METHOD_ICONS.qr} ${METHOD_LABELS.qr}` },
+  { value: 'cash', label: (<><AppIcon name={methodIcon('cash')} size="sm" /> {METHOD_LABELS.cash}</>) },
+  { value: 'qr', label: (<><AppIcon name={methodIcon('qr')} size="sm" /> {METHOD_LABELS.qr}</>) },
 ];
 
 export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack }: PaymentPanelProps) {
@@ -239,7 +240,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
                   El cliente escanea y transfiere <strong>Bs. {amountToCollect.toFixed(2)}</strong>
                 </p>
                 <p className="payment-panel__qr-cashnote">
-                  📱 El QR NO es dinero físico — se registra como depósito digital en el flujo de caja.
+                  <AppIcon name="smartphone" size="sm" /> El QR NO es dinero físico — se registra como depósito digital en el flujo de caja.
                 </p>
 
                 <Button
@@ -249,7 +250,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
                   loading={uploadingProof}
                   disabled={uploadingProof || processing}
                 >
-                  📷 {proofPhoto ? 'Cambiar foto del comprobante' : 'Tomar foto del comprobante'}
+                  <AppIcon name="camera" size="sm" /> {proofPhoto ? 'Cambiar foto del comprobante' : 'Tomar foto del comprobante'}
                 </Button>
                 <input
                   id="payment-proof-input"
@@ -269,7 +270,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
               </div>
             ) : (
               <div className="payment-panel__qr-disabled">
-                ⚠️ El QR de pago no está configurado. El administrador debe subir la imagen del QR.
+                <AppIcon name="alert" size="sm" /> El QR de pago no está configurado. El administrador debe subir la imagen del QR.
               </div>
             )}
           </div>
@@ -297,7 +298,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
           Volver
         </Button>
         <Button variant="secondary" onClick={() => setPrintOpen(true)} disabled={processing}>
-          🖨️ Imprimir
+          <AppIcon name="printer" size="sm" /> Imprimir
         </Button>
         <Button
           variant="primary"

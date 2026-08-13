@@ -19,6 +19,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Badge } from '../Badge/Badge';
+import { AppIcon } from '../AppIcon/AppIcon';
 import type { Order, KDSStatus } from '@/core/types';
 import './KDSOrderCard.css';
 
@@ -105,7 +106,9 @@ export function KDSOrderCard({
         </div>
         <div className="kds-order__meta">
           <div className="kds-order__round">
-            {round === 1 ? 'Ronda 1' : `Ronda ${round} 🆕`}
+            {round === 1 ? 'Ronda 1' : (
+              <>Ronda {round} <Badge variant="preparing">NUEVA</Badge></>
+            )}
           </div>
           <div className="kds-order__timer" style={{ color: timerColor }}>
             {formatTime(elapsed)}
@@ -127,7 +130,11 @@ export function KDSOrderCard({
             className={`kds-order__item ${item.status === 'ready' ? 'kds-order__item--ready' : ''} ${item.status === 'delivered' ? 'kds-order__item--done' : ''} ${item.status === 'cancelled' ? 'kds-order__item--cancelled' : ''}`}
           >
             <span className="kds-order__item-check" aria-hidden="true">
-              {item.status === 'ready' || item.status === 'delivered' ? '✓' : item.status === 'cancelled' ? '✕' : item.status === 'preparing' ? '○' : '·'}
+              {item.status === 'ready' || item.status === 'delivered'
+                ? <AppIcon name="check" size="sm" />
+                : item.status === 'cancelled'
+                  ? <AppIcon name="x" size="sm" />
+                  : item.status === 'preparing' ? '○' : '·'}
             </span>
             <span className="kds-order__item-qty">{item.quantity}x</span>
             <span className="kds-order__item-name">{item.menuItemName}</span>
@@ -150,7 +157,7 @@ export function KDSOrderCard({
             className="kds-order__action kds-order__action--start"
             onClick={() => onStart(order.id, round)}
           >
-            ▶ Iniciar
+            <AppIcon name="play" size="sm" /> Iniciar
           </button>
         )}
         {!hasPending && hasPreparing && onReady && (
@@ -158,11 +165,11 @@ export function KDSOrderCard({
             className="kds-order__action kds-order__action--ready"
             onClick={() => onReady(order.id, round)}
           >
-            ✓ Listo
+            <AppIcon name="check" size="sm" /> Listo
           </button>
         )}
         {allDone && (
-          <div className="kds-order__complete-badge">✓ COMPLETADO</div>
+          <div className="kds-order__complete-badge"><AppIcon name="check" size="sm" /> COMPLETADO</div>
         )}
       </div>
     </div>

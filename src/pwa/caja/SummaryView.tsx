@@ -12,8 +12,9 @@ import { Card, CardSkeleton } from '@/ui/components/Card';
 import { Button } from '@/ui/components/Button';
 import { StatCard } from '@/ui/components/StatCard';
 import { useToast } from '@/ui/components/Toast';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { buildDailySalesCsv, downloadCsv, dailyCsvFilename } from '../_shared/utils/csvExport';
-import { METHOD_LABELS, METHOD_ICONS } from '../_shared/utils/paymentMethods';
+import { METHOD_LABELS, methodIcon } from '../_shared/utils/paymentMethods';
 
 interface SummaryViewProps {
   token: string;
@@ -91,7 +92,7 @@ export function SummaryView({ token, today, ivaRate, refreshTick }: SummaryViewP
     <div className="caja-summary">
       <div className="caja-summary__toolbar">
         <Button variant="secondary" size="sm" onClick={handleExportCsv} loading={exporting} disabled={!summary}>
-          📄 Exportar CSV
+          <AppIcon name="download" size="sm" /> Exportar CSV
         </Button>
       </div>
       <div className="caja-summary__grid">
@@ -99,7 +100,7 @@ export function SummaryView({ token, today, ivaRate, refreshTick }: SummaryViewP
           label="Ventas del día"
           value={<span className="caja-stat caja-stat--gross">Bs. {totalSales.toFixed(2)}</span>}
           delta={`${summary.totalOrders} pedidos · ${summary.completedOrders} pagados`}
-          icon="💰"
+          icon={<AppIcon name="wallet" size="lg" />}
         />
 
         <StatCard
@@ -118,7 +119,7 @@ export function SummaryView({ token, today, ivaRate, refreshTick }: SummaryViewP
           label="Pedidos"
           value={<span className="caja-stat caja-stat--orders">{summary.totalOrders}</span>}
           delta={`${summary.cancelledOrders} cancelados`}
-          icon="🧾"
+          icon={<AppIcon name="receipt" size="lg" />}
         />
       </div>
 
@@ -131,7 +132,7 @@ export function SummaryView({ token, today, ivaRate, refreshTick }: SummaryViewP
             {methodEntries.map(([method, amount]) => (
               <div key={method} className="caja-methods__item">
                 <span className="caja-methods__label">
-                  {METHOD_ICONS[method] || '💰'}{' '}
+                  <AppIcon name={methodIcon(method)} size="sm" />{' '}
                   {method === 'cash' ? 'Efectivo (físico — cajón)' : method === 'qr' ? 'QR (digital — depositado)' : (METHOD_LABELS[method] || method)}
                 </span>
                 <div className="caja-methods__bar">

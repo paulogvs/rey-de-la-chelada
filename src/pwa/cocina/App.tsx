@@ -14,6 +14,7 @@ import { LoginScreen } from '../_shared/components/LoginScreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { Loader } from '@/ui/components/Loader';
 import { KDSBoard } from '@/ui/components/KDSBoard';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 
 export default function App() {
   setCurrentPwaModule('cocina');
@@ -37,5 +38,5 @@ export default function App() {
     );
   }
 
-  return <KDSBoard module="cocina" title="Cocina" icon="🍳" token={token} />;
+  return <KDSBoard module="cocina" title="Cocina" icon={<AppIcon name="flame" size="lg" />} token={token} />;
 }

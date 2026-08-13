@@ -78,12 +78,12 @@ export function loadSeedData(): { categories: MenuCategory[]; items: MenuItem[] 
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '')}`;
 
-      // Crear categoría
+      // Crear categoría (emoji en desuso — la UI ya no renderiza emojis)
       categories.push({
         id: categoryId,
         name: cat.nombre_categoria,
         description: cat.nombre_categoria,
-        emoji: areaKey === 'BAR' ? '🍺' : '🍽️',
+        emoji: '',
         sortOrder: categorySort++,
         isActive: true,
       });

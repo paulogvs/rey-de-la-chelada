@@ -14,6 +14,7 @@ import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
 import { Loader } from '@/ui/components/Loader';
 import { FormField } from '@/ui/components/FormField';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import {
   fetchAdminMenuItems,
   updateMenuItemPrice,
@@ -123,11 +124,11 @@ export function PriceEditorView({ token, onToast }: PriceEditorViewProps) {
         >
           <option value="">Todas las categorías</option>
           {categories.map(c => (
-            <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>
+            <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
         <Button variant="secondary" size="sm" onClick={load} loading={loading}>
-          ↻ Refrescar
+          <AppIcon name="refresh" size="sm" /> Refrescar
         </Button>
         <Badge variant={nullCount > 0 ? 'pending' : 'paid'}>
           {nullCount} sin precio
@@ -137,7 +138,7 @@ export function PriceEditorView({ token, onToast }: PriceEditorViewProps) {
       {allNull && (
         <Card className="admin-section">
           <p className="admin-muted">
-            ⚠️ Todos los items están SIN PRECIO. Usa <strong>Carga Masiva</strong> para
+            Todos los items están SIN PRECIO. Usa <strong>Carga Masiva</strong> para
             setear precios reales en un solo paso.
           </p>
         </Card>
@@ -182,7 +183,7 @@ export function PriceEditorView({ token, onToast }: PriceEditorViewProps) {
                       disabled={draft == null || draft.saved !== null}
                       onClick={() => handleSave(item)}
                     >
-                      {draft?.saved === 'ok' ? '✓' : draft?.saved === 'err' ? '✗' : 'Guardar'}
+                      {draft?.saved === 'ok' ? <AppIcon name="check" size="sm" /> : draft?.saved === 'err' ? <AppIcon name="x" size="sm" /> : 'Guardar'}
                     </Button>
                   </div>
                 </div>

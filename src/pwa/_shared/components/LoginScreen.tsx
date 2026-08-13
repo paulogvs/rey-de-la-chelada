@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import './Login.css';
 
 interface LoginScreenProps {
@@ -94,7 +95,7 @@ export function LoginScreen({ title, busy = false, onLogin }: LoginScreenProps) 
                   onClick={clearPin}
                   aria-label="Borrar"
                 >
-                  ⌫
+                  <AppIcon name="delete" size="md" />
                 </button>
               );
             }
@@ -108,7 +109,7 @@ export function LoginScreen({ title, busy = false, onLogin }: LoginScreenProps) 
                   disabled={pin.length < 4 || busy || submitting}
                   aria-label="Ingresar"
                 >
-                  {submitting ? '…' : '✓'}
+                  {submitting ? '…' : <AppIcon name="check" size="md" />}
                 </button>
               );
             }

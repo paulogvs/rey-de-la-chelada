@@ -11,6 +11,7 @@ import { Card } from '@/ui/components/Card';
 import { Button } from '@/ui/components/Button';
 import { FormField } from '@/ui/components/FormField';
 import { useToast } from '@/ui/components/Toast';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 
 export function InvoiceView() {
@@ -105,7 +106,7 @@ export function InvoiceView() {
 
         <div className="caja-invoice__actions">
           <Button variant="secondary" onClick={handlePrintInvoice} fullWidth>
-            🖨️ Imprimir factura
+            <AppIcon name="printer" size="sm" /> Imprimir factura
           </Button>
           <Button variant="primary" onClick={handleGenerateInvoice} fullWidth>
             Generar Factura

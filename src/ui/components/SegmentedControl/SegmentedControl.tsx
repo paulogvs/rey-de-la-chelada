@@ -11,7 +11,7 @@ import './SegmentedControl.css';
 
 export interface SegmentedOption {
   value: string;
-  label: string;
+  label: React.ReactNode;
 }
 
 export interface SegmentedControlProps {

@@ -57,3 +57,6 @@ export type { SegmentedControlProps, SegmentedOption } from './SegmentedControl/
 
 export { IconButton } from './IconButton/IconButton';
 export type { IconButtonProps } from './IconButton/IconButton';
+
+export { AppIcon } from './AppIcon/AppIcon';
+export type { AppIconProps, AppIconName, AppIconSize } from './AppIcon/AppIcon';

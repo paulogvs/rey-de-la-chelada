@@ -2,8 +2,8 @@ import React from 'react';
 import './EmptyState.css';
 
 interface EmptyStateProps {
-  /** Emoji icon (sutil, no decoration) */
-  icon?: string;
+  /** Icon (ReactNode, e.g. <AppIcon name="bell" />). Los strings emoji legados se ignoran. */
+  icon?: React.ReactNode;
   /** Short title, e.g. "No hay pedidos" */
   title?: string;
   /** Supporting message, e.g. "Esperando nuevos pedidos..." */
@@ -24,9 +24,11 @@ export function EmptyState({ icon, title, message, children, compact, className 
     .filter(Boolean)
     .join(' ');
 
+  const showIcon = icon != null && typeof icon !== 'string';
+
   return (
     <div className={cls} role="status" aria-live="polite">
-      {icon && <div className="empty-state__icon">{icon}</div>}
+      {showIcon && <div className="empty-state__icon">{icon}</div>}
       {title && <h3 className="empty-state__title">{title}</h3>}
       {message && <p className="empty-state__message">{message}</p>}
       {children && <div className="empty-state__actions">{children}</div>}

@@ -15,6 +15,7 @@
 import React, { useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/ui/components/Button';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import {
   formatBs,
   formatReceiptDate,
@@ -185,7 +186,11 @@ function ClosingReceiptBody({ receipt }: { receipt: ClosingReceiptData }) {
         </div>
         <div className="print-receipt__total-row print-receipt__total-row--grand">
           <span>{receipt.reconciled ? 'Conciliado' : 'SIN CONCILIAR'}</span>
-          <span>{receipt.reconciled ? '✓' : '⚠'}</span>
+          <span>
+            {receipt.reconciled
+              ? <AppIcon name="check" size="sm" />
+              : <AppIcon name="alert" size="sm" />}
+          </span>
         </div>
       </div>
 
@@ -284,7 +289,7 @@ export function PrintReceipt({ open, onClose, kind, receipt, label }: PrintRecei
         <div className="print-overlay__label">{label || 'Impresión'}</div>
         <div className="print-overlay__actions">
           <Button variant="primary" onClick={handlePrint}>
-            🖨️ Imprimir
+            <AppIcon name="printer" size="sm" /> Imprimir
           </Button>
           <Button variant="secondary" onClick={onClose}>
             Cerrar
