@@ -20,7 +20,7 @@ export default function App() {
   setCurrentPwaModule('cocina');
   bootstrapPwa('cocina');
 
-  const { isAuthenticated, token, login, restoring } = useStaffAuth('cocina', ['admin', 'kds']);
+  const { isAuthenticated, token, login, restoring, sessionExpired } = useStaffAuth('cocina', ['admin', 'kds']);
 
   if (restoring) {
     return (
@@ -33,7 +33,12 @@ export default function App() {
   if (!isAuthenticated || !token) {
     return (
       <PwaLayout title="Cocina">
-        <LoginScreen title="Cocina" busy={restoring} onLogin={login} />
+        <LoginScreen
+          title="Cocina"
+          busy={restoring}
+          notice={sessionExpired ? 'Tu sesión expiró. Ingresa tu PIN de nuevo.' : null}
+          onLogin={login}
+        />
       </PwaLayout>
     );
   }

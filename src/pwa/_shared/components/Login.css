@@ -70,6 +70,16 @@
   padding: 8px 12px;
 }
 
+.login-screen__notice {
+  color: var(--status-pending);
+  font-size: 13px;
+  margin: 0 0 16px;
+  background: color-mix(in srgb, var(--status-pending) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-pending) 18%, transparent);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+}
+
 .login-screen__busy {
   color: var(--text-faint);
   font-size: 13px;

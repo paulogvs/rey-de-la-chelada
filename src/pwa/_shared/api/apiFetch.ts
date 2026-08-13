@@ -23,9 +23,28 @@ export interface ApiOptions {
   token?: string | null;
   body?: unknown;
   fetchImpl?: typeof fetch;
+  /** Inject window for tests; defaults to the global window (if any). */
+  windowImpl?: AuthWindowLike | null;
+}
+
+/** Minimal window surface needed to dispatch the global auth-expiry event. */
+export interface AuthWindowLike {
+  dispatchEvent: (event: Event) => boolean;
 }
 
 const JSON_HEADERS = { 'Content-Type': 'application/json', Accept: 'application/json' };
+
+/** Session-invalid codes from the server (NOT invalid-pin from the login flow). */
+const AUTH_EXPIRED_CODES: ReadonlySet<string> = new Set(['INVALID_TOKEN', 'AUTH_REQUIRED']);
+
+/**
+ * True if this response means "your session is dead" and the app should
+ * force a global logout. Only 401s with a session-invalid code qualify —
+ * INVALID_PIN (bad PIN at login) and other codes do NOT.
+ */
+export function shouldDispatchAuthExpired(status: number, code: string | null): boolean {
+  return status === 401 && code !== null && AUTH_EXPIRED_CODES.has(code);
+}
 
 /**
  * Core fetch wrapper: adds auth header, parses JSON, normalizes errors.
@@ -33,7 +52,7 @@ const JSON_HEADERS = { 'Content-Type': 'application/json', Accept: 'application/
  */
 export async function apiFetch<T>(
   path: string,
-  { method = 'GET', token = null, body, fetchImpl = fetch }: ApiOptions = {}
+  { method = 'GET', token = null, body, fetchImpl = fetch, windowImpl }: ApiOptions = {}
 ): Promise<ApiResult<T>> {
   const headers: Record<string, string> = { ...JSON_HEADERS };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -65,10 +84,22 @@ export async function apiFetch<T>(
       };
     }
 
+    const code = (payload.code as string) || 'REQUEST_FAILED';
+
+    // Global reaction to a dead session: any 401 with a session-invalid code
+    // (INVALID_TOKEN / AUTH_REQUIRED) notifies useStaffAuth to force logout.
+    // INVALID_PIN (bad PIN at login) is intentionally excluded.
+    if (shouldDispatchAuthExpired(res.status, code)) {
+      const w = windowImpl !== undefined ? windowImpl : (typeof window !== 'undefined' ? window : null);
+      if (w) {
+        w.dispatchEvent(new CustomEvent('auth:expired'));
+      }
+    }
+
     return {
       ok: false,
       status: res.status,
-      code: (payload.code as string) || 'REQUEST_FAILED',
+      code,
       error: (payload.error as string) || `HTTP ${res.status}`,
       data: null,
     };

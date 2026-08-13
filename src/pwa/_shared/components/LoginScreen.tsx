@@ -14,11 +14,13 @@ interface LoginScreenProps {
   title: string;
   /** Loading state (auth restoring or logging in) */
   busy?: boolean;
+  /** Gentle notice shown above the keypad, e.g. "Tu sesión expiró". */
+  notice?: string | null;
   /** Called with the entered PIN */
   onLogin: (pin: string) => Promise<{ ok: boolean; code: string | null }>;
 }
 
-export function LoginScreen({ title, busy = false, onLogin }: LoginScreenProps) {
+export function LoginScreen({ title, busy = false, notice = null, onLogin }: LoginScreenProps) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -70,6 +72,8 @@ export function LoginScreen({ title, busy = false, onLogin }: LoginScreenProps) 
       <div className="login-screen__card">
         <h1 className="login-screen__title">{title}</h1>
         <p className="login-screen__subtitle">Ingresa tu PIN</p>
+
+        {notice && <p className="login-screen__notice">{notice}</p>}
 
         {/* PIN dots */}
         <div className="login-screen__dots" aria-label={`PIN actual: ${'•'.repeat(pin.length)}`}>

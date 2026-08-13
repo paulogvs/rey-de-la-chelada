@@ -22,7 +22,7 @@ export default function App() {
   setCurrentPwaModule('bar');
   bootstrapPwa('bar');
 
-  const { isAuthenticated, token, login, restoring } = useStaffAuth('bar', ['admin', 'kds']);
+  const { isAuthenticated, token, login, restoring, sessionExpired } = useStaffAuth('bar', ['admin', 'kds']);
 
   if (restoring) {
     return (
@@ -35,7 +35,12 @@ export default function App() {
   if (!isAuthenticated || !token) {
     return (
       <PwaLayout title="Bar">
-        <LoginScreen title="Barra" busy={restoring} onLogin={login} />
+        <LoginScreen
+          title="Barra"
+          busy={restoring}
+          notice={sessionExpired ? 'Tu sesión expiró. Ingresa tu PIN de nuevo.' : null}
+          onLogin={login}
+        />
       </PwaLayout>
     );
   }

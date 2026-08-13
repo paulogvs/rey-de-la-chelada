@@ -40,7 +40,7 @@ const VIEW_OPTIONS: SegmentedOption[] = [
 
 function CajaApp() {
   const { addToast } = useToast();
-  const { isAuthenticated, token, user, login, logout, restoring } = useStaffAuth('caja', ['admin', 'caja']);
+  const { isAuthenticated, token, user, login, logout, restoring, sessionExpired } = useStaffAuth('caja', ['admin', 'caja']);
 
   const [view, setView] = useState<ViewState>('summary');
   const [refreshTick, setRefreshTick] = useState(0);
@@ -96,7 +96,12 @@ function CajaApp() {
   if (!isAuthenticated || !token) {
     return (
       <PwaLayout title="Caja">
-        <LoginScreen title="Caja" busy={restoring} onLogin={login} />
+        <LoginScreen
+          title="Caja"
+          busy={restoring}
+          notice={sessionExpired ? 'Tu sesión expiró. Ingresa tu PIN de nuevo.' : null}
+          onLogin={login}
+        />
       </PwaLayout>
     );
   }

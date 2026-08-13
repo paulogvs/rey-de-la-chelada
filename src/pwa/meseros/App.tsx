@@ -37,7 +37,7 @@ type ViewState = 'tables' | 'order-panel' | 'payment-panel' | 'waiter-calls';
 
 function MeserosApp() {
   const { addToast } = useToast();
-  const { isAuthenticated, token, user, login, logout, restoring } = useStaffAuth('meseros', ['admin', 'mesero']);
+  const { isAuthenticated, token, user, login, logout, restoring, sessionExpired } = useStaffAuth('meseros', ['admin', 'mesero']);
 
   const [view, setView] = useState<ViewState>('tables');
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
@@ -155,7 +155,12 @@ function MeserosApp() {
   if (!isAuthenticated || !token) {
     return (
       <PwaLayout title="Meseros">
-        <LoginScreen title="Meseros" busy={restoring} onLogin={login} />
+        <LoginScreen
+          title="Meseros"
+          busy={restoring}
+          notice={sessionExpired ? 'Tu sesión expiró. Ingresa tu PIN de nuevo.' : null}
+          onLogin={login}
+        />
       </PwaLayout>
     );
   }

@@ -53,7 +53,7 @@ const NAV_ITEMS: { id: AdminView; label: string; icon: AppIconName }[] = [
 
 function AdminApp() {
   const { addToast } = useToast();
-  const { isAuthenticated, token, user, login, logout, restoring } = useStaffAuth('admin', ['admin']);
+  const { isAuthenticated, token, user, login, logout, restoring, sessionExpired } = useStaffAuth('admin', ['admin']);
   const [view, setView] = useState<AdminView>('dashboard');
 
   const restricted = isAuthenticated && user && user.role !== 'admin';
@@ -78,7 +78,12 @@ function AdminApp() {
   if (!isAuthenticated || !token) {
     return (
       <PwaLayout title="Admin">
-        <LoginScreen title="Panel Admin" busy={restoring} onLogin={login} />
+        <LoginScreen
+          title="Panel Admin"
+          busy={restoring}
+          notice={sessionExpired ? 'Tu sesión expiró. Ingresa tu PIN de nuevo.' : null}
+          onLogin={login}
+        />
       </PwaLayout>
     );
   }
