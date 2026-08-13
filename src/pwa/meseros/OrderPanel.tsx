@@ -22,6 +22,7 @@ import { Loader } from '@/ui/components/Loader';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { PriceDisplay } from '@/ui/components/PriceDisplay';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
+import { formatMoney } from '../_shared/utils/format';
 import { fetchMenuCategories, fetchMenuItems, fetchMenuItemDetail, type MenuItem } from '../_shared/api/menuApi';
 import { createOrder, fetchOrderById, deliverOrder, addOrderItem, removeOrderItem, type Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
@@ -336,6 +337,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
       }
 
       onOrderPlaced(created.order.id);
+      if (typeof navigator.vibrate === 'function') navigator.vibrate(10);
     } catch (err) {
       console.error('[OrderPanel] placeOrder error:', err);
       addToast({ type: 'error', message: 'Error al enviar el pedido', duration: 5000 });
@@ -393,7 +395,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                     {round === 1 ? 'Ronda 1' : <>Ronda {round} <Badge variant="preparing">NUEVA</Badge></>}
                   </span>
                   <span className="order-panel__round-group-total">
-                    Bs. {roundTotal.toFixed(2)}
+                    {formatMoney(roundTotal)}
                   </span>
                 </div>
                 <div
@@ -428,7 +430,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                               <div key={item.id} className="order-panel__active-item">
                                 <span className="order-panel__active-item-qty">{item.quantity}x</span>
                                 <span className="order-panel__active-item-name">{item.menuItemName}</span>
-                                <span className="order-panel__active-item-price">Bs. {item.subtotal.toFixed(2)}</span>
+                                <span className="order-panel__active-item-price">{formatMoney(item.subtotal)}</span>
                                 {canRemove && (
                                   <button
                                     className="order-panel__active-item-remove"
@@ -446,7 +448,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                         </div>
 
                         <div className="order-panel__mod-card-footer">
-                          <span className="order-panel__mod-card-total">Bs. {modTotal.toFixed(2)}</span>
+                          <span className="order-panel__mod-card-total">{formatMoney(modTotal)}</span>
                           {cardState === 'ready' && (
                             <Button
                               size="sm"
@@ -554,7 +556,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
               <div className="order-panel__item-info">
                 <span className="order-panel__item-name">{item.name}</span>
                 <span className="order-panel__item-price">
-                  {item.price != null ? `Bs. ${item.price.toFixed(2)}` : 'Ver variantes'}
+                  {item.price != null ? formatMoney(item.price) : 'Ver variantes'}
                 </span>
               </div>
               {item.subtitle && (
@@ -607,7 +609,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                     size="md"
                   />
                   <span className="order-panel__cart-item-total">
-                    Bs. {lineTotal.toFixed(2)}
+                    {formatMoney(lineTotal)}
                   </span>
                 </div>
               </Card>
@@ -617,7 +619,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
           {cart.length > 0 && (
             <div className="order-panel__cart-total">
               <span>Total</span>
-              <span className="order-panel__cart-total-amount">Bs. {cartTotal.toFixed(2)}</span>
+              <span className="order-panel__cart-total-amount">{formatMoney(cartTotal)}</span>
             </div>
           )}
 
@@ -669,7 +671,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
               <p className="order-panel__detail-desc">{itemDetail.description}</p>
             )}
             {itemDetail.price != null && (
-              <p className="order-panel__detail-price">Bs. {itemDetail.price.toFixed(2)}</p>
+              <p className="order-panel__detail-price">{formatMoney(itemDetail.price)}</p>
             )}
 
             {/* Modifiers */}
@@ -711,7 +713,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                         {opt.option_name}
                         {opt.option_price !== 0 && (
                           <span className="order-panel__detail-mod-price">
-                            {opt.option_price > 0 ? '+' : ''}Bs. {opt.option_price.toFixed(2)}
+                            {opt.option_price > 0 ? '+' : ''}{formatMoney(opt.option_price)}
                           </span>
                         )}
                       </button>
@@ -744,7 +746,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                 size="md"
               />
               <Button variant="primary" onClick={addToCart} fullWidth>
-                Agregar (Bs. {(((itemDetail.price ?? 0) * itemQuantity)).toFixed(2)})
+                Agregar ({formatMoney((itemDetail.price ?? 0) * itemQuantity)})
               </Button>
             </div>
           </div>

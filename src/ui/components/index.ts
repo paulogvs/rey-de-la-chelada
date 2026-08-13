@@ -60,3 +60,6 @@ export type { IconButtonProps } from './IconButton/IconButton';
 
 export { AppIcon } from './AppIcon/AppIcon';
 export type { AppIconProps, AppIconName, AppIconSize } from './AppIcon/AppIcon';
+
+export { MoneyInput } from './MoneyInput/MoneyInput';
+export type { MoneyInputProps } from './MoneyInput/MoneyInput';

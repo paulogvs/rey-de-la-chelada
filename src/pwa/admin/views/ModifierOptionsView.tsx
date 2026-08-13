@@ -20,6 +20,7 @@ import {
   bulkUpdateModifierPrices,
   type ModifierOptionRow,
 } from '../../_shared/api/adminApi';
+import { formatMoney } from '../../_shared/utils/format';
 
 interface ModifierOptionsViewProps {
   token: string;
@@ -76,7 +77,7 @@ export function ModifierOptionsView({ token, onToast }: ModifierOptionsViewProps
     const result = await updateModifierOptionPrice(token, opt.id, priceAdjustment);
     if (result.ok) {
       setOptions(prev => prev.map(o => (o.id === opt.id ? { ...o, price_adjustment: priceAdjustment } : o)));
-      onToast('success', `${opt.menu_item_name} · ${opt.name}: +Bs. ${priceAdjustment.toFixed(2)}`);
+      onToast('success', `${opt.menu_item_name} · ${opt.name}: +${formatMoney(priceAdjustment)}`);
     } else {
       onToast('error', `Error al guardar ${opt.name}`);
     }
@@ -165,14 +166,13 @@ export function ModifierOptionsView({ token, onToast }: ModifierOptionsViewProps
                   <div key={opt.id} className="admin-bulk-item">
                     <span className="admin-bulk-item__name">{opt.name}</span>
                     <div className="admin-price-input">
-                      <span className="admin-price-input__prefix">+Bs.</span>
+                      <span className="admin-price-input__prefix">+Bs</span>
                       <FormField
-                        type="number"
-                        min="0"
-                        step="0.5"
+                        type="text"
+                        inputMode="decimal"
                         variant="sm" className="form-input--mono"
                         value={value}
-                        onChange={e => handleChange(opt.id, e.target.value)}
+                        onChange={e => handleChange(opt.id, e.target.value.replace(',', '.'))}
                         onKeyDown={e => { if (e.key === 'Enter') handleSaveOne(opt); }}
                         aria-label={`Precio de ${opt.name} de ${opt.menu_item_name}`}
                       />

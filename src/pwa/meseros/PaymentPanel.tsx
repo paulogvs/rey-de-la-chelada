@@ -22,12 +22,14 @@ import { Loader } from '@/ui/components/Loader';
 import { SegmentedControl, type SegmentedOption } from '@/ui/components/SegmentedControl';
 import { useToast } from '@/ui/components/Toast';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
+import { MoneyInput } from '@/ui/components/MoneyInput/MoneyInput';
 import { apiFetch } from '../_shared/api/apiFetch';
 import { processPayment, uploadPaymentProof } from '../_shared/api/paymentsApi';
 import type { Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
 import { METHOD_LABELS, methodIcon } from '../_shared/utils/paymentMethods';
+import { formatMoney } from '../_shared/utils/format';
 import { appConfig } from '@/core/config/app.config';
 
 interface PaymentPanelProps {
@@ -169,7 +171,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
             <div key={item.id} className="payment-panel__item">
               <span className="payment-panel__item-qty">{item.quantity}x</span>
               <span className="payment-panel__item-name">{item.menuItemName}</span>
-              <span className="payment-panel__item-price">Bs. {item.subtotal.toFixed(2)}</span>
+              <span className="payment-panel__item-price">{formatMoney(item.subtotal)}</span>
             </div>
           ))}
         </div>
@@ -197,30 +199,27 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
         {/* Monto a cobrar — FIJO, NO editable */}
         <div className="payment-panel__amount-fixed">
           <span className="payment-panel__amount-label">Monto a cobrar</span>
-          <span className="payment-panel__amount-value">Bs. {amountToCollect.toFixed(2)}</span>
+          <span className="payment-panel__amount-value">{formatMoney(amountToCollect)}</span>
         </div>
 
         {method === 'cash' && (
           <>
             <div className="payment-panel__cash-fields">
               <label htmlFor="payment-received" className="payment-panel__cash-label">
-                Efectivo recibido (Bs.) — dinero que entra al restobar
+                Efectivo recibido (Bs) — dinero que entra al restobar
               </label>
-              <input
+              <MoneyInput
                 id="payment-received"
-                type="number"
                 className="payment-panel__received"
-                value={received || ''}
-                min={amountToCollect}
-                step={0.01}
-                placeholder="Bs."
-                onChange={e => setReceived(parseFloat(e.target.value) || 0)}
+                value={received}
+                placeholder="Bs"
+                onChange={setReceived}
               />
             </div>
 
             {change > 0 && (
               <p className="payment-panel__change">
-                Cambio a devolver: <strong className="payment-panel__change-amount">Bs. {change.toFixed(2)}</strong>
+                Cambio a devolver: <strong className="payment-panel__change-amount">{formatMoney(change)}</strong>
               </p>
             )}
           </>
@@ -237,7 +236,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
                   className="payment-panel__qr-image"
                 />
                 <p className="payment-panel__qr-hint">
-                  El cliente escanea y transfiere <strong>Bs. {amountToCollect.toFixed(2)}</strong>
+                  El cliente escanea y transfiere <strong>{formatMoney(amountToCollect)}</strong>
                 </p>
                 <p className="payment-panel__qr-cashnote">
                   <AppIcon name="smartphone" size="sm" /> El QR NO es dinero físico — se registra como depósito digital en el flujo de caja.
@@ -278,7 +277,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
 
         <div className="payment-panel__remaining">
           <span>Total a pagar:</span>
-          <span className="payment-panel__remaining-amount">Bs. {amountToCollect.toFixed(2)}</span>
+          <span className="payment-panel__remaining-amount">{formatMoney(amountToCollect)}</span>
         </div>
       </Card>
 
@@ -287,7 +286,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
         <h4>Facturación</h4>
         <p className="payment-panel__invoice-text">
           {order.total >= 1000
-            ? 'Monto mayor a Bs. 1,000 — requiere NIT para factura'
+            ? 'Monto mayor a Bs 1000 — requiere NIT para factura'
             : 'Factura sin NIT (consumidor final)'}
         </p>
       </Card>
@@ -311,7 +310,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
           }
           fullWidth
         >
-          {processing ? 'Procesando...' : `Cobrar Bs. ${amountToCollect.toFixed(2)}`}
+          {processing ? 'Procesando...' : `Cobrar ${formatMoney(amountToCollect)}`}
         </Button>
       </div>
 

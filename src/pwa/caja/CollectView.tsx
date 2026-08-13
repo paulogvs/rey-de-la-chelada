@@ -23,7 +23,9 @@ import { PriceDisplay } from '@/ui/components/PriceDisplay';
 import { SegmentedControl, type SegmentedOption } from '@/ui/components/SegmentedControl';
 import { useToast } from '@/ui/components/Toast';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
+import { MoneyInput } from '@/ui/components/MoneyInput/MoneyInput';
 import { METHOD_LABELS, methodIcon, PAYMENT_METHODS } from '../_shared/utils/paymentMethods';
+import { formatMoney } from '../_shared/utils/format';
 import { appConfig } from '@/core/config/app.config';
 import './CollectView.css';
 
@@ -149,7 +151,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
         } else {
           addToast({
             type: 'info',
-            message: `Pago parcial — restante Bs. ${result.remaining.toFixed(2)}`,
+            message: `Pago parcial — restante ${formatMoney(result.remaining)}`,
             duration: 3000,
           });
         }
@@ -182,7 +184,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
             : `${orders.length} pedido${orders.length === 1 ? '' : 's'} pendiente${orders.length === 1 ? '' : 's'} de cobro`}
         </div>
         <div className="caja-collect__summary-value">
-          {orders.length === 0 ? <AppIcon name="check" size="md" /> : `Bs. ${pendingTotal.toFixed(2)}`}
+          {orders.length === 0 ? <AppIcon name="check" size="md" /> : formatMoney(pendingTotal)}
         </div>
       </Card>
 
@@ -222,7 +224,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                   {order.items.reduce((n, i) => n + i.quantity, 0)} items
                 </span>
                 <span className="caja-collect__order-amount">
-                  Bs. {remaining.toFixed(2)}
+                  {formatMoney(remaining)}
                 </span>
                 <span className="caja-collect__order-caret" aria-hidden="true">
                   {isExpanded ? <AppIcon name="chevron-up" size="sm" /> : <AppIcon name="chevron-down" size="sm" />}
@@ -236,7 +238,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                       <div key={item.id} className="caja-collect__item">
                         <span className="caja-collect__item-qty">{item.quantity}x</span>
                         <span className="caja-collect__item-name">{item.menuItemName}</span>
-                        <span className="caja-collect__item-price">Bs. {item.subtotal.toFixed(2)}</span>
+                        <span className="caja-collect__item-price">{formatMoney(item.subtotal)}</span>
                       </div>
                     ))}
                   </div>
@@ -248,7 +250,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                   />
                   {order.paidAmount > 0 && (
                     <p className="caja-collect__paid-hint">
-                      Ya cobrado: Bs. {order.paidAmount.toFixed(2)} · Saldo: Bs. {remaining.toFixed(2)}
+                      Ya cobrado: {formatMoney(order.paidAmount)} · Saldo: {formatMoney(remaining)}
                     </p>
                   )}
 
@@ -267,19 +269,16 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                     {method === 'cash' && (
                       <div className="caja-collect__pay-field">
                         <label htmlFor={`received-${order.id}`}>Efectivo recibido</label>
-                        <input
+                        <MoneyInput
                           id={`received-${order.id}`}
-                          type="number"
                           className="caja-collect__received"
-                          value={received || ''}
-                          min={remaining}
-                          step={0.01}
-                          placeholder="Bs."
-                          onChange={e => setReceived(parseFloat(e.target.value) || 0)}
+                          value={received}
+                          placeholder="Bs"
+                          onChange={setReceived}
                         />
                         {change > 0 && (
                           <p className="caja-collect__change">
-                            Cambio: <strong>Bs. {change.toFixed(2)}</strong>
+                            Cambio: <strong>{formatMoney(change)}</strong>
                           </p>
                         )}
                       </div>
@@ -296,7 +295,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                                 className="caja-collect__qr-image"
                               />
                               <p className="caja-collect__qr-hint">
-                                El cliente transfiere <strong>Bs. {remaining.toFixed(2)}</strong> escaneando el QR
+                                El cliente transfiere <strong>{formatMoney(remaining)}</strong> escaneando el QR
                               </p>
                               <Button
                                 variant="secondary"
@@ -340,7 +339,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                       disabled={paying}
                       onClick={() => handlePay(order)}
                     >
-                      Cobrar Bs. {remaining.toFixed(2)}
+                      Cobrar {formatMoney(remaining)}
                     </Button>
                   </div>
                 </div>

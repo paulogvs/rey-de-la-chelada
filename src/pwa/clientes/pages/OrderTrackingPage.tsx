@@ -17,6 +17,7 @@
 import React, { useMemo } from 'react';
 import { ToastInline } from '@/ui/components/Toast';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
+import { formatMoney } from '@/pwa/_shared/utils/format';
 import { statusLabel, isTerminalStatus } from '../hooks/useClientOrder';
 import type { TrackedOrder } from '../hooks/useClientOrder';
 import './OrderTrackingPage.css';
@@ -54,7 +55,7 @@ export function OrderTrackingPage({ order, error, polling, onReset }: OrderTrack
             <span className="tracking-receipt__label">Mesa</span>
             <span className="tracking-receipt__value">{order.tableNumber}</span>
             <span className="tracking-receipt__label">Total pagado</span>
-            <span className="tracking-receipt__value">Bs. {order.total.toFixed(2)}</span>
+            <span className="tracking-receipt__value">{formatMoney(order.total)}</span>
           </div>
         </div>
         <button className="tracking-btn tracking-btn--primary" onClick={onReset}>
@@ -139,7 +140,7 @@ export function OrderTrackingPage({ order, error, polling, onReset }: OrderTrack
       <section className="tracking-summary">
         <div className="tracking-summary__row">
           <span>Total (incluye IVA)</span>
-          <strong>Bs. {order.total.toFixed(2)}</strong>
+          <strong>{formatMoney(order.total)}</strong>
         </div>
       </section>
 

@@ -18,6 +18,7 @@ import { fetchTables } from '../../_shared/api/tablesApi';
 import { fetchClosings } from '../../_shared/api/adminApi';
 import { fetchDailySales } from '../../_shared/api/reportsApi';
 import { localDateStr } from '../../_shared/utils/localDate';
+import { formatMoney } from '../../_shared/utils/format';
 
 interface DashboardViewProps {
   token: string;
@@ -136,7 +137,7 @@ export function DashboardView({ token, onToast }: DashboardViewProps) {
             <StatCard
               className="admin-stat admin-stat--revenue"
               label={`Ventas ${today}`}
-              value={`Bs. ${stats.revenueToday.toFixed(2)}`}
+              value={formatMoney(stats.revenueToday)}
               delta={`${stats.closingsToday} corte(s) hoy`}
               deltaTone={stats.revenueToday > 0 ? 'up' : 'neutral'}
               icon={<AppIcon name="wallet" size="lg" />}

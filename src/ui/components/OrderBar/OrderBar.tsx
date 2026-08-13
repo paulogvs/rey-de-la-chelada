@@ -8,6 +8,7 @@
  */
 
 import React from 'react';
+import { formatMoney } from '@/pwa/_shared/utils/format';
 import './OrderBar.css';
 
 export interface OrderBarProps {
@@ -24,7 +25,7 @@ export interface OrderBarProps {
 export function OrderBar({ itemCount, total, onSend, sending = false }: OrderBarProps) {
   if (itemCount === 0) return null;
 
-  const totalLabel = total > 0 ? `Bs. ${total.toFixed(2)}` : '—';
+  const totalLabel = total > 0 ? formatMoney(total) : '—';
 
   return (
     <div className="order-bar">

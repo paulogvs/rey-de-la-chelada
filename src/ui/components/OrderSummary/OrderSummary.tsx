@@ -8,6 +8,8 @@
  */
 
 import React from 'react';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
+import { formatMoney } from '@/pwa/_shared/utils/format';
 import './OrderSummary.css';
 
 export interface OrderSummaryItem {
@@ -49,7 +51,7 @@ export function OrderSummary({
       <div className="order-summary" onClick={e => e.stopPropagation()}>
         <header className="order-summary__header">
           <h2 className="order-summary__title">Tu Pedido</h2>
-          <button className="order-summary__close" onClick={onClose}>✕</button>
+          <button className="order-summary__close" onClick={onClose} aria-label="Cerrar"><AppIcon name="x" size="sm" /></button>
         </header>
 
         <div className="order-summary__items">
@@ -60,7 +62,7 @@ export function OrderSummary({
                 <span className="order-summary__item-name">{item.name}</span>
               </div>
               <span className="order-summary__item-price">
-                Bs. {item.subtotal.toFixed(2)}
+                {formatMoney(item.subtotal)}
               </span>
             </div>
           ))}
@@ -70,16 +72,16 @@ export function OrderSummary({
           <div className="order-summary__totals">
             <div className="order-summary__row">
               <span>Subtotal</span>
-              <span>Bs. {(total - ivaAmount).toFixed(2)}</span>
+              <span>{formatMoney(total - ivaAmount)}</span>
             </div>
             <div className="order-summary__row">
               <span>IVA (13%)</span>
-              <span>Bs. {ivaAmount.toFixed(2)}</span>
+              <span>{formatMoney(ivaAmount)}</span>
             </div>
             <div className="order-summary__divider" />
             <div className="order-summary__row order-summary__row--total">
               <span>Total</span>
-              <span className="order-summary__total-amount">Bs. {total.toFixed(2)}</span>
+              <span className="order-summary__total-amount">{formatMoney(total)}</span>
             </div>
           </div>
 

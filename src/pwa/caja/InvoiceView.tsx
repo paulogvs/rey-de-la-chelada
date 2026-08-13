@@ -10,9 +10,11 @@ import { appConfig } from '@/core/config';
 import { Card } from '@/ui/components/Card';
 import { Button } from '@/ui/components/Button';
 import { FormField } from '@/ui/components/FormField';
+import { MoneyInput } from '@/ui/components/MoneyInput/MoneyInput';
 import { useToast } from '@/ui/components/Toast';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
+import { formatMoney } from '../_shared/utils/format';
 
 export function InvoiceView() {
   const { addToast } = useToast();
@@ -33,7 +35,7 @@ export function InvoiceView() {
 
     addToast({
       type: 'success',
-      message: `Factura generada: ${invoiceNit} — Bs. ${invoiceAmount.toFixed(2)}`,
+      message: `Factura generada: ${invoiceNit} — ${formatMoney(invoiceAmount)}`,
       duration: 4000,
     });
   }, [invoiceNit, invoiceName, invoiceAmount, addToast]);
@@ -92,14 +94,13 @@ export function InvoiceView() {
           </div>
 
           <div className="caja-invoice__field">
-            <label>Monto (Bs.)</label>
-            <FormField
-              type="number"
-              variant="lg" className="form-input--mono"
-              value={invoiceAmount || ''}
-              step={0.01}
-              onChange={e => setInvoiceAmount(parseFloat(e.target.value) || 0)}
-              placeholder="0.00"
+            <label>Monto (Bs)</label>
+            <MoneyInput
+              variant="lg"
+              className="form-input--mono"
+              value={invoiceAmount}
+              onChange={setInvoiceAmount}
+              placeholder="0,00"
             />
           </div>
         </div>

@@ -13,6 +13,7 @@ import { Button } from '@/ui/components/Button';
 import { Loader } from '@/ui/components/Loader';
 import { fetchClosings, type ClosingRow } from '../../_shared/api/adminApi';
 import { localDateTimeStr } from '../../_shared/utils/localDate';
+import { formatMoney } from '../../_shared/utils/format';
 
 interface ClosingsViewProps {
   token: string;
@@ -79,10 +80,10 @@ export function ClosingsView({ token, onToast }: ClosingsViewProps) {
                     </Badge>
                   </div>
                   <div className="admin-closing-row__nums">
-                    <span>Esperado <strong>Bs. {Number(c.expected_cash).toFixed(2)}</strong></span>
-                    <span>Real <strong>Bs. {Number(c.actual_cash).toFixed(2)}</strong></span>
+                    <span>Esperado <strong>{formatMoney(Number(c.expected_cash))}</strong></span>
+                    <span>Real <strong>{formatMoney(Number(c.actual_cash))}</strong></span>
                     <span className={diff < 0 ? 'admin-closing-row__neg' : 'admin-closing-row__pos'}>
-                      Dif. {diff >= 0 ? '+' : ''}{Number(diff).toFixed(2)}
+                      Dif. {diff >= 0 ? '+' : ''}{formatMoney(Number(diff))}
                     </span>
                   </div>
                   <div className="admin-closing-row__meta">

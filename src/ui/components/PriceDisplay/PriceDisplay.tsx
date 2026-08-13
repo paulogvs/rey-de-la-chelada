@@ -8,6 +8,7 @@
 
 import React, { useState } from 'react';
 import { appConfig } from '@/core/config';
+import { formatMoney } from '@/pwa/_shared/utils/format';
 import './PriceDisplay.css';
 
 export interface PriceDisplayProps {
@@ -17,7 +18,7 @@ export interface PriceDisplayProps {
   ivaPercentage?: number;
   /** Show IVA breakdown toggle */
   showBreakdown?: boolean;
-  /** Currency symbol (defaults to app config) */
+  /** Currency symbol (deprecated — la moneda está unificada en formatMoney) */
   currencySymbol?: string;
   /** Large display mode (for KDS / totals) */
   large?: boolean;
@@ -28,12 +29,10 @@ export function PriceDisplay({
   priceWithIVA,
   ivaPercentage,
   showBreakdown = false,
-  currencySymbol,
   large = false,
   className = '',
 }: PriceDisplayProps) {
   const config = appConfig.all;
-  const symbol = currencySymbol || config.currency.symbol;
   const rate = (ivaPercentage ?? config.taxes.iva.percentage) / 100;
   const [breakdownOpen, setBreakdownOpen] = useState(false);
 
@@ -62,7 +61,7 @@ export function PriceDisplay({
       {/* Main Price */}
       <div className="price-display__main">
         <span className="price-display__amount">
-          {symbol} {priceWithIVA.toFixed(2)}
+          {formatMoney(priceWithIVA)}
         </span>
         {showBreakdown && (
           <button
@@ -80,16 +79,16 @@ export function PriceDisplay({
         <div className="price-display__breakdown">
           <div className="price-display__row">
             <span>Subtotal (sin IVA)</span>
-            <span className="price-display__value">{symbol} {base.toFixed(2)}</span>
+            <span className="price-display__value">{formatMoney(base)}</span>
           </div>
           <div className="price-display__row">
             <span>IVA ({config.taxes.iva.percentage}%)</span>
-            <span className="price-display__value">{symbol} {ivaAmount.toFixed(2)}</span>
+            <span className="price-display__value">{formatMoney(ivaAmount)}</span>
           </div>
           <div className="price-display__divider" />
           <div className="price-display__row price-display__row--total">
             <span>Total</span>
-            <span className="price-display__value">{symbol} {priceWithIVA.toFixed(2)}</span>
+            <span className="price-display__value">{formatMoney(priceWithIVA)}</span>
           </div>
         </div>
       )}

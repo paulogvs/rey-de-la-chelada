@@ -7,6 +7,8 @@
 import React from 'react';
 import type { MenuItem } from '@/core/types';
 import { Badge } from '@/ui/components/Badge';
+import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
+import { formatMoney } from '@/pwa/_shared/utils/format';
 import './ItemDetailModal.css';
 
 interface ItemDetailModalProps {
@@ -43,7 +45,7 @@ export function ItemDetailModal({ item, onClose, onAdd }: ItemDetailModalProps) 
   return (
     <div className="clientes-detail-overlay" onClick={onClose}>
       <div className="clientes-detail" onClick={e => e.stopPropagation()}>
-        <button className="clientes-detail__close" onClick={onClose}>✕</button>
+        <button className="clientes-detail__close" onClick={onClose} aria-label="Cerrar"><AppIcon name="x" size="sm" /></button>
 
         {showImage ? (
           <img
@@ -62,7 +64,7 @@ export function ItemDetailModal({ item, onClose, onAdd }: ItemDetailModalProps) 
         <p className="clientes-detail__desc">{item.description}</p>
 
         <div className="clientes-detail__price">
-          {effectivePrice > 0 ? `Bs. ${effectivePrice.toFixed(2)}` : '—'}
+          {effectivePrice > 0 ? formatMoney(effectivePrice) : '—'}
         </div>
 
         {item.tags.length > 0 && (
@@ -92,7 +94,7 @@ export function ItemDetailModal({ item, onClose, onAdd }: ItemDetailModalProps) 
                       {o.name}
                       {o.priceAdjustment !== 0 && (
                         <span className="clientes-detail__mod-price">
-                          {o.priceAdjustment > 0 ? '+' : ''}Bs. {o.priceAdjustment.toFixed(2)}
+                          {o.priceAdjustment > 0 ? '+' : ''}{formatMoney(o.priceAdjustment)}
                         </span>
                       )}
                     </button>

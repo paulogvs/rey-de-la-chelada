@@ -147,6 +147,7 @@ export function MenuPage({
         })),
         guest_count: 1,
       });
+      if (typeof navigator.vibrate === 'function') navigator.vibrate(10);
       setDraftItems([]);
       setShowSummary(false);
     } catch {
@@ -162,6 +163,7 @@ export function MenuPage({
     if (!session.canCallWaiter) return;
     try {
       await session.callWaiter();
+      if (typeof navigator.vibrate === 'function') navigator.vibrate(10);
       setCallFeedback('Mesero notificado');
       setTimeout(() => setCallFeedback(null), 3000);
     } catch {

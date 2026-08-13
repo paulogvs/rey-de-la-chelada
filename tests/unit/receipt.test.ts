@@ -16,19 +16,19 @@ import {
 
 describe('formatBs', () => {
   it('formats whole amounts with two decimals', () => {
-    expect(formatBs(25)).toBe('Bs. 25.00');
+    expect(formatBs(25)).toBe('Bs 25,00');
   });
 
   it('formats decimals', () => {
-    expect(formatBs(45.5)).toBe('Bs. 45.50');
+    expect(formatBs(45.5)).toBe('Bs 45,50');
   });
 
   it('formats zero', () => {
-    expect(formatBs(0)).toBe('Bs. 0.00');
+    expect(formatBs(0)).toBe('Bs 0,00');
   });
 
   it('handles null/undefined defensively', () => {
-    expect(formatBs(null as unknown as number)).toBe('Bs. 0.00');
+    expect(formatBs(null as unknown as number)).toBe('Bs 0,00');
   });
 });
 
@@ -114,7 +114,7 @@ describe('buildReceiptData', () => {
 
   it('summarizes positive modifier adjustments on items', () => {
     const receipt = buildReceiptData(order);
-    expect(receipt.items[1].modifiers).toBe('Familiar +Bs. 20.00');
+    expect(receipt.items[1].modifiers).toBe('Familiar +Bs 20,00');
   });
 
   it('uses default business name when not provided', () => {

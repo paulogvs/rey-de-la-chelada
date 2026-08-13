@@ -18,6 +18,7 @@ import React, { useState } from 'react';
 import type { MenuItem } from '@/core/types';
 import { Badge } from '../Badge/Badge';
 import { AppIcon } from '../AppIcon/AppIcon';
+import { formatMoney } from '@/pwa/_shared/utils/format';
 import './MenuItemCard.css';
 
 export interface MenuItemCardProps {
@@ -53,7 +54,7 @@ export function MenuItemCard({
     className,
   ].filter(Boolean).join(' ');
 
-  const priceLabel = item.price != null ? `Bs. ${item.price.toFixed(2)}` : '—';
+  const priceLabel = item.price != null ? formatMoney(item.price) : '—';
   const handleImgError = () => setImgError(true);
 
   if (variant === 'photo') {

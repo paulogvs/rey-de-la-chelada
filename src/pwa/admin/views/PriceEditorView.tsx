@@ -21,6 +21,7 @@ import {
   type AdminMenuItem,
 } from '../../_shared/api/adminApi';
 import { fetchMenuCategories, type MenuCategory } from '../../_shared/api/menuApi';
+import { formatMoney } from '../../_shared/utils/format';
 
 interface PriceEditorViewProps {
   token: string;
@@ -88,7 +89,7 @@ export function PriceEditorView({ token, onToast }: PriceEditorViewProps) {
     if (result.ok) {
       setItems(prev => prev.map(i => (i.id === item.id ? { ...i, price } : i)));
       setDrafts(prev => ({ ...prev, [item.id]: { value: String(price), saving: false, saved: 'ok' } }));
-      onToast('success', `${item.name}: Bs. ${price.toFixed(2)}`);
+      onToast('success', `${item.name}: ${formatMoney(price)}`);
     } else {
       setDrafts(prev => ({ ...prev, [item.id]: { value: String(price), saving: false, saved: 'err' } }));
       onToast('error', `Error al guardar ${item.name}`);
@@ -163,15 +164,14 @@ export function PriceEditorView({ token, onToast }: PriceEditorViewProps) {
                   </div>
                   <div className="admin-price-row__edit">
                     <div className="admin-price-input">
-                      <span className="admin-price-input__prefix">Bs.</span>
+                      <span className="admin-price-input__prefix">Bs</span>
                       <FormField
-                        type="number"
-                        min="0"
-                        step="0.5"
+                        type="text"
+                        inputMode="decimal"
                         variant="sm" className="form-input--mono"
                         value={value}
                         placeholder="—"
-                        onChange={e => handleDraftChange(item.id, e.target.value)}
+                        onChange={e => handleDraftChange(item.id, e.target.value.replace(',', '.'))}
                         onKeyDown={e => { if (e.key === 'Enter') handleSave(item); }}
                         aria-label={`Precio de ${item.name}`}
                       />

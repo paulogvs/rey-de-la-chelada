@@ -15,6 +15,7 @@ import { useToast } from '@/ui/components/Toast';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { buildDailySalesCsv, downloadCsv, dailyCsvFilename } from '../_shared/utils/csvExport';
 import { METHOD_LABELS, methodIcon } from '../_shared/utils/paymentMethods';
+import { formatMoney } from '../_shared/utils/format';
 
 interface SummaryViewProps {
   token: string;
@@ -98,21 +99,21 @@ export function SummaryView({ token, today, ivaRate, refreshTick }: SummaryViewP
       <div className="caja-summary__grid">
         <StatCard
           label="Ventas del día"
-          value={<span className="caja-stat caja-stat--gross">Bs. {totalSales.toFixed(2)}</span>}
+          value={<span className="caja-stat caja-stat--gross">{formatMoney(totalSales)}</span>}
           delta={`${summary.totalOrders} pedidos · ${summary.completedOrders} pagados`}
           icon={<AppIcon name="wallet" size="lg" />}
         />
 
         <StatCard
           label="Ticket promedio"
-          value={<span className="caja-stat">Bs. {summary.averageTicket.toFixed(2)}</span>}
-          delta={`Venta bruta: Bs. ${summary.grossRevenue.toFixed(2)}`}
+          value={<span className="caja-stat">{formatMoney(summary.averageTicket)}</span>}
+          delta={`Venta bruta: ${formatMoney(summary.grossRevenue)}`}
         />
 
         <StatCard
           label={`IVA ${Math.round(ivaRate * 100)}%`}
-          value={<span className="caja-stat caja-stat--iva">Bs. {summary.totalIva.toFixed(2)}</span>}
-          delta={`Base imponible: Bs. ${summary.baseRevenue.toFixed(2)}`}
+          value={<span className="caja-stat caja-stat--iva">{formatMoney(summary.totalIva)}</span>}
+          delta={`Base imponible: ${formatMoney(summary.baseRevenue)}`}
         />
 
         <StatCard
@@ -144,7 +145,7 @@ export function SummaryView({ token, today, ivaRate, refreshTick }: SummaryViewP
                   />
                 </div>
                 <span className="caja-methods__amount">
-                  Bs. {amount.toFixed(2)}
+                  {formatMoney(amount)}
                 </span>
               </div>
             ))}

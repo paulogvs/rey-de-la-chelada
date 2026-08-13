@@ -20,11 +20,12 @@ import { Card } from '@/ui/components/Card';
 import { Loader } from '@/ui/components/Loader';
 import { Button } from '@/ui/components/Button';
 import { StatCard } from '@/ui/components/StatCard';
-import { FormField } from '@/ui/components/FormField';
+import { MoneyInput } from '@/ui/components/MoneyInput/MoneyInput';
 import { useToast } from '@/ui/components/Toast';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { localDateTimeStr } from '../_shared/utils/localDate';
+import { formatMoney } from '../_shared/utils/format';
 
 interface ClosingViewProps {
   token: string;
@@ -135,26 +136,24 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
                   efectivo real se calcula contra este total. */}
               <label>Efectivo esperado en cajón (solo físico — QR es digital)</label>
               <div className="caja-close__value">
-                Bs. {(closing.expected_cash ?? 0).toFixed(2)}
+                {formatMoney(closing.expected_cash ?? 0)}
               </div>
             </div>
 
             <div className="caja-close__field">
               <label>Efectivo real en caja</label>
-              <FormField
-                type="number"
+              <MoneyInput
                 variant="lg"
                 className="form-input--mono"
                 value={actualCash}
-                step={0.01}
-                onChange={e => setActualCash(parseFloat(e.target.value) || 0)}
+                onChange={setActualCash}
               />
             </div>
 
             <div className="caja-close__field">
               <label>Diferencia</label>
               <div className={`caja-close__diff ${difference >= 0 ? 'positive' : 'negative'}`}>
-                {difference >= 0 ? '+' : ''}Bs. {difference.toFixed(2)}
+                {difference >= 0 ? '+' : ''}{formatMoney(difference)}
               </div>
             </div>
 
@@ -201,11 +200,11 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
         <div className="caja-close__stats">
           <StatCard
             label="Total ventas"
-            value={<span className="caja-stat caja-stat--gross">Bs. {(daily?.totalSales ?? 0).toFixed(2)}</span>}
+            value={<span className="caja-stat caja-stat--gross">{formatMoney(daily?.totalSales ?? 0)}</span>}
           />
           <StatCard
             label="IVA total"
-            value={<span className="caja-stat caja-stat--iva">Bs. {(daily?.totalIva ?? 0).toFixed(2)}</span>}
+            value={<span className="caja-stat caja-stat--iva">{formatMoney(daily?.totalIva ?? 0)}</span>}
           />
           <StatCard
             label="Pedidos"
@@ -218,11 +217,11 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
           <div className="caja-close__history-list">
             <div className="caja-close__history-item">
               <span><AppIcon name="banknote" size="sm" /> Efectivo (físico — va al cajón)</span>
-              <span className="caja-close__history-value">Bs. {(byMethod['cash'] ?? 0).toFixed(2)}</span>
+              <span className="caja-close__history-value">{formatMoney(byMethod['cash'] ?? 0)}</span>
             </div>
             <div className="caja-close__history-item">
               <span><AppIcon name="smartphone" size="sm" /> QR (digital — depositado, NO va al cajón)</span>
-              <span className="caja-close__history-value">Bs. {qrTotal.toFixed(2)}</span>
+              <span className="caja-close__history-value">{formatMoney(qrTotal)}</span>
             </div>
           </div>
         </div>

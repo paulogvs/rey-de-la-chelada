@@ -13,6 +13,7 @@
 // ============================================================
 
 import { computeTotals } from '@/core/config/iva';
+import { formatMoney } from './format';
 
 export interface ReceiptItem {
   name: string;
@@ -68,9 +69,9 @@ export interface InvoiceReceiptData {
 // Formatters (pure)
 // ============================================================
 
-/** Format an amount as BOB currency string. */
+/** Format an amount as BOB currency string ("Bs 12,50" — coma decimal). */
 export function formatBs(amount: number): string {
-  return `Bs. ${Number(amount || 0).toFixed(2)}`;
+  return formatMoney(amount);
 }
 
 /** Format an ISO date as dd/mm/yyyy HH:mm (deterministic, testable). */

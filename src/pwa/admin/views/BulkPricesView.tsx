@@ -168,15 +168,14 @@ export function BulkPricesView({ token, onToast }: BulkPricesViewProps) {
                       {item.price == null && <Badge variant="pending">—</Badge>}
                     </span>
                     <div className="admin-price-input">
-                      <span className="admin-price-input__prefix">Bs.</span>
+                      <span className="admin-price-input__prefix">Bs</span>
                       <FormField
-                        type="number"
-                        min="0"
-                        step="0.5"
+                        type="text"
+                        inputMode="decimal"
                         variant="sm" className="form-input--mono"
                         value={value}
                         placeholder="—"
-                        onChange={e => handleChange(item.id, e.target.value)}
+                        onChange={e => handleChange(item.id, e.target.value.replace(',', '.'))}
                         aria-label={`Precio de ${item.name}`}
                       />
                       {field?.saved === 'ok' && <span className="admin-bulk-item__ok"><AppIcon name="check" size="sm" /></span>}
