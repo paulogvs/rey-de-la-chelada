@@ -203,10 +203,24 @@ export function associateOrderToSession(db, sessionId, orderId) {
  * Limpia sesiones expiradas sin pedido (housekeeping).
  * @param {object} db
  * @returns {number} — sesiones eliminadas
+ *
+ * BUG FIX (2026-08-13): ANTES comparaba expires_at (ISO '2026-08-13T14:24:46Z')
+ * contra datetime('now') ('2026-08-13 14:24:46') en SQL. Lexicográficamente
+ * 'T' > ' ' → la sesión ISO SIEMPRE es "mayor" → la condición nunca era
+ * cierta → no se limpiaba NADA. Ahora la expiración se evalúa en JS con
+ * Date (mismo criterio que validateClientSession) y el DELETE es explícito.
  */
 export function cleanExpiredSessions(db) {
-  const res = db.prepare(
-    "DELETE FROM client_sessions WHERE expires_at < datetime('now') AND (order_id IS NULL OR order_id = '')"
-  ).run();
-  return res.changes;
+  const rows = db.prepare(
+    "SELECT id, expires_at FROM client_sessions WHERE order_id IS NULL OR order_id = ''"
+  ).all();
+  const expired = rows.filter(r => {
+    const t = new Date(r.expires_at).getTime();
+    return Number.isFinite(t) && t < Date.now();
+  });
+  if (expired.length === 0) return 0;
+  const placeholders = expired.map(() => '?').join(',');
+  db.prepare(`DELETE FROM client_sessions WHERE id IN (${placeholders})`)
+    .run(...expired.map(r => r.id));
+  return expired.length;
 }

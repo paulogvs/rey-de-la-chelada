@@ -40,7 +40,16 @@ function createMockDb() {
   const stmt = (sql) => ({
     get: (...params) => {
       if (sql.includes('FROM staff WHERE role')) {
+        // La query de mesero por defecto lleva el rol como LITERAL en SQL
+        // (role = 'mesero') — sin bind param. El rol puede venir también
+        // como parámetro (otros callers).
+        const roleMatch = sql.match(/role = '([^']+)'/);
+        if (roleMatch) return staff.find(s => s.role === roleMatch[1]) || undefined;
         return staff.find(s => s.role === params[0]) || undefined;
+      }
+      if (sql.includes('FROM staff WHERE is_active')) {
+        // Fallback a cualquier staff activo (fix FK 2026-08-13)
+        return staff.find(s => s.is_active === 1) || undefined;
       }
       if (sql.includes('FROM tables WHERE number')) {
         return tables.find(t => t.number === Number(params[0])) || undefined;

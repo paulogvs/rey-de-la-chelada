@@ -89,7 +89,17 @@ const PAYMENT_STATUS_MAP = {
 export function processPayment(db, { order_id, method, amount, iva_amount, reference, notes, status, processed_by, received }) {
   const canonicalMethod = PAYMENT_METHOD_MAP[method];
   const canonicalStatus = PAYMENT_STATUS_MAP[status || 'completed'];
-  const amountValue = round2(Number(amount) || 0);
+
+  // B2 (2026-08-13): defensa en profundidad — la ruta ya valida amount,
+  // pero este es el punto de entrada ÚNICO para registrar pagos. Antes
+  // `Number(amount) || 0` convertía 'abc' o NaN en Bs 0 silenciosamente.
+  // Ahora: throw claro (el catch de la ruta lo mapea). Se aceptan strings
+  // numéricas ("34.5") por retrocompat con clientes legacy.
+  const rawAmount = Number(amount);
+  if (!Number.isFinite(rawAmount) || rawAmount < 0) {
+    throw new Error(`El monto es inválido: ${String(amount)} (debe ser un número ≥ 0)`);
+  }
+  const amountValue = round2(rawAmount);
 
   if (!canonicalMethod) {
     throw new Error(`Método de pago inválido: ${method}`);
@@ -290,6 +300,20 @@ router.post('/', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res)
         success: false,
         error: 'Orden, monto y método son requeridos',
         code: 'PAYMENT_DATA_REQUIRED',
+      });
+    }
+
+    // B2 (2026-08-13): amount DEBE ser numérico ≥ 0. Decisión documentada:
+    // se aceptan strings numéricas ("34.5") por retrocompat con clientes
+    // legacy que serializan montos como string (Number("34.5") es finito).
+    // Se rechaza: 'abc', NaN, null, '', booleanos, arrays y negativos.
+    if (amount === null || amount === '' ||
+        (typeof amount !== 'number' && typeof amount !== 'string') ||
+        !Number.isFinite(Number(amount)) || Number(amount) < 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Monto inválido (debe ser un número ≥ 0)',
+        code: 'INVALID_AMOUNT',
       });
     }
 

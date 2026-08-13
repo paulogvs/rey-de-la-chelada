@@ -614,7 +614,10 @@ router.patch('/:id/confirm', requireAuth, requireRole('admin', 'mesero'), (req, 
 // PATCH /api/orders/:id/status — Cambiar estado del pedido
 // ============================================================
 
-router.patch('/:id/status', requireAuth, (req, res) => {
+// B1 (2026-08-13): solo admin/mesero cambian el estado global del pedido.
+// kds (cocina/barra) y caja cobran por sus rutas propias (items/:id/status
+// y POST /api/payments) — no pueden tocar el flujo global de la orden.
+router.patch('/:id/status', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
   try {
     const { status } = req.body;
 

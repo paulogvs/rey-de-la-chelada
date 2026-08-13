@@ -161,10 +161,27 @@ export function createPublicOrder(db, input) {
 
   // FK: waiter_id references staff(id) — assign the default mesero as
   // placeholder; the confirming mesero is assigned at confirm time.
+  // BUG FIX (2026-08-13): ANTES, si no había mesero activo, se insertaba
+  // 'client' como waiter_id → FOREIGN KEY constraint failed → 500 en el
+  // menú público. Ahora cae a cualquier staff activo; si NO hay NINGÚN
+  // staff (bootstrap falló), se devuelve un error claro en vez de crashear.
   const defaultMesero = db.prepare(
     "SELECT id FROM staff WHERE role = 'mesero' AND is_active = 1 ORDER BY created_at LIMIT 1"
   ).get();
-  const waiterId = (defaultMesero && defaultMesero.id) || 'client';
+  let waiterId = (defaultMesero && defaultMesero.id) || null;
+  if (!waiterId) {
+    const anyStaff = db.prepare(
+      'SELECT id FROM staff WHERE is_active = 1 ORDER BY created_at LIMIT 1'
+    ).get();
+    waiterId = (anyStaff && anyStaff.id) || null;
+  }
+  if (!waiterId) {
+    return {
+      success: false,
+      code: 'NO_STAFF_CONFIGURED',
+      error: 'No hay personal configurado — revisa el seed del servidor antes de recibir pedidos',
+    };
+  }
 
   const insertOrder = db.prepare(`
     INSERT INTO orders (id, table_id, table_number, waiter_id, waiter_name, status,

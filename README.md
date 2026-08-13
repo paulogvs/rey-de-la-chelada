@@ -69,7 +69,7 @@ El sistema maneja **10 mesas**, con **2 meseros por turno**, una **cajera dedica
 |----------|------------|
 | **Frontend** | React 19 + Vite + Tailwind CSS v4 + TypeScript |
 | **Backend** | Node.js + Express 5 |
-| **Database** | PostgreSQL + IndexedDB (offline) |
+| **Database** | SQLite (better-sqlite3) |
 | **Offline** | Service Worker + Background Sync API |
 | **PWA** | vite-plugin-pwa + Workbox |
 | **KDS** | WebSocket para tiempo real |
