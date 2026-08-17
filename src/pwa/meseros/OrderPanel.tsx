@@ -662,14 +662,14 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                   {item.price_variable === 1
                     ? 'Precio a definir'
                     : item.price != null
-                      ? (item.promo_price != null ? (
-                        <>
-                          <span className="order-panel__item-price-old">{formatMoney(item.price)}</span>{' '}
-                          {formatMoney(item.promo_price)} <span className="order-panel__item-badge order-panel__item-badge--promo">Promo</span>
-                        </>
-                      ) : formatMoney(item.price))
+                      ? formatMoney(item.price)
                       : 'Ver variantes'}
                 </span>
+                {item.promo_price != null && (
+                  <span className="order-panel__item-promo">
+                    {formatMoney(item.promo_price)} <span className="order-panel__item-badge order-panel__item-badge--promo">PROMO</span>
+                  </span>
+                )}
               </div>
               {item.subtitle && (
                 <span className="order-panel__item-subtitle">{item.subtitle}</span>
@@ -803,10 +803,8 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                 onClick={() => setItemApplyPromo(v => !v)}
                 aria-pressed={itemApplyPromo}
               >
-                <span className="order-panel__detail-promo-label">
-                  {itemApplyPromo ? 'Promo aplicada' : 'Aplicar promo'}
-                </span>
                 <span className="order-panel__detail-promo-price">{formatMoney(itemDetail.promo_price)}</span>
+                <span className="order-panel__detail-promo-badge">PROMO</span>
               </button>
             )}
 

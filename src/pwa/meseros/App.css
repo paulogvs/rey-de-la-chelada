@@ -424,6 +424,17 @@
   margin-top: 2px;
 }
 
+/* Promo: precio pequeño debajo del precio grande (no tachado) */
+.order-panel__item-promo {
+  display: block;
+  font-family: var(--font-mono);
+  color: var(--dorado-rey);
+  font-weight: 600;
+  font-size: var(--text-xs);
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
 /* ---- Sprint 1 (B/E): badges manual "Consultar precio" + promo ---- */
 
 .order-panel__item-badge {
@@ -449,12 +460,6 @@
   background: var(--dorado-rey);
 }
 
-.order-panel__item-price-old {
-  text-decoration: line-through;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
 .order-panel__cart-item-total--missing {
   color: var(--status-cancelled);
   font-size: var(--text-sm);
@@ -462,21 +467,23 @@
   font-weight: 600;
 }
 
-/* Detalle: toggle promo manual (Sprint 1 E) */
+/* Detalle: toggle promo manual (Sprint 1 E) — pill pequeño debajo del precio grande */
 
 .order-panel__detail-promo {
-  display: flex;
-  justify-content: space-between;
+  display: inline-flex;
+  justify-content: center;
   align-items: center;
-  width: 100%;
-  min-height: 48px;
-  padding: var(--space-3) var(--space-4);
+  gap: var(--space-2);
+  width: auto;
+  min-height: 0;
+  padding: var(--space-1) var(--space-3);
   border: 1px dashed var(--dorado-rey);
   border-radius: var(--radius-full);
   background: transparent;
   color: var(--text-strong);
   font-weight: 600;
-  margin: var(--space-3) 0;
+  font-size: var(--text-sm);
+  margin: var(--space-2) 0 var(--space-3);
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
 }
@@ -489,6 +496,13 @@
 .order-panel__detail-promo-price {
   font-family: var(--font-mono);
   color: var(--dorado-rey);
+  font-weight: 700;
+}
+
+.order-panel__detail-promo-badge {
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
   font-weight: 700;
 }
 
