@@ -33,6 +33,10 @@ export interface MenuItem {
   area: 'bar' | 'cocina' | null;
   category_id: string;
   category_name: string;
+  /** Sprint 1 (B): item de precio manual "Consultar precio" (price null + variable=1) */
+  price_variable?: number | null;
+  /** Sprint 1 (E): precio de promo manual (display items lo tienen, items regulares null) */
+  promo_price?: number | null;
 }
 
 export interface ModifierOption {

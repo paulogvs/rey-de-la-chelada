@@ -51,6 +51,7 @@ import {
   LogOut,
   Delete,
   ChefHat,
+  Search,
 } from 'lucide-react';
 import './AppIcon.css';
 
@@ -97,6 +98,7 @@ const ICONS = {
   info: Info,
   logout: LogOut,
   delete: Delete,
+  search: Search,
 } as const;
 
 export type AppIconName = keyof typeof ICONS;

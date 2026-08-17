@@ -99,9 +99,17 @@ export function MenuPage({
       imageUrl: i.image_url ?? i.imageUrl,
       ivaPercentage: i.iva_percentage ?? i.ivaPercentage ?? 13,
       preparationTime: i.preparation_time ?? i.preparationTime ?? 15,
+      // Sprint 1 (B/E): items de precio manual y promos → solo meseros
+      priceVariable: i.price_variable === 1,
+      promoPrice: i.promo_price ?? null,
     }))
     .filter(i => (selectedCategory ? i.categoryId === selectedCategory : true))
-    .filter(i => i.isActive && i.isAvailable);
+    .filter(i => i.isActive && i.isAvailable)
+    // Contrato Sprint 1: clientes NO ven items de precio manual ("Consultar
+    // precio" lo define el mesero) ni items display no facturables (promos).
+    // Los items con variantes de tamaño (pizzas, price null + modifiers) SÍ se muestran.
+    .filter(i => !i.priceVariable)
+    .filter(i => i.price != null || i.modifierGroups.length > 0);
 
   // Add item to draft (with optional modifier selections)
   const handleAddToDraft = useCallback((item: MenuItem, modifierOptionIds: string[] = []) => {

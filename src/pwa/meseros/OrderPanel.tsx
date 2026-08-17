@@ -21,8 +21,10 @@ import { Modal } from '@/ui/components/Modal';
 import { Loader } from '@/ui/components/Loader';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { PriceDisplay } from '@/ui/components/PriceDisplay';
+import { MoneyInput } from '@/ui/components/MoneyInput';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { formatMoney } from '../_shared/utils/format';
+import { filterMenuItems } from '../_shared/utils/filterMenuItems';
 import { fetchMenuCategories, fetchMenuItems, fetchMenuItemDetail, type MenuItem } from '../_shared/api/menuApi';
 import { createOrder, fetchOrderById, deliverOrder, addOrderItem, removeOrderItem, type Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
@@ -64,6 +66,28 @@ interface CartItem {
   quantity: number;
   selectedModifiers: ModifierOption[];
   notes: string;
+  /** Sprint 1 (B): precio manual "Consultar precio" (item price_variable) */
+  manualPrice?: number;
+  /** Sprint 1 (E): aplicar promo manual */
+  applyPromo?: boolean;
+}
+
+/**
+ * Sprint 1 (B/E): espejo del resolver del server (order-pricing.js).
+ * unitPrice = promo (si applyPromo) > price base (+mods) > manual (+mods) > ajuste (pizza).
+ * Devuelve null cuando el server rechazaría (PRICE_REQUIRED_MANUAL).
+ */
+function resolveCartUnitPrice(
+  menuItem: MenuItem,
+  manualPrice: number | undefined,
+  applyPromo: boolean | undefined,
+  modAdjustment: number
+): number | null {
+  if (applyPromo && menuItem.promo_price != null) return menuItem.promo_price;
+  if (menuItem.price != null) return menuItem.price + modAdjustment;
+  if (manualPrice != null && manualPrice > 0) return manualPrice + modAdjustment;
+  if (modAdjustment > 0) return modAdjustment;
+  return null;
 }
 
 interface DetailModifier {
@@ -86,12 +110,17 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  // Sprint 1 (C): buscador de meseros — filtra por nombre/descripción/categoría
+  const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [itemDetail, setItemDetail] = useState<MenuItem | null>(null);
   const [detailGroups, setDetailGroups] = useState<DetailGroup[]>([]);
   const [itemQuantity, setItemQuantity] = useState(1);
   const [itemModifiers, setItemModifiers] = useState<ModifierOption[]>([]);
   const [itemNotes, setItemNotes] = useState('');
+  // Sprint 1 (B/E): precio manual "Consultar precio" + toggle promo
+  const [itemManualPrice, setItemManualPrice] = useState(0);
+  const [itemApplyPromo, setItemApplyPromo] = useState(false);
   const [loadingMenu, setLoadingMenu] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
@@ -193,6 +222,8 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
           menu_item_id: ci.menuItem.id,
           quantity: ci.quantity,
           notes: ci.notes || undefined,
+          manual_price: ci.manualPrice,
+          apply_promo: ci.applyPromo,
           modifiers: ci.selectedModifiers.map(m => ({
             groupName: (detailGroups.find(g => g.options.some(o => o.option_id === m.id))?.name) || '',
             optionName: m.name,
@@ -234,7 +265,12 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
     return () => { disposed = true; };
   }, []);
 
-  const filteredItems = activeCategory ? items.filter(i => i.category_id === activeCategory) : items;
+  // Sprint 1 (C): búsqueda global (todas las áreas) o filtro por categoría
+  const filteredItems = searchQuery.trim()
+    ? filterMenuItems(items, searchQuery)
+    : activeCategory
+      ? items.filter(i => i.category_id === activeCategory)
+      : items;
 
   // Load modifiers when an item is opened
   const openItem = useCallback(async (item: MenuItem) => {
@@ -242,6 +278,8 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
     setItemQuantity(1);
     setItemModifiers([]);
     setItemNotes('');
+    setItemManualPrice(0);
+    setItemApplyPromo(false);
     setDetailGroups([]);
     try {
       const detail = await fetchMenuItemDetail(item.id);
@@ -269,19 +307,41 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
     setItemQuantity(1);
     setItemModifiers([]);
     setItemNotes('');
+    setItemManualPrice(0);
+    setItemApplyPromo(false);
   }, []);
 
-  // Cart totals (modifier adjustments included)
+  // Cart totals (Sprint 1 B/E: promo/manual resueltos como el server)
   const cartTotal = cart.reduce((sum, ci) => {
     const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
-    return sum + (((ci.menuItem.price ?? 0) + modAdjustment) * ci.quantity);
+    const unit = resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdjustment) ?? 0;
+    return sum + unit * ci.quantity;
   }, 0);
 
   const addToCart = useCallback(() => {
     if (!itemDetail) return;
+    const modAdjustment = itemModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
+    const unit = resolveCartUnitPrice(
+      itemDetail,
+      itemManualPrice > 0 ? itemManualPrice : undefined,
+      itemApplyPromo,
+      modAdjustment
+    );
+    // Sprint 1 (B): el server rechaza con PRICE_REQUIRED_MANUAL — validamos
+    // igual que él (nunca dejar facturar 0).
+    if (unit == null) {
+      addToast({
+        type: 'warning',
+        message: 'Define el precio (Consultar precio) o selecciona un tamaño para este item',
+        duration: 4000,
+      });
+      return;
+    }
     setCart(prev => {
       const existing = prev.find(ci =>
         ci.menuItem.id === itemDetail.id &&
+        ci.manualPrice === itemManualPrice &&
+        ci.applyPromo === itemApplyPromo &&
         JSON.stringify(ci.selectedModifiers.map(m => m.id).sort()) === JSON.stringify(itemModifiers.map(m => m.id).sort())
       );
       if (existing) {
@@ -292,10 +352,12 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
         quantity: itemQuantity,
         selectedModifiers: itemModifiers,
         notes: itemNotes,
+        manualPrice: itemManualPrice > 0 ? itemManualPrice : undefined,
+        applyPromo: itemApplyPromo || undefined,
       }];
     });
     closeItem();
-  }, [itemDetail, itemQuantity, itemModifiers, itemNotes, closeItem]);
+  }, [itemDetail, itemQuantity, itemModifiers, itemNotes, itemManualPrice, itemApplyPromo, addToast, closeItem]);
 
   const removeFromCart = useCallback((index: number) => {
     setCart(prev => prev.filter((_, i) => i !== index));
@@ -322,6 +384,8 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
           menu_item_id: ci.menuItem.id,
           quantity: ci.quantity,
           notes: ci.notes || undefined,
+          manual_price: ci.manualPrice,
+          apply_promo: ci.applyPromo,
           modifiers: ci.selectedModifiers.map(m => ({
             groupName: (detailGroups.find(g => g.options.some(o => o.option_id === m.id))?.name) || '',
             optionName: m.name,
@@ -358,6 +422,12 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
 
   // FASE 4C: cobro SOLO cuando TODO el pedido está entregado (served)
   const canCharge = !!activeOrder && activeOrder.status === 'served';
+
+  // Sprint 1 (B/E): precio resuelto del item en el modal (espejo del server)
+  const detailModAdjustment = itemModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
+  const detailUnit = itemDetail
+    ? resolveCartUnitPrice(itemDetail, itemManualPrice > 0 ? itemManualPrice : undefined, itemApplyPromo, detailModAdjustment)
+    : null;
 
   return (
     <div className="order-panel">
@@ -429,7 +499,12 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                             return (
                               <div key={item.id} className="order-panel__active-item">
                                 <span className="order-panel__active-item-qty">{item.quantity}x</span>
-                                <span className="order-panel__active-item-name">{item.menuItemName}</span>
+                                <span className="order-panel__active-item-name">
+                                  {item.menuItemName}
+                                  {item.promoLabel && (
+                                    <span className="order-panel__item-badge order-panel__item-badge--promo">{item.promoLabel}</span>
+                                  )}
+                                </span>
                                 <span className="order-panel__active-item-price">{formatMoney(item.subtotal)}</span>
                                 {canRemove && (
                                   <button
@@ -521,19 +596,42 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
           )}
         </div>
       )}
+      {/* Sprint 1 (C): buscador de meseros */}
+      <div className="order-panel__search">
+        <AppIcon name="search" size="sm" />
+        <input
+          type="search"
+          className="order-panel__search-input"
+          placeholder="Buscar producto…"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          aria-label="Buscar producto en el menú"
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            className="order-panel__search-clear"
+            onClick={() => setSearchQuery('')}
+            aria-label="Limpiar búsqueda"
+          >
+            <AppIcon name="x" size="sm" />
+          </button>
+        )}
+      </div>
+
       {/* Category bar */}
       <nav className="order-panel__categories">
         <button
-          className={`order-panel__cat-btn ${!activeCategory ? 'active' : ''}`}
-          onClick={() => setActiveCategory(null)}
+          className={`order-panel__cat-btn ${!activeCategory && !searchQuery.trim() ? 'active' : ''}`}
+          onClick={() => { setActiveCategory(null); setSearchQuery(''); }}
         >
           Todo
         </button>
         {categories.map(cat => (
           <button
             key={cat.id}
-            className={`order-panel__cat-btn ${activeCategory === cat.id ? 'active' : ''}`}
-            onClick={() => setActiveCategory(cat.id)}
+            className={`order-panel__cat-btn ${activeCategory === cat.id && !searchQuery.trim() ? 'active' : ''}`}
+            onClick={() => { setActiveCategory(cat.id); setSearchQuery(''); }}
           >
             {cat.name}
           </button>
@@ -545,7 +643,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
         <div className="order-panel__items">
           {loadingMenu && <Loader label="Cargando menú…" />}
           {!loadingMenu && filteredItems.length === 0 && (
-            <EmptyState compact icon={<AppIcon name="beer" size="lg" />} message="Sin items en esta categoría" />
+            <EmptyState compact icon={<AppIcon name="search" size="lg" />} message={searchQuery.trim() ? `Sin resultados para "${searchQuery}"` : 'Sin items en esta categoría'} />
           )}
           {filteredItems.map(item => (
             <button
@@ -554,9 +652,23 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
               onClick={() => openItem(item)}
             >
               <div className="order-panel__item-info">
-                <span className="order-panel__item-name">{item.name}</span>
+                <span className="order-panel__item-name">
+                  {item.name}
+                  {item.price_variable === 1 && (
+                    <span className="order-panel__item-badge order-panel__item-badge--manual">Consultar precio</span>
+                  )}
+                </span>
                 <span className="order-panel__item-price">
-                  {item.price != null ? formatMoney(item.price) : 'Ver variantes'}
+                  {item.price_variable === 1
+                    ? 'Precio a definir'
+                    : item.price != null
+                      ? (item.promo_price != null ? (
+                        <>
+                          <span className="order-panel__item-price-old">{formatMoney(item.price)}</span>{' '}
+                          {formatMoney(item.promo_price)} <span className="order-panel__item-badge order-panel__item-badge--promo">Promo</span>
+                        </>
+                      ) : formatMoney(item.price))
+                      : 'Ver variantes'}
                 </span>
               </div>
               {item.subtitle && (
@@ -580,12 +692,21 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
 
           {cart.map((ci, index) => {
             const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
-            const lineTotal = ((ci.menuItem.price ?? 0) + modAdjustment) * ci.quantity;
+            const unit = resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdjustment) ?? 0;
+            const lineTotal = unit * ci.quantity;
 
             return (
               <Card key={index} padded={false} className="order-panel__cart-item">
                 <div className="order-panel__cart-item-header">
-                  <span className="order-panel__cart-item-name">{ci.menuItem.name}</span>
+                  <span className="order-panel__cart-item-name">
+                    {ci.menuItem.name}
+                    {ci.applyPromo && (
+                      <span className="order-panel__item-badge order-panel__item-badge--promo">Promo</span>
+                    )}
+                    {ci.manualPrice != null && (
+                      <span className="order-panel__item-badge order-panel__item-badge--manual">Bs {ci.manualPrice}</span>
+                    )}
+                  </span>
                   <button
                     className="order-panel__cart-item-remove"
                     onClick={() => removeFromCart(index)}
@@ -609,7 +730,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                     size="md"
                   />
                   <span className="order-panel__cart-item-total">
-                    {formatMoney(lineTotal)}
+                    {unit == null ? <span className="order-panel__cart-item-total--missing">Precio requerido</span> : formatMoney(lineTotal)}
                   </span>
                 </div>
               </Card>
@@ -672,6 +793,38 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
             )}
             {itemDetail.price != null && (
               <p className="order-panel__detail-price">{formatMoney(itemDetail.price)}</p>
+            )}
+
+            {/* Sprint 1 (E): promo manual — toggle activable por el mesero */}
+            {itemDetail.promo_price != null && (
+              <button
+                type="button"
+                className={`order-panel__detail-promo ${itemApplyPromo ? 'active' : ''}`}
+                onClick={() => setItemApplyPromo(v => !v)}
+                aria-pressed={itemApplyPromo}
+              >
+                <span className="order-panel__detail-promo-label">
+                  {itemApplyPromo ? 'Promo aplicada' : 'Aplicar promo'}
+                </span>
+                <span className="order-panel__detail-promo-price">{formatMoney(itemDetail.promo_price)}</span>
+              </button>
+            )}
+
+            {/* Sprint 1 (B): precio manual "Consultar precio" (item variable) */}
+            {(itemDetail.price_variable === 1 || itemDetail.price == null) && (
+              <div className="order-panel__detail-manual">
+                <label htmlFor="item-manual-price">Precio a definir (Bs)</label>
+                <MoneyInput
+                  id="item-manual-price"
+                  value={itemManualPrice}
+                  onChange={setItemManualPrice}
+                  placeholder="Ej: 12,5"
+                  variant="lg"
+                />
+                <p className="order-panel__detail-manual-hint">
+                  Item de precio variable — el mesero define el precio al momento.
+                </p>
+              </div>
             )}
 
             {/* Modifiers */}
@@ -746,7 +899,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                 size="md"
               />
               <Button variant="primary" onClick={addToCart} fullWidth>
-                Agregar ({formatMoney((itemDetail.price ?? 0) * itemQuantity)})
+                Agregar ({detailUnit != null ? formatMoney(detailUnit * itemQuantity) : 'Define precio'})
               </Button>
             </div>
           </div>
@@ -765,16 +918,20 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
           // Modelo SSOT EXTRACTIVO: cartTotal ya incluye IVA
           ...orderPanelTotals(cartTotal),
           paymentMethod: undefined,
-          items: cart.map(ci => ({
-            menuItemName: ci.menuItem.name,
-            quantity: ci.quantity,
-            unitPrice: (ci.menuItem.price ?? 0) + ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0),
-            subtotal: (((ci.menuItem.price ?? 0) + ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0)) * ci.quantity),
-            modifiers: ci.selectedModifiers.map(m => ({
-              optionName: m.name,
-              priceAdjustment: m.priceAdjustment ?? 0,
-            })),
-          })),
+          items: cart.map(ci => {
+            const modAdj = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
+            const unit = resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdj) ?? 0;
+            return {
+              menuItemName: ci.menuItem.name,
+              quantity: ci.quantity,
+              unitPrice: unit,
+              subtotal: unit * ci.quantity,
+              modifiers: ci.selectedModifiers.map(m => ({
+                optionName: m.name,
+                priceAdjustment: m.priceAdjustment ?? 0,
+              })),
+            };
+          }),
         })}
         label={`Mesa ${table.number} — Comanda`}
       />

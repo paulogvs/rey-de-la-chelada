@@ -122,6 +122,18 @@
   text-shadow: 0 0 20px color-mix(in srgb, var(--dorado-rey) 30%, transparent);
 }
 
+/* Sprint 1 (B): items de precio manual — solo lectura en clientes */
+.clientes-detail__manual-hint {
+  color: #fff;
+  background: var(--status-pending);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  padding: 6px 12px;
+  display: inline-block;
+  margin-bottom: var(--space-3);
+}
+
 .clientes-detail__tags {
   display: flex;
   gap: var(--space-1);

@@ -54,7 +54,11 @@ export function MenuItemCard({
     className,
   ].filter(Boolean).join(' ');
 
-  const priceLabel = item.price != null ? formatMoney(item.price) : '—';
+  const priceLabel = item.priceVariable
+    ? 'Consultar precio'
+    : item.price != null
+      ? formatMoney(item.price)
+      : '—';
   const handleImgError = () => setImgError(true);
 
   if (variant === 'photo') {

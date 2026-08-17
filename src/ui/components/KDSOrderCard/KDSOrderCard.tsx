@@ -138,6 +138,9 @@ export function KDSOrderCard({
             </span>
             <span className="kds-order__item-qty">{item.quantity}x</span>
             <span className="kds-order__item-name">{item.menuItemName}</span>
+            {item.promoLabel && (
+              <span className="kds-order__item-promo">{item.promoLabel}</span>
+            )}
             {item.modifiers.length > 0 && (
               <span className="kds-order__item-mods">
                 {item.modifiers.map(m => m.optionName).join(', ')}

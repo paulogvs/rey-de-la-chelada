@@ -22,6 +22,8 @@ export interface ReceiptItem {
   lineTotal: number;
   /** Human-readable modifier summary, e.g. "Familiar +20" */
   modifiers?: string;
+  /** Sprint 1 (E): "Promo" cuando el item se facturó con promo manual */
+  promoLabel?: string;
 }
 
 export interface ReceiptData {
@@ -112,6 +114,8 @@ export function buildReceiptData(
       unitPrice: number;
       subtotal: number;
       modifiers?: Array<{ groupName?: string; optionName: string; priceAdjustment?: number }>;
+      /** Sprint 1 (E): server manda promo_label cuando se aplicó promo */
+      promoLabel?: string | null;
     }>;
   },
   businessName = 'El Rey de la Chelada'
@@ -123,10 +127,11 @@ export function buildReceiptData(
     createdAt: order.createdAt,
     receiptCode: toReceiptCode(order.id),
     items: order.items.map(item => ({
-      name: item.menuItemName,
+      name: item.promoLabel ? `${item.menuItemName} (${item.promoLabel})` : item.menuItemName,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       lineTotal: item.subtotal,
+      promoLabel: item.promoLabel ?? undefined,
       modifiers: (item.modifiers || [])
         .map(m => {
           const adj = Number(m.priceAdjustment || 0);

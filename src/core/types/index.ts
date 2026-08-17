@@ -126,6 +126,10 @@ export interface MenuItem {
   };
   sizeVariants?: Record<string, number | null>;  // Para items con variantes de tamaño (ej: pizzas)
   hasIce?: boolean;           // Sujeto a ICE (Impuesto al Consumo Específico)
+  /** Sprint 1 (B): item de precio manual "Consultar precio" (price null + variable=1). Solo meseros. */
+  priceVariable?: boolean;
+  /** Sprint 1 (E): precio de promo manual (meseros). Los clientes no ven promos. */
+  promoPrice?: number | null;
 }
 
 /** A line item in an order (product + modifiers) */
@@ -151,6 +155,8 @@ export interface OrderLineItem {
   /** FASE 4B: ronda ("segunda comanda") — items agregados a un pedido con
    *  platos ya procesados entran en una ronda nueva (max+1). */
   round?: number;
+  /** Sprint 1 (E): "Promo" cuando el item se facturó con promo manual */
+  promoLabel?: string | null;
 }
 
 /** Customer order */

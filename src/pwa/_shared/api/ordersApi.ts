@@ -24,6 +24,8 @@ export interface ServerOrderItem {
   kds_module?: string;
   /** FASE 4B: ronda ("segunda comanda") — el server lo incluye desde v7 */
   round?: number;
+  /** Sprint 1 (E): "Promo" cuando el item se facturó con promo manual */
+  promo_label?: string | null;
 }
 
 /** Server order row (snake_case) */
@@ -67,6 +69,8 @@ export interface OrderLineItem {
   /** FASE 4B: ronda ("segunda comanda") — items agregados a un pedido con
    *  platos ya procesados entran en una ronda nueva (max+1). */
   round?: number;
+  /** Sprint 1 (E): "Promo" cuando el item se facturó con promo manual */
+  promoLabel?: string | null;
 }
 
 export interface Order {
@@ -99,6 +103,10 @@ export interface OrderItemPayload {
   quantity: number;
   notes?: string;
   modifiers?: { groupName: string; optionName: string; priceAdjustment: number }[];
+  /** Sprint 1 (B): precio manual "Consultar precio" (items price_variable, solo meseros) */
+  manual_price?: number;
+  /** Sprint 1 (E): aplicar promo manual (item con promo_price, solo meseros) */
+  apply_promo?: boolean;
 }
 
 export interface OrderPayload {
@@ -140,6 +148,7 @@ function normalizeItem(item: ServerOrderItem): OrderLineItem {
     preparationNotes: item.preparation_notes,
     kdsModule: item.kds_module,
     round: typeof item.round === 'number' ? item.round : 1,
+    promoLabel: item.promo_label ?? null,
   };
 }
 

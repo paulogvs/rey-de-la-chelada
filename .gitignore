@@ -67,3 +67,6 @@ secrets/
 
 # E2E session tokens (rate-limit safe login)
 scripts/.e2e-session.json
+
+# Freebuff runtime (frontend adicional del ecosistema)
+.freebuff/

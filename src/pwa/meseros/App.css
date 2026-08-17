@@ -424,6 +424,146 @@
   margin-top: 2px;
 }
 
+/* ---- Sprint 1 (B/E): badges manual "Consultar precio" + promo ---- */
+
+.order-panel__item-badge {
+  display: inline-block;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+  margin-left: var(--space-2);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.order-panel__item-badge--manual {
+  color: #fff;
+  background: var(--status-pending);
+}
+
+.order-panel__item-badge--promo {
+  color: var(--bg);
+  background: var(--dorado-rey);
+}
+
+.order-panel__item-price-old {
+  text-decoration: line-through;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.order-panel__cart-item-total--missing {
+  color: var(--status-cancelled);
+  font-size: var(--text-sm);
+  font-style: italic;
+  font-weight: 600;
+}
+
+/* Detalle: toggle promo manual (Sprint 1 E) */
+
+.order-panel__detail-promo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--dorado-rey);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-strong);
+  font-weight: 600;
+  margin: var(--space-3) 0;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+}
+
+.order-panel__detail-promo.active {
+  background: color-mix(in srgb, var(--dorado-rey) 18%, transparent);
+  border-style: solid;
+}
+
+.order-panel__detail-promo-price {
+  font-family: var(--font-mono);
+  color: var(--dorado-rey);
+  font-weight: 700;
+}
+
+/* Detalle: precio manual "Consultar precio" (Sprint 1 B) */
+
+.order-panel__detail-manual {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+.order-panel__detail-manual label {
+  font-weight: 600;
+  color: var(--text-strong);
+  font-size: var(--text-sm);
+}
+
+.order-panel__detail-manual-hint {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* ---- Sprint 1 (C): buscador de meseros ---- */
+
+.order-panel__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  min-height: 48px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg-strong);
+  color: var(--text-muted);
+}
+
+.order-panel__search:focus-within {
+  border-color: var(--dorado-rey);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dorado-rey) 20%, transparent);
+}
+
+.order-panel__search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-strong);
+  font-size: var(--text-base);
+  outline: none;
+  height: 46px;
+}
+
+.order-panel__search-input::placeholder {
+  color: var(--text-faint);
+}
+
+.order-panel__search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-full);
+}
+
+.order-panel__search-clear:hover {
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+
 /* ---- Carrito (glass strong, acciones fijas) ---- */
 
 .order-panel__cart {

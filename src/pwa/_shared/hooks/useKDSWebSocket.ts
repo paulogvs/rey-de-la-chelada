@@ -160,6 +160,8 @@ export function normalizeServerItem(raw: unknown): OrderLineItem | null {
     ...(typeof src.kds_module === 'string' ? { kds_module: src.kds_module } : {}),
     // FASE 4B: ronda ("segunda comanda") — el server la incluye desde v7
     ...(typeof src.round === 'number' ? { round: src.round } : { round: 1 }),
+    // Sprint 1 (E): promo_label ("Promo") para desambiguar items facturados con promo
+    ...(typeof src.promo_label === 'string' ? { promoLabel: src.promo_label } : { promoLabel: null }),
   };
 }
 

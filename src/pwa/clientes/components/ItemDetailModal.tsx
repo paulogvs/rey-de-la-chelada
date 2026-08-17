@@ -37,6 +37,10 @@ export function ItemDetailModal({ item, onClose, onAdd }: ItemDetailModalProps) 
     );
   };
 
+  // Sprint 1 (B): items de precio manual "Consultar precio" son SOLO meseros.
+  // El server los rechaza en clientes (PRICE_REQUIRED_MANUAL) — mostramos en
+  // modo lectura y bloqueamos "Agregar al pedido" (defensivo: ya se filtran).
+  const readOnlyManual = item.priceVariable === true;
   const effectivePrice = item.modifierGroups
     .flatMap(g => g.options)
     .filter(o => selectedMods.includes(o.id))
@@ -64,8 +68,14 @@ export function ItemDetailModal({ item, onClose, onAdd }: ItemDetailModalProps) 
         <p className="clientes-detail__desc">{item.description}</p>
 
         <div className="clientes-detail__price">
-          {effectivePrice > 0 ? formatMoney(effectivePrice) : '—'}
+          {readOnlyManual ? 'Consultar precio' : effectivePrice > 0 ? formatMoney(effectivePrice) : '—'}
         </div>
+
+        {readOnlyManual && (
+          <p className="clientes-detail__manual-hint">
+            Item de precio variable — pregunta al mesero para pedirlo.
+          </p>
+        )}
 
         {item.tags.length > 0 && (
           <div className="clientes-detail__tags">
@@ -108,8 +118,9 @@ export function ItemDetailModal({ item, onClose, onAdd }: ItemDetailModalProps) 
         <button
           className="clientes-detail__add-btn"
           onClick={() => { onAdd(item, selectedMods); onClose(); }}
+          disabled={readOnlyManual}
         >
-          Agregar al pedido
+          {readOnlyManual ? 'Solicitar en barra' : 'Agregar al pedido'}
         </button>
       </div>
     </div>
