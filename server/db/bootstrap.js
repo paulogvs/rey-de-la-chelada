@@ -10,7 +10,7 @@
  *  de getDb(). Garantiza una DB usable desde el primer arranque:
  *
  *    1. Si staff está vacío → crea staff (admin/mesero/kds) + mesas
- *    2. Carga el menú REAL (menu-seed.json → 49 items)
+ *    2. Carga el menú REAL (menu-seed.json → 112 items)
  *    3. Aplica precios demo (si los items no tienen precio)
  *
  *  Idempotente: si ya hay datos, no duplica nada ni pisa precios

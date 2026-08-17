@@ -69,7 +69,7 @@ export function ensureTables(db, count = 10) {
 // ============================================================
 // Menu — el menú REAL lo carga load-menu.js (menu-seed.json = SSOT).
 // Aquí NO se siembran categorías genéricas: el menú de producción
-// (8 categorías / 49 items) proviene exclusivamente de
+// (21 categorías / 112 items) proviene exclusivamente de
 // src/core/data/menu-seed.json vía server/db/bootstrap.js.
 // ============================================================
 

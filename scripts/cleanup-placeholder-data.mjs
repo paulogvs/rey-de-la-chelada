@@ -19,11 +19,12 @@ const { getDb, closeDb } = await import('../server/db/index.js');
 
 // Los items placeholder viven en server/db/seed.js → ITEMS.
 // Mantener en sync con esa lista (SSOT de nombres del seed genérico).
+// OJO (Sprint 1): 'Chelada Clásica', 'Mojito' y 'Cuba Libre' fueron
+// NOMBRES REUTILIZADOS por el menú oficial (menu-seed.json BAR-012/018/024)
+// — ya NO son placeholders, no borrarlos.
 const PLACEHOLDER_NAMES = [
   // Cervezas
   'Cerveza Pacena', 'Cerveza Huari', 'Cerveza Taquina', 'Cerveza Sin Alcohol',
-  // Tragos
-  'Cuba Libre', 'Mojito', 'Chelada Clásica',
   // Comidas
   'Pique Macho', 'Silpancho', 'Fricase', 'Picante de Pollo',
   // Entradas
