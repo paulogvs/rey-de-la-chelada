@@ -94,6 +94,7 @@ const stats = {
   categoriesUpserted: 0,
   itemsCreated: 0,
   itemsUpdated: 0,
+  itemsDeduplicated: 0,
 };
 
 const tx = db.transaction(() => {
@@ -179,6 +180,22 @@ const tx = db.transaction(() => {
     if (plan.adicionales && !DRY_RUN) {
       createAdditionsModifiersForItem(db, itemId, plan.adicionales);
     }
+    // 6. De-duplicar (name + category_id): PROD puede tener filas duplicadas
+    //    heredadas de sprints previos (ej. 2x "Mango Sunset" en Micheladas
+    //    Signature). El upsert por (name, category_id) solo toca UNA fila; las
+    //    demás duplicadas quedan ACTIVAS y rompen el conteo esperado. Aquí se
+    //    desactiva cualquier otra fila activa con el MISMO (name, category)
+    //    que no sea la canónica (itemId) que acabamos de re-activar.
+    if (!DRY_RUN) {
+      const dedup = db.prepare(`
+        UPDATE menu_items SET is_active = 0, updated_at = datetime('now')
+        WHERE category_id = ? AND name = ? AND id != ? AND is_active = 1
+      `).run(cat.id, plan.name, itemId);
+      if (dedup.changes > 0) {
+        stats.itemsDeduplicated += dedup.changes;
+        console.log(`  [dup INA] ${plan.name} (${plan.categoryName})`);
+      }
+    }
   }
 });
 
@@ -189,8 +206,9 @@ console.log('[reseed] Resumen:');
 console.log(`  Categorías desactivadas: ${stats.categoriesDeactivated}`);
 console.log(`  Items desactivados:      ${stats.itemsDeactivated}`);
 console.log(`  Categorías BAR upsert:   ${stats.categoriesUpserted}`);
-console.log(`  Items BAR creados:       ${stats.itemsCreated}`);
-console.log(`  Items BAR actualizados:  ${stats.itemsUpdated}`);
+  console.log(`  Items BAR creados:       ${stats.itemsCreated}`);
+  console.log(`  Items BAR actualizados:  ${stats.itemsUpdated}`);
+  console.log(`  Duplicados desactivados: ${stats.itemsDeduplicated}`);
 
 if (DRY_RUN) {
   console.log('  ⚠️  DRY-RUN — nada se escribió.');
