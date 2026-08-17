@@ -13,8 +13,9 @@
  *  - S1/v5: DB con staff existente → ensureBootstrap asegura el rol caja sin duplicar
  *  - does NOT overwrite admin-set prices on existing DB
  *  - Sprint 1 (2026-08-17): menú BAR con precios reales; SOLO quedan NULL los
- *    items "Consultar precio" (price_variable=1, 2) y la categoría display
- *    Promociones (6, no facturables). El demo no pisa manuales ni promos.
+ *    items "Consultar precio" (price_variable=1, 2) y la promo display
+ *    "Jueves de Chelada 2x1" (price_variable=0, no facturable). El demo no
+ *    pisa manuales ni promos.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -47,22 +48,24 @@ describe('ensureBootstrap', () => {
     expect(db.prepare("SELECT COUNT(*) AS n FROM menu_categories WHERE name = 'Cervezas'").get().n).toBe(0);
 
     // Sprint 1: precios REALES del seed cargados (los items BAR ya no son null).
-    // Solo quedan NULL: 2 items "Consultar precio" (price_variable=1) + 6 promos
-    // display (price_variable=0, no facturables).
+    // Solo quedan NULL: 2 items "Consultar precio" (price_variable=1) + 1 promo
+    // display (Jueves de Chelada 2x1, price_variable=0, no facturable).
     expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND price_variable = 1').get().n).toBe(2);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND price_variable = 0').get().n).toBe(6);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND price_variable = 0').get().n).toBe(1);
     // El demo rellenó TODA la cocina (39 items con price null → precio)
     expect(db.prepare("SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND area = 'cocina'").get().n).toBe(0);
-    // Promos con precio (Cheve-Chango 30 → promo 25; IPA 18 → promo 12)
-    expect(db.prepare("SELECT promo_price FROM menu_items WHERE name = 'Cheve-Chango'").get().promo_price).toBe(25);
-    expect(db.prepare("SELECT promo_price FROM menu_items WHERE name = 'IPA Artesanal'").get().promo_price).toBe(12);
+    // Promos con precio (Isla Dorada 40 → promo 25; Cerveza Artesanal 15 → promo 12)
+    expect(db.prepare("SELECT promo_price FROM menu_items WHERE name = 'Isla Dorada'").get().promo_price).toBe(25);
+    expect(db.prepare(
+      "SELECT promo_price FROM menu_items WHERE name = 'Negra' AND category_id = (SELECT id FROM menu_categories WHERE name = 'Cerveza Artesanal')"
+    ).get().promo_price).toBe(12);
 
     // Sprint 1 (D): adicionales como modifiers — grupo "Adicionales" en las
     // micheladas (Shot +15, Doble Escarchado +5), siembra idempotente.
-    const cheveId = db.prepare("SELECT id FROM menu_items WHERE name = 'Cheve-Chango'").get().id;
+    const islaId = db.prepare("SELECT id FROM menu_items WHERE name = 'Isla Dorada'").get().id;
     const addGroup = db.prepare(
       'SELECT id, type, required, max_select FROM modifier_groups WHERE menu_item_id = ? AND name = ?'
-    ).get(cheveId, 'Adicionales');
+    ).get(islaId, 'Adicionales');
     expect(addGroup).toBeDefined();
     expect(addGroup.type).toBe('multi');
     expect(addGroup.required).toBe(0);
@@ -73,10 +76,10 @@ describe('ensureBootstrap', () => {
       { name: 'Shot + Michelada', price_adjustment: 15 },
       { name: 'Doble Escarchado', price_adjustment: 5 },
     ]);
-    // 10 items de barra con adicionales (8 Signature + BAR-009 + BAR-011)
+    // 17 items de barra con adicionales (8 Signature + 3 Especiales + 6 Cheladas)
     expect(db.prepare(
       "SELECT COUNT(*) AS n FROM modifier_groups WHERE name = 'Adicionales'"
-    ).get().n).toBe(10);
+    ).get().n).toBe(17);
 
     // Result summary
     expect(result.seeded).toBe(true);
@@ -123,12 +126,12 @@ describe('ensureBootstrap', () => {
     ensureBootstrap(db);
 
     // Admin changes a price
-    db.prepare("UPDATE menu_items SET price = 99 WHERE name = 'Cheve-Chango'").run();
+    db.prepare("UPDATE menu_items SET price = 99 WHERE name = 'Isla Dorada'").run();
 
     // Re-run bootstrap (simulates server restart)
     ensureBootstrap(db);
 
-    expect(db.prepare("SELECT price FROM menu_items WHERE name = 'Cheve-Chango'").get().price).toBe(99);
+    expect(db.prepare("SELECT price FROM menu_items WHERE name = 'Isla Dorada'").get().price).toBe(99);
     db.close();
   });
 

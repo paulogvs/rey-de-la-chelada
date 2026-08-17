@@ -13,139 +13,155 @@
             "items": [
               {
                 "id": "BAR-001",
-                "nombre": "Cheve-Chango",
-                "subtitulo": "Tamarindo & Mango",
-                "descripcion": "Base cítrica y dulce con mango y tamarindo",
-                "ingredientes": ["355 ml Cerveza", "Mango", "Tamarindo", "Limón", "Chamoy", "Chile en polvo"],
-                "decoracion_garnish": ["Brocheta de gomitas/dulces", "Escarchado de chile y chamoy"],
-                "precio": 30,
+                "nombre": "Isla Dorada",
+                "descripcion": "Dulce, cítrica y muy refrescante. Piña, maracuyá, limón y agave, escarchado de sal de Tajín y coco tostado.",
+                "precio": 40,
                 "promo_price": 25,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
-                  { "nombre": "Shot + Michelada", "precio": 15 },
-                  { "nombre": "Doble Escarchado", "precio": 5 }
-                ],
-                "imagen": "BAR-001.png"
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  },
+                  {
+                    "nombre": "Doble Escarchado",
+                    "precio": 5
+                  }
+                ]
               },
               {
                 "id": "BAR-002",
-                "nombre": "Elixir Azteca",
-                "subtitulo": "Pepino & Albahaca",
-                "descripcion": "Refrescante, herbal y ligera",
-                "ingredientes": ["355 ml Cerveza", "Pepino", "Albahaca", "Limón", "Sal de limón", "Sal de grano"],
-                "decoracion_garnish": ["Rodajas de pepino fresco", "Hojas de albahaca", "Escarchado de sal"],
-                "precio": 32,
+                "nombre": "Mango Sunset",
+                "descripcion": "Tropical, dulce y ligeramente picante. Mango, limón, naranja y un toque de chamoy.",
+                "precio": 40,
                 "promo_price": 25,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
-                  { "nombre": "Shot + Michelada", "precio": 15 },
-                  { "nombre": "Doble Escarchado", "precio": 5 }
-                ],
-                "imagen": "BAR-002.png"
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  },
+                  {
+                    "nombre": "Doble Escarchado",
+                    "precio": 5
+                  }
+                ]
+              },
+              {
+                "id": "BAR-003",
+                "nombre": "Maracuyá Paradise",
+                "descripcion": "Ácida, aromática y muy fresca, con pulpa de maracuyá, jugo de limón, jarabe simple y cerveza.",
+                "precio": 35,
+                "promo_price": 25,
+                "area": "bar",
+                "tiene_ice": true,
+                "adicionales": [
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  },
+                  {
+                    "nombre": "Doble Escarchado",
+                    "precio": 5
+                  }
+                ]
               },
               {
                 "id": "BAR-004",
-                "nombre": "Sandía-Loca",
-                "subtitulo": "Sandía & Chamoy",
-                "descripcion": "Dulce, ácida y picante, estilo veraniego",
-                "ingredientes": ["355 ml Cerveza", "Sandía", "Chamoy", "Limón", "Gomitas", "Chile en polvo"],
-                "decoracion_garnish": ["Triángulo de sandía", "Brocheta de gomitas dulces", "Escarchado de chamoy"],
-                "precio": 30,
+                "nombre": "Sandía Beach",
+                "descripcion": "Muy refrescante, ideal para el verano. Cerveza rubia, jugo natural de sandía, jugo de limón, jarabe simple y un toque de salsa inglesa.",
+                "precio": 35,
                 "promo_price": 25,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
-                  { "nombre": "Shot + Michelada", "precio": 15 },
-                  { "nombre": "Doble Escarchado", "precio": 5 }
-                ],
-                "imagen": "BAR-004.png"
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  },
+                  {
+                    "nombre": "Doble Escarchado",
+                    "precio": 5
+                  }
+                ]
               },
               {
                 "id": "BAR-005",
-                "nombre": "Sandía Ice",
-                "subtitulo": "Con Skittles & Pelón",
-                "descripcion": "Ultra refrescante con toppings de confitería",
-                "ingredientes": ["355 ml Cerveza", "Sandía congelada", "Limón", "Skittles", "Tamarindo/Pelón Pelo Rico"],
-                "decoracion_garnish": ["Tubo de tamarindo/Pelón", "Dulces Skittles", "Sandía"],
-                "precio": 32,
+                "nombre": "Tamarindo Vulcano",
+                "descripcion": "Dulce, ácida y con un toque picante. Pulpa de tamarindo, jugo de limón, salsa inglesa, chamoy y salsa picante.",
+                "precio": 35,
                 "promo_price": 25,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
-                  { "nombre": "Shot + Michelada", "precio": 15 },
-                  { "nombre": "Doble Escarchado", "precio": 5 }
-                ],
-                "imagen": "BAR-005.png"
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  },
+                  {
+                    "nombre": "Doble Escarchado",
+                    "precio": 5
+                  }
+                ]
               },
               {
                 "id": "BAR-006",
-                "nombre": "Candy-Cheve",
-                "subtitulo": "Sandía & Algodón de Azúcar",
-                "descripcion": "Experiencia dulce y llamativa",
-                "ingredientes": ["355 ml Cerveza", "Sandía", "Jarabe dulce", "Limón", "Algodón de azúcar", "Caramelo"],
-                "decoracion_garnish": ["Nube de algodón de azúcar rosa", "Paleta dulce / Lollipop", "Escarchado rosa"],
-                "precio": 33,
+                "nombre": "Costa Tropical",
+                "descripcion": "Combinación de mango, piña, jugo de limón y maracuyá con un toque de chamoy y escarchado de coco.",
+                "precio": 35,
                 "promo_price": 25,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
-                  { "nombre": "Shot + Michelada", "precio": 15 },
-                  { "nombre": "Doble Escarchado", "precio": 5 }
-                ],
-                "imagen": "BAR-006.png"
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  },
+                  {
+                    "nombre": "Doble Escarchado",
+                    "precio": 5
+                  }
+                ]
               },
               {
                 "id": "BAR-007",
-                "nombre": "Piña Ahumada & Chipotle",
-                "subtitulo": "Piña & Chipotle",
-                "descripcion": "Toque ahumado y picante tropical",
-                "ingredientes": ["355 ml Cerveza", "Piña", "Chipotle", "Limón", "Chamoy", "Sal de chile"],
-                "decoracion_garnish": ["Brocheta de piña asada/ahumada", "Chile picante", "Escarchado de sal de chile"],
-                "precio": 34,
+                "nombre": "Marea Roja",
+                "descripcion": "Cerveza roja, sandía y tamarindo con jugo de limón en un intenso color, con toque de chamoy y Tajín.",
+                "precio": 35,
                 "promo_price": 25,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
-                  { "nombre": "Shot + Michelada", "precio": 15 },
-                  { "nombre": "Doble Escarchado", "precio": 5 }
-                ],
-                "imagen": "BAR-007.png"
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  },
+                  {
+                    "nombre": "Doble Escarchado",
+                    "precio": 5
+                  }
+                ]
               },
               {
                 "id": "BAR-008",
-                "nombre": "Mango Sunset",
-                "subtitulo": "Mango & Chile",
-                "descripcion": "Tropical, dulce y ligeramente picante",
-                "ingredientes": ["355 ml Cerveza Rubia", "Puré de mango", "Jugo de limón", "Jugo de naranja", "Chamoy", "Salsa inglesa", "Tajín"],
-                "decoracion_garnish": ["Cubos de mango", "Chile en polvo", "Brocheta de mango", "Hoja de menta"],
-                "precio": 30,
+                "nombre": "Paraíso Maya",
+                "descripcion": "Piña, jugo de limón, mango y tamarindo sobre cerveza clara, coronada con piña deshidratada y canela.",
+                "precio": 35,
                 "promo_price": 25,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
-                  { "nombre": "Shot + Michelada", "precio": 15 },
-                  { "nombre": "Doble Escarchado", "precio": 5 }
-                ],
-                "imagen": "BAR-008.png"
-              },
-              {
-                "id": "BAR-010",
-                "nombre": "Costa Tropical",
-                "subtitulo": "Piña, Mango & Maracuyá",
-                "descripcion": "Combinación de frutas exóticas y equilibrada",
-                "ingredientes": ["355 ml Cerveza Clara", "Puré de mango", "Puré de piña", "Pulpa de maracuyá", "Jugo de limón", "Chamoy"],
-                "decoracion_garnish": ["Piña", "Mango", "Maracuyá", "Flores tropicales"],
-                "precio": 34,
-                "promo_price": 25,
-                "area": "bar",
-                "tiene_ice": true,
-                "adicionales": [
-                  { "nombre": "Shot + Michelada", "precio": 15 },
-                  { "nombre": "Doble Escarchado", "precio": 5 }
-                ],
-                "imagen": "BAR-010.png"
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  },
+                  {
+                    "nombre": "Doble Escarchado",
+                    "precio": 5
+                  }
+                ]
               }
             ]
           },
@@ -153,46 +169,60 @@
             "nombre_categoria": "Micheladas Especiales",
             "items": [
               {
-                "id": "BAR-003",
+                "id": "BAR-009",
+                "nombre": "De Mar",
+                "descripcion": "Pulpa de maracuyá, cerveza rubia, Aperol, jarabe simple, toque de limón y salsa picante, con camarón bañado en salsa barbacoa.",
+                "precio": 40,
+                "area": "bar",
+                "tiene_ice": true,
+                "adicionales": [
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  },
+                  {
+                    "nombre": "Doble Escarchado",
+                    "precio": 5
+                  }
+                ]
+              },
+              {
+                "id": "BAR-010",
+                "nombre": "Elixir Azteca",
+                "subtitulo": "Pepino y Albahaca",
+                "descripcion": "Fresca y de color verde vibrante. Cerveza con pepino, jugo de limón, hierbabuena y sal de grano con ralladura de limón.",
+                "precio": 35,
+                "area": "bar",
+                "tiene_ice": true,
+                "adicionales": [
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  },
+                  {
+                    "nombre": "Doble Escarchado",
+                    "precio": 5
+                  }
+                ]
+              },
+              {
+                "id": "BAR-011",
                 "nombre": "Negra Ahumada",
                 "subtitulo": "Consultar precio",
-                "descripcion": "Perfil ahumado e intenso",
-                "ingredientes": ["355 ml Cerveza negra/oscura", "Mezcal", "Salsa inglesa", "Limón", "Sal de gusano", "Salsa picante"],
-                "decoracion_garnish": ["Rodaja de naranja/limón deshidratado", "Chile ají seco", "Escarchado de sal de gusano"],
+                "descripcion": "Con cerveza artesanal, jugo de limón, salsas inglesa y picante, y escarchado de sal.",
                 "precio": null,
                 "precio_variable": 1,
                 "area": "bar",
                 "tiene_ice": true,
-                "imagen": "BAR-003.png"
-              },
-              {
-                "id": "BAR-009",
-                "nombre": "Maracuyá Paradise",
-                "subtitulo": "Maracuyá Tropical",
-                "descripcion": "Ácida, aromática y muy fresca",
-                "ingredientes": ["355 ml Cerveza Lager", "Pulpa de maracuyá", "Jugo de limón", "Jarabe simple", "Agua con gas (opcional)"],
-                "decoracion_garnish": ["Maracuyá abierta", "Rodaja de limón", "Romero fresco"],
-                "precio": 28,
-                "area": "bar",
-                "tiene_ice": true,
                 "adicionales": [
-                  { "nombre": "Shot + Michelada", "precio": 15 },
-                  { "nombre": "Doble Escarchado", "precio": 5 }
-                ],
-                "imagen": "BAR-009.png"
-              },
-              {
-                "id": "BAR-011",
-                "nombre": "Michelada de Frutas",
-                "subtitulo": "Frutas de estación",
-                "descripcion": "Michelada con frutas frescas de estación a elección",
-                "ingredientes": ["355 ml Cerveza", "Frutas de estación", "Limón", "Chamoy", "Chile en polvo"],
-                "precio": 26,
-                "area": "bar",
-                "tiene_ice": true,
-                "adicionales": [
-                  { "nombre": "Shot + Michelada", "precio": 15 },
-                  { "nombre": "Doble Escarchado", "precio": 5 }
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  },
+                  {
+                    "nombre": "Doble Escarchado",
+                    "precio": 5
+                  }
                 ]
               }
             ]
@@ -200,123 +230,527 @@
           {
             "nombre_categoria": "Cheladas",
             "items": [
-              { "id": "BAR-012", "nombre": "Chelada Clásica", "subtitulo": "Cerveza, limón y sal", "precio": 15, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-013", "nombre": "Chelada Preparada", "subtitulo": "Clamato y salsa inglesa", "precio": 18, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-014", "nombre": "Chelada de Mango", "subtitulo": "Mango y chamoy", "precio": 20, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-015", "nombre": "Chelada de Sandía", "subtitulo": "Sandía y chile en polvo", "precio": 20, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-016", "nombre": "Chelada de Tamarindo", "subtitulo": "Tamarindo y sal de chile", "precio": 20, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-017", "nombre": "Chelada de Maracuyá", "subtitulo": "Maracuyá y limón", "precio": 20, "area": "bar", "tiene_ice": true }
+              {
+                "id": "BAR-012",
+                "nombre": "Negra",
+                "descripcion": "Cerveza negra con limón y sal al borde del vaso.",
+                "precio": 20,
+                "area": "bar",
+                "tiene_ice": true,
+                "adicionales": [
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  }
+                ]
+              },
+              {
+                "id": "BAR-013",
+                "nombre": "Rubia",
+                "descripcion": "Cerveza rubia con limón y sal al borde del vaso.",
+                "precio": 20,
+                "area": "bar",
+                "tiene_ice": true,
+                "adicionales": [
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  }
+                ]
+              },
+              {
+                "id": "BAR-014",
+                "nombre": "Roja",
+                "descripcion": "Cerveza roja con limón y sal al borde del vaso.",
+                "precio": 20,
+                "area": "bar",
+                "tiene_ice": true,
+                "adicionales": [
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  }
+                ]
+              },
+              {
+                "id": "BAR-015",
+                "nombre": "Choleada",
+                "descripcion": "Cerveza negra y rubia con limón y sal al borde del vaso.",
+                "precio": 20,
+                "area": "bar",
+                "tiene_ice": true,
+                "adicionales": [
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  }
+                ]
+              },
+              {
+                "id": "BAR-016",
+                "nombre": "Michelada Normal",
+                "descripcion": "Cerveza con limón, sal y merkén al borde del vaso.",
+                "precio": 25,
+                "area": "bar",
+                "tiene_ice": true,
+                "adicionales": [
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  }
+                ]
+              },
+              {
+                "id": "BAR-017",
+                "nombre": "Michelada Completa",
+                "descripcion": "Cerveza con limón, sal y merkén al borde, con tabasco y salsa inglesa.",
+                "precio": 30,
+                "area": "bar",
+                "tiene_ice": true,
+                "adicionales": [
+                  {
+                    "nombre": "Shot + Michelada",
+                    "precio": 15
+                  }
+                ]
+              }
             ]
           },
           {
             "nombre_categoria": "Coctelería Clásica",
             "items": [
-              { "id": "BAR-018", "nombre": "Mojito", "subtitulo": "Ron, menta y limón", "precio": 25, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-019", "nombre": "Piña Colada", "subtitulo": "Ron, piña y crema de coco", "precio": 28, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-020", "nombre": "Daiquiri", "subtitulo": "Ron, limón y azúcar", "precio": 25, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-021", "nombre": "Margarita", "subtitulo": "Tequila, triple sec y limón", "precio": 28, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-022", "nombre": "Caipirinha", "subtitulo": "Cachaça, lima y azúcar", "precio": 27, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-023", "nombre": "Cuba Libre", "subtitulo": "Ron y cola", "precio": 22, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-024", "nombre": "Gin Tonic", "subtitulo": "Gin, tónica y limón", "precio": 28, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-025", "nombre": "Aperol Spritz", "subtitulo": "Aperol, prosecco y soda", "precio": 30, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-026", "nombre": "Negroni", "subtitulo": "Gin, Campari y vermut", "precio": 32, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-027", "nombre": "Old Fashioned", "subtitulo": "Whiskey, azúcar y bitters", "precio": 35, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-028", "nombre": "Whiskey Sour", "subtitulo": "Whiskey, limón y azúcar", "precio": 30, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-029", "nombre": "Tequila Sunrise", "subtitulo": "Tequila, naranja y granadina", "precio": 28, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-030", "nombre": "Sex on the Beach", "subtitulo": "Vodka, durazno y frutos rojos", "precio": 28, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-031", "nombre": "Pisco Sour", "subtitulo": "Pisco, limón y clara de huevo", "precio": 28, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-032", "nombre": "Moscow Mule", "subtitulo": "Vodka, jengibre y limón", "precio": 28, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-033", "nombre": "Cosmopolitan", "subtitulo": "Vodka, triple sec y arándano", "precio": 30, "area": "bar", "tiene_ice": true }
+              {
+                "id": "BAR-018",
+                "nombre": "Mojito Tradicional",
+                "precio": 30,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-019",
+                "nombre": "Mojito de Sabores",
+                "descripcion": "Frutilla, mango, piña o maracuyá.",
+                "precio": 40,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-020",
+                "nombre": "Chuflay",
+                "precio": 30,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-021",
+                "nombre": "Margarita Tradicional",
+                "precio": 35,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-022",
+                "nombre": "Margarita Blue",
+                "precio": 40,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-023",
+                "nombre": "Orgasmo",
+                "precio": 35,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-024",
+                "nombre": "Piña Colada",
+                "precio": 35,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-025",
+                "nombre": "Mojito Cerveza",
+                "precio": 60,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-026",
+                "nombre": "Cuba Libre",
+                "precio": 25,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-027",
+                "nombre": "Fernet Cola",
+                "precio": 45,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-028",
+                "nombre": "Pasión Boliviana",
+                "precio": 35,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-029",
+                "nombre": "Sex on the Beach",
+                "precio": 35,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-030",
+                "nombre": "Tequila Sunrise",
+                "precio": 40,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-031",
+                "nombre": "Mimosa",
+                "precio": 25,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-032",
+                "nombre": "Caipiroska",
+                "precio": 25,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-033",
+                "nombre": "Tropical Gin",
+                "precio": 40,
+                "area": "bar",
+                "tiene_ice": true
+              }
             ]
           },
           {
             "nombre_categoria": "Coctelería de Autor Exclusivo",
             "items": [
-              { "id": "BAR-034", "nombre": "Rey Dorado", "subtitulo": "Ron añejo, maracuyá y canela", "precio": 40, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-035", "nombre": "Don Rey", "subtitulo": "Whiskey, miel y bitter de naranja", "precio": 42, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-036", "nombre": "Chelada Real", "subtitulo": "Cerveza, mezcal y frutos rojos", "precio": 38, "area": "bar", "tiene_ice": true }
+              {
+                "id": "BAR-034",
+                "nombre": "Paraíso Perdido",
+                "descripcion": "Jack Daniel's Apple, Aperol, pulpa de maracuyá, sirope de romero y ralladura de limón.",
+                "precio": 100,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-035",
+                "nombre": "Sigo Siendo el Rey",
+                "descripcion": "Tequila reposado, limoncello, zumo de pomelo, sirope de miel y maracuyá, ralladura de limón.",
+                "precio": 70,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-036",
+                "nombre": "Anhelo",
+                "descripcion": "Singani, Campari, triple sec, zumo de piña, sirope de canela y ralladura de limón.",
+                "precio": 65,
+                "area": "bar",
+                "tiene_ice": true
+              }
             ]
           },
           {
             "nombre_categoria": "Botellas",
             "items": [
-              { "id": "BAR-037", "nombre": "Flor de Caña", "subtitulo": "Consultar precio", "precio": null, "precio_variable": 1, "area": "bar", "tiene_ice": false },
-              { "id": "BAR-038", "nombre": "Jägermeister", "precio": 350, "area": "bar", "tiene_ice": false },
-              { "id": "BAR-039", "nombre": "Casa Real Etiqueta Negra", "precio": 280, "area": "bar", "tiene_ice": false },
-              { "id": "BAR-040", "nombre": "Smirnoff", "precio": 250, "area": "bar", "tiene_ice": false },
-              { "id": "BAR-041", "nombre": "Havana Club", "precio": 300, "area": "bar", "tiene_ice": false },
-              { "id": "BAR-042", "nombre": "Cacique", "precio": 220, "area": "bar", "tiene_ice": false },
-              { "id": "BAR-043", "nombre": "Ron Abuelo", "precio": 320, "area": "bar", "tiene_ice": false },
-              { "id": "BAR-044", "nombre": "Beefeater", "precio": 350, "area": "bar", "tiene_ice": false }
+              {
+                "id": "BAR-037",
+                "nombre": "Flor de Caña",
+                "subtitulo": "Consultar precio",
+                "precio": null,
+                "precio_variable": 1,
+                "area": "bar"
+              },
+              {
+                "id": "BAR-038",
+                "nombre": "Fernet Menta",
+                "precio": 250,
+                "area": "bar"
+              },
+              {
+                "id": "BAR-039",
+                "nombre": "Fernet Branca",
+                "precio": 230,
+                "area": "bar"
+              },
+              {
+                "id": "BAR-040",
+                "nombre": "Havana Reserva 7 Años",
+                "precio": 350,
+                "area": "bar"
+              },
+              {
+                "id": "BAR-041",
+                "nombre": "Havana Reserva",
+                "precio": 260,
+                "area": "bar"
+              },
+              {
+                "id": "BAR-042",
+                "nombre": "Havana Especial",
+                "precio": 240,
+                "area": "bar"
+              },
+              {
+                "id": "BAR-043",
+                "nombre": "Jägermeister",
+                "precio": 370,
+                "area": "bar"
+              },
+              {
+                "id": "BAR-044",
+                "nombre": "Casa Real Etiqueta Negra",
+                "precio": 250,
+                "area": "bar"
+              }
             ]
           },
           {
             "nombre_categoria": "Jarras",
             "items": [
-              { "id": "BAR-045", "nombre": "Jarra Michelada", "subtitulo": "1 litro, preparación de la casa", "precio": 40, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-046", "nombre": "Jarra Chelada", "subtitulo": "1 litro, limón y sal", "precio": 45, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-047", "nombre": "Jarra Cuba Libre", "subtitulo": "1 litro, ron y cola", "precio": 45, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-048", "nombre": "Jarra Mojito", "subtitulo": "1 litro, ron, menta y limón", "precio": 50, "area": "bar", "tiene_ice": true }
+              {
+                "id": "BAR-045",
+                "nombre": "Fernet",
+                "precio": 60,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-046",
+                "nombre": "Chuflay",
+                "precio": 50,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-047",
+                "nombre": "Mojito",
+                "precio": 50,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-048",
+                "nombre": "Havana",
+                "precio": 55,
+                "area": "bar",
+                "tiene_ice": true
+              }
             ]
           },
           {
             "nombre_categoria": "Shots",
             "items": [
-              { "id": "BAR-049", "nombre": "Shot Tequila", "precio": 12, "area": "bar", "tiene_ice": false },
-              { "id": "BAR-050", "nombre": "Shot Jägermeister", "precio": 15, "area": "bar", "tiene_ice": false },
-              { "id": "BAR-051", "nombre": "Shot Vodka", "precio": 12, "area": "bar", "tiene_ice": false }
+              {
+                "id": "BAR-049",
+                "nombre": "Tequila",
+                "precio": 25,
+                "area": "bar"
+              },
+              {
+                "id": "BAR-050",
+                "nombre": "Jägermeister",
+                "precio": 35,
+                "area": "bar"
+              },
+              {
+                "id": "BAR-051",
+                "nombre": "Casa Real Etiqueta Negra",
+                "precio": 20,
+                "area": "bar"
+              }
             ]
           },
           {
             "nombre_categoria": "Cerveza Artesanal",
             "items": [
-              { "id": "BAR-052", "nombre": "IPA Artesanal", "subtitulo": "Amargor intenso, lúpulo floral", "precio": 18, "promo_price": 12, "area": "bar", "tiene_ice": false },
-              { "id": "BAR-053", "nombre": "Lager Artesanal", "subtitulo": "Ligera y refrescante", "precio": 18, "promo_price": 12, "area": "bar", "tiene_ice": false },
-              { "id": "BAR-054", "nombre": "Golden Artesanal", "subtitulo": "Dorada, suave y afrutada", "precio": 18, "promo_price": 12, "area": "bar", "tiene_ice": false },
-              { "id": "BAR-055", "nombre": "Stout Artesanal", "subtitulo": "Oscura, torrefacta y cremosa", "precio": 20, "promo_price": 12, "area": "bar", "tiene_ice": false }
+              {
+                "id": "BAR-052",
+                "nombre": "Negra",
+                "precio": 15,
+                "promo_price": 12,
+                "area": "bar"
+              },
+              {
+                "id": "BAR-053",
+                "nombre": "Rubia",
+                "precio": 15,
+                "promo_price": 12,
+                "area": "bar"
+              },
+              {
+                "id": "BAR-054",
+                "nombre": "Roja",
+                "precio": 15,
+                "promo_price": 12,
+                "area": "bar"
+              },
+              {
+                "id": "BAR-055",
+                "nombre": "Choleada",
+                "descripcion": "Rubia y negra.",
+                "precio": 15,
+                "promo_price": 12,
+                "area": "bar"
+              }
             ]
           },
           {
             "nombre_categoria": "Cerveza",
             "items": [
-              { "id": "BAR-056", "nombre": "Cerveza Nacional", "subtitulo": "355 ml", "precio": 12, "area": "bar", "tiene_ice": false },
-              { "id": "BAR-057", "nombre": "Cerveza Importada", "subtitulo": "355 ml", "precio": 16, "area": "bar", "tiene_ice": false }
+              {
+                "id": "BAR-056",
+                "nombre": "Corona",
+                "precio": 25,
+                "area": "bar"
+              },
+              {
+                "id": "BAR-057",
+                "nombre": "Huari",
+                "precio": 20,
+                "area": "bar"
+              }
             ]
           },
           {
             "nombre_categoria": "Jugos Naturales",
             "items": [
-              { "id": "BAR-058", "nombre": "Jugo de Naranja", "subtitulo": "500 ml, natural", "precio": 12, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-059", "nombre": "Jugo de Maracuyá", "subtitulo": "500 ml, natural", "precio": 14, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-060", "nombre": "Jugo de Mango", "subtitulo": "500 ml, natural", "precio": 14, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-061", "nombre": "Jugo de Sandía", "subtitulo": "500 ml, natural", "precio": 14, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-062", "nombre": "Jugo de Papaya", "subtitulo": "500 ml, natural", "precio": 14, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-063", "nombre": "Jugo de Frutilla", "subtitulo": "500 ml, natural", "precio": 14, "area": "bar", "tiene_ice": true }
+              {
+                "id": "BAR-058",
+                "nombre": "Limonada",
+                "precio": 12,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-059",
+                "nombre": "Maracuyá",
+                "precio": 12,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-060",
+                "nombre": "Frutilla",
+                "precio": 12,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-061",
+                "nombre": "Mango",
+                "precio": 12,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-062",
+                "nombre": "Piña",
+                "precio": 12,
+                "area": "bar",
+                "tiene_ice": true
+              },
+              {
+                "id": "BAR-063",
+                "nombre": "Limonada con Hierbabuena y Jengibre",
+                "precio": 15,
+                "area": "bar",
+                "tiene_ice": true
+              }
             ]
           },
           {
             "nombre_categoria": "Gaseosas 500ml",
             "items": [
-              { "id": "BAR-064", "nombre": "Coca-Cola", "precio": 8, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-065", "nombre": "Sprite", "precio": 8, "area": "bar", "tiene_ice": true },
-              { "id": "BAR-066", "nombre": "Fanta", "precio": 8, "area": "bar", "tiene_ice": true }
+              {
+                "id": "BAR-064",
+                "nombre": "Coca-Cola",
+                "precio": 15,
+                "area": "bar"
+              },
+              {
+                "id": "BAR-065",
+                "nombre": "Fanta",
+                "precio": 15,
+                "area": "bar"
+              },
+              {
+                "id": "BAR-066",
+                "nombre": "Sprite",
+                "precio": 15,
+                "area": "bar"
+              }
             ]
           },
           {
             "nombre_categoria": "Agua",
             "items": [
-              { "id": "BAR-067", "nombre": "Agua Mineral", "subtitulo": "500 ml", "precio": 5, "area": "bar", "tiene_ice": true }
+              {
+                "id": "BAR-067",
+                "nombre": "Vital",
+                "precio": 10,
+                "area": "bar"
+              }
             ]
           },
           {
             "nombre_categoria": "Promociones",
             "items": [
-              { "id": "PROMO-001", "nombre": "Jueves de Chelada 2x1", "subtitulo": "Todas las cheladas 2x1, cada jueves", "precio": null, "area": "bar", "tiene_ice": false },
-              { "id": "PROMO-002", "nombre": "Happy Hour", "subtitulo": "Lun a vie 17:00-19:00: 2x1 en cheladas y tragos de la casa", "precio": null, "area": "bar", "tiene_ice": false },
-              { "id": "PROMO-003", "nombre": "Lunes de Shot", "subtitulo": "Shots seleccionados 2x1 todos los lunes", "precio": null, "area": "bar", "tiene_ice": false },
-              { "id": "PROMO-004", "nombre": "Martes de Michelada", "subtitulo": "Micheladas 2x1 todos los martes", "precio": null, "area": "bar", "tiene_ice": false },
-              { "id": "PROMO-005", "nombre": "Combo Canasta + Chelada", "subtitulo": "Canasta Rey + chelada a precio especial", "precio": null, "area": "bar", "tiene_ice": false },
-              { "id": "PROMO-006", "nombre": "Pitón de Cerveza", "subtitulo": "2 litros de cerveza nacional con descuento", "precio": null, "area": "bar", "tiene_ice": false }
+              {
+                "id": "PROMO-001",
+                "nombre": "Jueves de Chelada 2x1",
+                "descripcion": "2x1 en Micheladas Signature. Solo los jueves.",
+                "precio": null,
+                "area": "bar"
+              },
+              {
+                "id": "PROMO-002",
+                "nombre": "Miércoles de Barra",
+                "descripcion": "Cerveza Artesanal a precio especial. Solo los miércoles.",
+                "precio": 12,
+                "area": "bar"
+              },
+              {
+                "id": "PROMO-003",
+                "nombre": "Combo Michelada + Cerveza",
+                "descripcion": "1 Michelada Signature + 1 Cerveza Artesanal. Miércoles, jueves y domingo.",
+                "precio": 45,
+                "area": "bar"
+              },
+              {
+                "id": "PROMO-004",
+                "nombre": "Primera Visita",
+                "descripcion": "Michelada Signature para nuevos seguidores en Instagram. Miércoles, jueves y domingo.",
+                "precio": 25,
+                "area": "bar"
+              },
+              {
+                "id": "PROMO-005",
+                "nombre": "Doble Escarchado",
+                "descripcion": "Súmale un segundo escarchado: Tajín, coco o chamoy. Miércoles, jueves y domingo.",
+                "precio": 5,
+                "area": "bar"
+              },
+              {
+                "id": "PROMO-006",
+                "nombre": "Shot + Michelada",
+                "descripcion": "Remátala con un shot a tu elección. Miércoles, jueves y domingo.",
+                "precio": 15,
+                "area": "bar"
+              }
             ]
           }
         ]
@@ -327,76 +761,498 @@
           {
             "nombre_categoria": "Ensaladas",
             "items": [
-              { "id": "COC-001", "nombre": "César Tradicional", "ingredientes": ["Lechuga crespa", "Abundante pollo salteado"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-002", "nombre": "King César", "ingredientes": ["Lechuga", "Crutones", "Pollo salteado", "Aliño César"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-003", "nombre": "El Rey", "ingredientes": ["Mix verde", "Lechuga crespa", "Rácula", "Berros", "Manzana verde", "Corona de palta", "Pollo", "Nueces"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-004", "nombre": "Romántica", "ingredientes": ["Corazones de tomate", "Queso de cabra", "Albahaca", "Aceitunas verdes", "Nueces", "Almendras"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-005", "nombre": "Ensalada Surtida", "ingredientes": ["Verduras de estación a elección del chef"], "precio": null, "area": "cocina", "tiene_ice": false }
+              {
+                "id": "COC-001",
+                "nombre": "César Tradicional",
+                "ingredientes": [
+                  "Lechuga crespa",
+                  "Abundante pollo salteado"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-002",
+                "nombre": "King César",
+                "ingredientes": [
+                  "Lechuga",
+                  "Crutones",
+                  "Pollo salteado",
+                  "Aliño César"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-003",
+                "nombre": "El Rey",
+                "ingredientes": [
+                  "Mix verde",
+                  "Lechuga crespa",
+                  "Rácula",
+                  "Berros",
+                  "Manzana verde",
+                  "Corona de palta",
+                  "Pollo",
+                  "Nueces"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-004",
+                "nombre": "Romántica",
+                "ingredientes": [
+                  "Corazones de tomate",
+                  "Queso de cabra",
+                  "Albahaca",
+                  "Aceitunas verdes",
+                  "Nueces",
+                  "Almendras"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-005",
+                "nombre": "Ensalada Surtida",
+                "ingredientes": [
+                  "Verduras de estación a elección del chef"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              }
             ]
           },
           {
             "nombre_categoria": "Tablas y Canastas",
             "items": [
-              { "id": "COC-006", "nombre": "Canasta Rey", "ingredientes": ["Cama de papas fritas", "Pollo o carne", "Queso derretido", "Tocino crocante", "Cebollín picado"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-007", "nombre": "Canasta Mixta", "ingredientes": ["Cama de papas fritas", "Pollo", "Carne", "Queso derretido", "Tocino crocante", "Cebollín picado"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-008", "nombre": "Pichanaca para 2", "ingredientes": ["Papas fritas", "Carne", "Pollo", "Salchichas", "Queso fundido", "Huevo frito", "Cebolla frita"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-009", "nombre": "Pichanga para 4", "ingredientes": ["Papas fritas", "Carne", "Pollo", "Salchichas", "Queso fundido", "Huevo frito", "Cebolla frita", "Palta"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-010", "nombre": "Tabla Fría", "ingredientes": ["Aceitunas", "Pechuga ahumada", "Salame", "Queso", "Pepinillos"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-011", "nombre": "Tabla Rey", "ingredientes": ["Suculentos trozos de lomo vetado", "Trozos de pechuga de pollo", "Camarones al pil pil", "4 empanadas de queso", "Chips de camote"], "precio": null, "area": "cocina", "tiene_ice": false }
+              {
+                "id": "COC-006",
+                "nombre": "Canasta Rey",
+                "ingredientes": [
+                  "Cama de papas fritas",
+                  "Pollo o carne",
+                  "Queso derretido",
+                  "Tocino crocante",
+                  "Cebollín picado"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-007",
+                "nombre": "Canasta Mixta",
+                "ingredientes": [
+                  "Cama de papas fritas",
+                  "Pollo",
+                  "Carne",
+                  "Queso derretido",
+                  "Tocino crocante",
+                  "Cebollín picado"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-008",
+                "nombre": "Pichanaca para 2",
+                "ingredientes": [
+                  "Papas fritas",
+                  "Carne",
+                  "Pollo",
+                  "Salchichas",
+                  "Queso fundido",
+                  "Huevo frito",
+                  "Cebolla frita"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-009",
+                "nombre": "Pichanga para 4",
+                "ingredientes": [
+                  "Papas fritas",
+                  "Carne",
+                  "Pollo",
+                  "Salchichas",
+                  "Queso fundido",
+                  "Huevo frito",
+                  "Cebolla frita",
+                  "Palta"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-010",
+                "nombre": "Tabla Fría",
+                "ingredientes": [
+                  "Aceitunas",
+                  "Pechuga ahumada",
+                  "Salame",
+                  "Queso",
+                  "Pepinillos"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-011",
+                "nombre": "Tabla Rey",
+                "ingredientes": [
+                  "Suculentos trozos de lomo vetado",
+                  "Trozos de pechuga de pollo",
+                  "Camarones al pil pil",
+                  "4 empanadas de queso",
+                  "Chips de camote"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              }
             ]
           },
           {
             "nombre_categoria": "Burgers & Sandwiches",
             "items": [
-              { "id": "COC-012", "nombre": "Barro Luco", "ingredientes": ["Carne", "Abundante queso fundido"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-013", "nombre": "Broaster Chicken", "ingredientes": ["Pechuga de pollo crocante", "Tomate", "Lechuga"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-014", "nombre": "Americano", "ingredientes": ["Carne", "Huevo frito", "Queso fundido", "Jamón"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-015", "nombre": "Carnívoro Burguer", "ingredientes": ["Doble carne", "Tocino crocante", "Queso cheddar", "Cebolla caramelizada"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-016", "nombre": "Especial", "ingredientes": ["Carne", "Tomate", "Mayonesa"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-017", "nombre": "Italiano", "ingredientes": ["Carne", "Tomate", "Palta", "Mayonesa"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-018", "nombre": "Completo", "ingredientes": ["Carne", "Tomate", "Palta", "Chucrut", "Mayonesa"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-019", "nombre": "Chacarero", "ingredientes": ["Carne", "Tomate", "Porotos verdes", "Ají verde", "Mayonesa"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-020", "nombre": "Brasileño", "ingredientes": ["Carne", "Queso fundido", "Palta", "Mayonesa"], "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-021", "nombre": "La Crispy", "ingredientes": ["Pollo frito crocante con tocino", "Queso cheddar fundido", "Mayonesa"], "precio": null, "area": "cocina", "tiene_ice": false }
+              {
+                "id": "COC-012",
+                "nombre": "Barro Luco",
+                "ingredientes": [
+                  "Carne",
+                  "Abundante queso fundido"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-013",
+                "nombre": "Broaster Chicken",
+                "ingredientes": [
+                  "Pechuga de pollo crocante",
+                  "Tomate",
+                  "Lechuga"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-014",
+                "nombre": "Americano",
+                "ingredientes": [
+                  "Carne",
+                  "Huevo frito",
+                  "Queso fundido",
+                  "Jamón"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-015",
+                "nombre": "Carnívoro Burguer",
+                "ingredientes": [
+                  "Doble carne",
+                  "Tocino crocante",
+                  "Queso cheddar",
+                  "Cebolla caramelizada"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-016",
+                "nombre": "Especial",
+                "ingredientes": [
+                  "Carne",
+                  "Tomate",
+                  "Mayonesa"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-017",
+                "nombre": "Italiano",
+                "ingredientes": [
+                  "Carne",
+                  "Tomate",
+                  "Palta",
+                  "Mayonesa"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-018",
+                "nombre": "Completo",
+                "ingredientes": [
+                  "Carne",
+                  "Tomate",
+                  "Palta",
+                  "Chucrut",
+                  "Mayonesa"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-019",
+                "nombre": "Chacarero",
+                "ingredientes": [
+                  "Carne",
+                  "Tomate",
+                  "Porotos verdes",
+                  "Ají verde",
+                  "Mayonesa"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-020",
+                "nombre": "Brasileño",
+                "ingredientes": [
+                  "Carne",
+                  "Queso fundido",
+                  "Palta",
+                  "Mayonesa"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-021",
+                "nombre": "La Crispy",
+                "ingredientes": [
+                  "Pollo frito crocante con tocino",
+                  "Queso cheddar fundido",
+                  "Mayonesa"
+                ],
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              }
             ]
           },
           {
             "nombre_categoria": "Quesadillas",
             "items": [
-              { "id": "COC-022", "nombre": "Quesadilla Carne", "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-023", "nombre": "Quesadilla Pollo", "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-024", "nombre": "Quesadilla Mixta", "precio": null, "area": "cocina", "tiene_ice": false }
+              {
+                "id": "COC-022",
+                "nombre": "Quesadilla Carne",
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-023",
+                "nombre": "Quesadilla Pollo",
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-024",
+                "nombre": "Quesadilla Mixta",
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              }
             ]
           },
           {
             "nombre_categoria": "Pizzas",
-            "variantes_tamanos": ["Mediana", "Familiar", "XL"],
+            "variantes_tamanos": [
+              "Mediana",
+              "Familiar",
+              "XL"
+            ],
             "items": [
-              { "id": "COC-025", "nombre": "La Rey", "ingredientes": ["Salsa pomodoro", "Carne", "Queso fundido", "Champiñones", "Pimentón", "Orégano"], "precios": { "mediana": null, "familiar": null, "xl": null }, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-026", "nombre": "Vegetariana", "ingredientes": ["Salsa pomodoro", "Queso fundido", "Verduras variadas", "Orégano"], "precios": { "mediana": null, "familiar": null, "xl": null }, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-027", "nombre": "La Tóxica", "ingredientes": ["Salsa pomodoro", "Queso fundido", "Pepperoni", "Salame", "Jamón", "Chorizo", "Tocino", "Aceitunas negras", "Orégano"], "precios": { "mediana": null, "familiar": null, "xl": null }, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-028", "nombre": "Hawaiana", "ingredientes": ["Salsa pomodoro", "Queso", "Jamón cocido", "Piña tropical", "Orégano"], "precios": { "mediana": null, "familiar": null, "xl": null }, "area": "cocina", "tiene_ice": false }
+              {
+                "id": "COC-025",
+                "nombre": "La Rey",
+                "ingredientes": [
+                  "Salsa pomodoro",
+                  "Carne",
+                  "Queso fundido",
+                  "Champiñones",
+                  "Pimentón",
+                  "Orégano"
+                ],
+                "precios": {
+                  "mediana": null,
+                  "familiar": null,
+                  "xl": null
+                },
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-026",
+                "nombre": "Vegetariana",
+                "ingredientes": [
+                  "Salsa pomodoro",
+                  "Queso fundido",
+                  "Verduras variadas",
+                  "Orégano"
+                ],
+                "precios": {
+                  "mediana": null,
+                  "familiar": null,
+                  "xl": null
+                },
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-027",
+                "nombre": "La Tóxica",
+                "ingredientes": [
+                  "Salsa pomodoro",
+                  "Queso fundido",
+                  "Pepperoni",
+                  "Salame",
+                  "Jamón",
+                  "Chorizo",
+                  "Tocino",
+                  "Aceitunas negras",
+                  "Orégano"
+                ],
+                "precios": {
+                  "mediana": null,
+                  "familiar": null,
+                  "xl": null
+                },
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-028",
+                "nombre": "Hawaiana",
+                "ingredientes": [
+                  "Salsa pomodoro",
+                  "Queso",
+                  "Jamón cocido",
+                  "Piña tropical",
+                  "Orégano"
+                ],
+                "precios": {
+                  "mediana": null,
+                  "familiar": null,
+                  "xl": null
+                },
+                "area": "cocina",
+                "tiene_ice": false
+              }
             ]
           },
           {
             "nombre_categoria": "Empanadas",
             "items": [
-              { "id": "COC-029", "nombre": "Camarón Queso", "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-030", "nombre": "Choclo Crema, Queso", "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-031", "nombre": "Carne Queso", "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-032", "nombre": "Pollo Queso", "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-033", "nombre": "Casi Chaparrita", "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-034", "nombre": "Champiñón Queso", "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-035", "nombre": "Queso", "precio": null, "area": "cocina", "tiene_ice": false }
+              {
+                "id": "COC-029",
+                "nombre": "Camarón Queso",
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-030",
+                "nombre": "Choclo Crema, Queso",
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-031",
+                "nombre": "Carne Queso",
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-032",
+                "nombre": "Pollo Queso",
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-033",
+                "nombre": "Casi Chaparrita",
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-034",
+                "nombre": "Champiñón Queso",
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-035",
+                "nombre": "Queso",
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              }
             ]
           },
           {
             "nombre_categoria": "Salsas y Extras",
             "items": [
-              { "id": "COC-036", "nombre": "Salsa BBQ", "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-037", "nombre": "Salsa Verde", "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-038", "nombre": "Extra Queso", "precio": null, "area": "cocina", "tiene_ice": false },
-              { "id": "COC-039", "nombre": "Doble Tocino", "precio": null, "area": "cocina", "tiene_ice": false }
+              {
+                "id": "COC-036",
+                "nombre": "Salsa BBQ",
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-037",
+                "nombre": "Salsa Verde",
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-038",
+                "nombre": "Extra Queso",
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-039",
+                "nombre": "Doble Tocino",
+                "precio": null,
+                "area": "cocina",
+                "tiene_ice": false
+              }
             ]
           }
         ]
