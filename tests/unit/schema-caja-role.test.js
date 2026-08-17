@@ -79,13 +79,13 @@ function seedV4World(db) {
 
 describe('Migración staff rol caja (v4 → v6)', () => {
   it('SCHEMA_VERSION ahora es 7', () => {
-    expect(SCHEMA_VERSION).toBe(8);
+    expect(SCHEMA_VERSION).toBe(9);
   });
 
   it('DB nueva: applySchema crea staff que acepta role caja y registra versión 6', () => {
     const db = new Database(':memory:');
     applySchema(db);
-    expect(currentVersion(db)).toBe(8);
+    expect(currentVersion(db)).toBe(9);
     db.prepare(`
       INSERT INTO staff (id, pin_hash, role, display_name)
       VALUES ('caja-1', 'hash', 'caja', 'Cajero')
@@ -101,7 +101,7 @@ describe('Migración staff rol caja (v4 → v6)', () => {
 
     applySchema(db);
 
-    expect(currentVersion(db)).toBe(8);
+    expect(currentVersion(db)).toBe(9);
     // Los datos existentes se preservan
     const admin = db.prepare('SELECT role, display_name FROM staff WHERE id = ?').get('admin-1');
     expect(admin.role).toBe('admin');
@@ -119,7 +119,7 @@ describe('Migración staff rol caja (v4 → v6)', () => {
     const db = new Database(':memory:');
     applySchema(db);
     applySchema(db);
-    expect(currentVersion(db)).toBe(8);
+    expect(currentVersion(db)).toBe(9);
     db.prepare(`
       INSERT INTO staff (id, pin_hash, role, display_name)
       VALUES ('caja-1', 'hash', 'caja', 'Cajero')
@@ -153,7 +153,7 @@ describe('Migración cash_closings sin columnas fantasma (T6, misma v7)', () => 
 
     applySchema(db);
 
-    expect(currentVersion(db)).toBe(8);
+    expect(currentVersion(db)).toBe(9);
     // Columnas fantasma ELIMINADAS
     expect(hasColumn(db, 'cash_closings', 'total_sales')).toBe(false);
     expect(hasColumn(db, 'cash_closings', 'total_iva')).toBe(false);

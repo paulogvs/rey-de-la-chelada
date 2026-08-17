@@ -8,6 +8,11 @@
  *  categories + items into SQLite. Also creates modifier groups
  *  for items with size_variants (pizzas, etc).
  *
+ *  v9 (Sprint 1): el seed puede traer `precio_variable` (1 = "Consultar
+ *  precio", precio manual obligatorio) y `promo_price` (precio promo).
+ *  En UPDATE, price_variable solo se pisa si el seed lo define (null
+ *  conserva el valor existente para no pisar cambios del admin).
+ *
  *  Idempotent: safe to run multiple times.
  *
  *  Image path convention:
@@ -24,7 +29,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { getDb, closeDb } from '../db/index.js';
-import { createModifierGroupsForItem } from './menu-modifier-helpers.js';
+import { createModifierGroupsForItem, createAdditionsModifiersForItem } from './menu-modifier-helpers.js';
 
 // ── Paths ──────────────────────────────────────────────────
 const ROOT = resolve(import.meta.dirname, '..', '..');
@@ -98,12 +103,24 @@ export function loadMenuFromSeed(db, { log = console.log } = {}) {
           sizeVariants = seedItem.precios;
         }
 
+        // Sprint 1 (D): adicionales como modifiers (grupo "Adicionales" multi)
+        const adicionales = Array.isArray(seedItem.adicionales) ? seedItem.adicionales : null;
+
+        // price_variable (v9): 1 = "Consultar precio" (precio manual obligatorio
+        // al facturar). Solo se actualiza en UPDATE cuando el seed lo define
+        // explícitamente (null → se conserva el valor existente, no pisa admin).
+        const priceVariable = seedItem.precio_variable === undefined
+          ? null
+          : (seedItem.precio_variable ? 1 : 0);
+
         items.push({
           category: catName,
           name: seedItem.nombre,
           subtitle: seedItem.subtitulo || '',
           description: description || ingredientes,
           price: seedItem.precio ?? null,
+          price_variable: priceVariable,
+          promo_price: seedItem.promo_price ?? null,
           area: areaLower,
           sort_order: itemSort++,
           preparation_time: areaLower === 'bar' ? 5 : 15,
@@ -113,6 +130,7 @@ export function loadMenuFromSeed(db, { log = console.log } = {}) {
           ingredient_list: seedItem.ingredientes || [],
           garnish_list: seedItem.decoracion_garnish || [],
           recipe_json: seedItem.receta_tecnica || null,
+          adicionales,
         });
       }
     }
@@ -167,11 +185,16 @@ export function loadMenuFromSeed(db, { log = console.log } = {}) {
       const recipeJson = item.recipe_json ? JSON.stringify(item.recipe_json) : null;
 
       if (existing) {
+        // price/promo_price solo se rellenan si la DB está en NULL (CASE WHEN):
+        // el seed es SSOT para el arranque, pero NUNCA pisa un precio que el
+        // admin haya editado (contrato bootstrap.test.js "does NOT overwrite").
         db.prepare(`
           UPDATE menu_items
           SET subtitle = COALESCE(?, subtitle),
               description = COALESCE(?, description),
-              price = COALESCE(?, price),
+              price = CASE WHEN price IS NULL THEN COALESCE(?, price) ELSE price END,
+              price_variable = COALESCE(?, price_variable),
+              promo_price = CASE WHEN promo_price IS NULL THEN COALESCE(?, promo_price) ELSE promo_price END,
               area = COALESCE(?, area),
               sort_order = COALESCE(?, sort_order),
               preparation_time = COALESCE(?, preparation_time),
@@ -187,6 +210,8 @@ export function loadMenuFromSeed(db, { log = console.log } = {}) {
           item.subtitle || null,
           item.description || null,
           item.price,
+          item.price_variable,
+          item.promo_price,
           item.area,
           item.sort_order,
           item.preparation_time,
@@ -203,14 +228,19 @@ export function loadMenuFromSeed(db, { log = console.log } = {}) {
         if (item.size_variants) {
           createModifierGroupsForItem(db, existing.id, item.size_variants);
         }
+        // Sprint 1 (D): adicionales como modifiers (barra)
+        if (item.adicionales) {
+          createAdditionsModifiersForItem(db, existing.id, item.adicionales);
+        }
         itemsUpdated++;
       } else {
         const newId = randomUUID();
         db.prepare(`
-          INSERT INTO menu_items (id, category_id, name, subtitle, description, price, currency,
-                                  is_active, is_available, preparation_time, sort_order, area,
-                                  has_ice, ingredient_list, garnish_list, recipe_json, size_variants, image_url)
-          VALUES (?, ?, ?, ?, ?, ?, 'BOB', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO menu_items (id, category_id, name, subtitle, description, price, price_variable,
+                                  promo_price, currency, is_active, is_available, preparation_time,
+                                  sort_order, area, has_ice, ingredient_list, garnish_list, recipe_json,
+                                  size_variants, image_url)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'BOB', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           newId,
           category.id,
@@ -218,6 +248,8 @@ export function loadMenuFromSeed(db, { log = console.log } = {}) {
           item.subtitle || null,
           item.description || '',
           item.price,
+          item.price_variable ? 1 : 0,
+          item.promo_price,
           item.preparation_time,
           item.sort_order,
           item.area,
@@ -232,6 +264,10 @@ export function loadMenuFromSeed(db, { log = console.log } = {}) {
         // Create modifier groups for items with size_variants
         if (item.size_variants) {
           createModifierGroupsForItem(db, newId, item.size_variants);
+        }
+        // Sprint 1 (D): adicionales como modifiers (barra)
+        if (item.adicionales) {
+          createAdditionsModifiersForItem(db, newId, item.adicionales);
         }
         itemsCreated++;
       }

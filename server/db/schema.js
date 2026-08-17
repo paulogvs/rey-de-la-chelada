@@ -26,7 +26,17 @@
 // v8 (Fase 5 — cobro): payments.proof_photo TEXT NOT NULL DEFAULT '' — ruta del comprobante
 //   foto del pago QR (se sube en base64, se guarda en data/payment-proofs/). SOLO aplica a
 //   method='qr' (el efectivo no necesita foto). ADD COLUMN no destructivo.
-const SCHEMA_VERSION = 8;
+// v9 (S1 — menú oficial de barra + promos): soporte de precios variable/promocionales.
+//   - menu_items.price_variable INTEGER NOT NULL DEFAULT 0 — item con precio MANUAL
+//     ("Consultar precio", ej. Negra Ahumada / Flor de Caña): price IS NULL + flag 1 →
+//     el server exige manual_price > 0 en el payload (nunca factura Bs 0).
+//   - menu_items.promo_price REAL NULL — precio promocional del item (Miércoles de Barra
+//     = 12, Primera Visita = 25); NULL = sin promo. El mesero lo aplica con toggle manual
+//     (apply_promo) y el server lo valida contra la DB.
+//   - order_items.promo_label TEXT NULL — 'Promo' cuando la línea se facturó con
+//     promo_price (el ticket imprime "(Promo)" discreto para la caja).
+//   Las 3 son ADD COLUMN no destructivas (los registros existentes quedan con defaults).
+const SCHEMA_VERSION = 9;
 
 const CREATE_TABLES = [
   // ── Staff / Users (v5: 4 roles — admin, mesero, kds, caja) ─────
@@ -77,6 +87,8 @@ const CREATE_TABLES = [
     subtitle        TEXT,
     description     TEXT NOT NULL DEFAULT '',
     price           REAL,
+    price_variable  INTEGER NOT NULL DEFAULT 0,  -- v9: precio MANUAL ("Consultar precio")
+    promo_price     REAL,                        -- v9: precio promocional (NULL = sin promo)
     currency        TEXT NOT NULL DEFAULT 'BOB',
     iva_percentage  REAL NOT NULL DEFAULT 13,
     image_url       TEXT,
@@ -159,6 +171,7 @@ const CREATE_TABLES = [
     quantity        INTEGER NOT NULL DEFAULT 1,
     unit_price      REAL NOT NULL,
     modifiers_json  TEXT,  -- JSON array of {groupName, optionName, priceAdjustment}
+    promo_label     TEXT,  -- v9: 'Promo' cuando la línea se facturó con promo_price
     subtotal        REAL NOT NULL,
     status          TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','preparing','ready','delivered','cancelled')),
     round           INTEGER NOT NULL DEFAULT 1,
@@ -316,6 +329,22 @@ function applySchema(db) {
       if (!hasColumn(db, 'payments', 'proof_photo')) {
         db.exec(`ALTER TABLE payments ADD COLUMN proof_photo TEXT NOT NULL DEFAULT ''`);
         console.log('[DB] Migration v8: payments.proof_photo (comprobante QR)');
+      }
+      // v9 (S1 — menú oficial de barra + promos): price_variable/promo_price en
+      // menu_items + promo_label en order_items. Cada ADD COLUMN se dispara por
+      // separado (defensivo ante DBs parcialmente migradas). No destructivo:
+      // items existentes → price_variable=0, promo_price=NULL, promo_label=NULL.
+      if (!hasColumn(db, 'menu_items', 'price_variable')) {
+        db.exec(`ALTER TABLE menu_items ADD COLUMN price_variable INTEGER NOT NULL DEFAULT 0`);
+        console.log('[DB] Migration v9: menu_items.price_variable (precio manual)');
+      }
+      if (!hasColumn(db, 'menu_items', 'promo_price')) {
+        db.exec(`ALTER TABLE menu_items ADD COLUMN promo_price REAL`);
+        console.log('[DB] Migration v9: menu_items.promo_price (precio promocional)');
+      }
+      if (!hasColumn(db, 'order_items', 'promo_label')) {
+        db.exec(`ALTER TABLE order_items ADD COLUMN promo_label TEXT`);
+        console.log('[DB] Migration v9: order_items.promo_label (Promo en ticket)');
       }
       // v5a: staff con rol 'caja' — recrear SOLO si el CHECK viejo no lo acepta
       if (!staffAcceptsCajaRole(db)) {

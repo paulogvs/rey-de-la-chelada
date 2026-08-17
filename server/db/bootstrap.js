@@ -76,8 +76,8 @@ export function ensureBootstrap(db, { log = console.log } = {}) {
   // ── 3. Precios demo (solo si hay items sin precio) ────────
   const nullPriceCount = db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL').get().n;
   if (nullPriceCount > 0) {
-    applyDemoPrices(db, { log });
-    log(`[Bootstrap] Precios demo aplicados a ${nullPriceCount} items`);
+    const priceResult = applyDemoPrices(db, { log });
+    log(`[Bootstrap] Precios demo: ${priceResult.updated} items rellenados (${nullPriceCount} sin precio en DB)`);
     steps.push('prices-applied');
   } else {
     log(`[Bootstrap] Todos los items ya tienen precio — skip`);

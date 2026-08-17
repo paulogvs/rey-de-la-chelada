@@ -14,7 +14,6 @@
  *    node server/scripts/demo-prices.js --reset    → deja todo en NULL/0
  *
  *  Rango por categoría (BOB, Cochabamba):
- *    Micheladas             Bs 25 – 45
  *    Ensaladas              Bs 28 – 40
  *    Tablas y Canastas      Bs 42 – 85
  *    Burgers & Sandwiches   Bs 26 – 40
@@ -22,6 +21,12 @@
  *    Pizzas (Mediana)       Bs 50 (Familiar +20, XL +40 → 50–90)
  *    Empanadas              Bs 12 – 17
  *    Salsas y Extras        Bs 6 – 10
+ *
+ *  ⚠️ Sprint 1 (2026-08-17): el menú BAR ya trae precios REALES en el seed.
+ *  El demo SOLO rellena items sin precio (price IS NULL), NUNCA a items de
+ *  precio manual (price_variable = 1, "Consultar precio") ni a la categoría
+ *  display "Promociones" (no facturables). 'Micheladas de la Casa' (vieja
+ *  categoría del seed genérico) fue retirada del plan.
  * ═══════════════════════════════════════════════════════════
  */
 
@@ -33,8 +38,8 @@ import {
 } from '../services/menu-bulk-updates.js';
 
 // ── Pricing plan: category → prices in sort_order ──────────
+// Sprint 1: SOLO categorías COCINA (el menú BAR ya tiene precios reales).
 const PRICING_PLAN = {
-  'Micheladas de la Casa': [28, 30, 32, 34, 30, 33, 35, 32, 31, 34],
   'Ensaladas': [28, 32, 38, 34, 30],
   'Tablas y Canastas': [45, 52, 58, 68, 42, 85],
   'Burgers & Sandwiches': [28, 32, 30, 38, 26, 34, 30, 35, 32, 40, 36],
@@ -43,6 +48,9 @@ const PRICING_PLAN = {
   'Empanadas': [14, 15, 16, 14, 17, 15, 12],
   'Salsas y Extras': [6, 7, 8, 10],
 };
+
+/** Categoría display de promociones — nunca facturable, jamás recibe demo price. */
+const DISPLAY_ONLY_CATEGORIES = new Set(['Promociones']);
 
 /** Tamaños de pizza: ajuste de precio sobre el precio base (Mediana). */
 const PIZZA_SIZE_ADJUST = { Mediana: 0, Familiar: 20, XL: 40 };
@@ -130,7 +138,7 @@ export function applyDemoPrices(db, { log = console.log, dryRun = false, reset =
 
   // 1. Cargar items con su categoría (ordenados por sort_order)
   const items = db.prepare(`
-    SELECT mi.id, mi.name, mi.price, mc.name as category
+    SELECT mi.id, mi.name, mi.price, mi.price_variable, mc.name as category
     FROM menu_items mi
     JOIN menu_categories mc ON mi.category_id = mc.id
     ORDER BY mc.sort_order ASC, mi.sort_order ASC
@@ -170,6 +178,13 @@ export function applyDemoPrices(db, { log = console.log, dryRun = false, reset =
   for (const [category, catItems] of Object.entries(byCategory)) {
     const plan = PRICING_PLAN[category];
     catItems.forEach((item, idx) => {
+      // Sprint 1: el demo SOLO rellena items sin precio. Nunca pisa precios
+      // reales del seed, ni items "Consultar precio" (price_variable = 1),
+      // ni categorías display no facturables (Promociones).
+      if (item.price !== null) return;
+      if (item.price_variable === 1) return;
+      if (DISPLAY_ONLY_CATEGORIES.has(category)) return;
+
       const price = plan ? (plan[idx] ?? FALLBACK_PRICE) : FALLBACK_PRICE;
       if (item.price !== price) {
         itemUpdates.push({ id: item.id, price });

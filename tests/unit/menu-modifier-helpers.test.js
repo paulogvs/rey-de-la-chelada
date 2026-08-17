@@ -49,6 +49,16 @@ function makeDb() {
         },
         run(...args) {
           if (sql.includes('INSERT INTO modifier_groups')) {
+            if (sql.includes('Adicionales')) {
+              // Sprint 1 (D): VALUES (?, ?, 'Adicionales', 'multi', 0, 0, ?, 1)
+              const [id, menu_item_id, max_select] = args;
+              groups.set(id, {
+                id, menu_item_id,
+                name: 'Adicionales', type: 'multi',
+                required: 0, min_select: 0, max_select, sort_order: 1,
+              });
+              return { changes: 1 };
+            }
             // Helper SQL has literals: VALUES (?, ?, 'Tamaño', 'select', 1, 1, 1, 0)
             const [id, menu_item_id] = args;
             groups.set(id, {
@@ -59,6 +69,15 @@ function makeDb() {
             return { changes: 1 };
           }
           if (sql.includes('UPDATE modifier_groups')) {
+            if (sql.includes('max_select')) {
+              // Sprint 1 (D): SET type='multi', required=0, min_select=0, max_select=? WHERE id=?
+              const [max_select, id] = args;
+              const g = groups.get(id);
+              if (g) {
+                g.type = 'multi'; g.required = 0; g.min_select = 0; g.max_select = max_select;
+              }
+              return { changes: 1 };
+            }
             // Helper SQL: SET type = 'select', required = 1, min_select = 1, max_select = 1 WHERE id = ?
             const [id] = args;
             const g = groups.get(id);
@@ -68,13 +87,23 @@ function makeDb() {
             return { changes: 1 };
           }
           if (sql.includes('UPDATE modifier_options')) {
-            // P0-2 (2026-08-11): UPSERT — SET price_adjustment=?, is_default=?, sort_order=? WHERE id=?
-            const [price_adjustment, is_default, sort_order, id] = args;
-            const opt = options.get(id);
-            if (opt) {
-              opt.price_adjustment = price_adjustment;
-              opt.is_default = is_default;
-              opt.sort_order = sort_order;
+            if (sql.includes('is_default')) {
+              // P0-2 (2026-08-11): UPSERT tamaños — SET price_adjustment=?, is_default=?, sort_order=? WHERE id=?
+              const [price_adjustment, is_default, sort_order, id] = args;
+              const opt = options.get(id);
+              if (opt) {
+                opt.price_adjustment = price_adjustment;
+                opt.is_default = is_default;
+                opt.sort_order = sort_order;
+              }
+            } else {
+              // Sprint 1 (D): UPSERT adicionales — SET price_adjustment=?, sort_order=? WHERE id=?
+              const [price_adjustment, sort_order, id] = args;
+              const opt = options.get(id);
+              if (opt) {
+                opt.price_adjustment = price_adjustment;
+                opt.sort_order = sort_order;
+              }
             }
             return { changes: 1 };
           }
@@ -239,5 +268,67 @@ describe('createModifierGroupsForItem', () => {
     const byName = Object.fromEntries(Array.from(db.options.values()).map(o => [o.name, o]));
     expect(byName['Familiar'].price_adjustment).toBe(25);
     expect(byName['XL'].price_adjustment).toBe(45);
+  });
+});
+
+// ═══ Sprint 1 (D): adicionales como modifiers ═══════════════════
+import { createAdditionsModifiersForItem } from '../../server/scripts/menu-modifier-helpers.js';
+
+describe('createAdditionsModifiersForItem', () => {
+  let db;
+
+  beforeEach(() => {
+    db = makeDb();
+  });
+
+  it('crea el grupo "Adicionales" (multi, opcional) con sus opciones y precios', () => {
+    createAdditionsModifiersForItem(db, 'bar-001', [
+      { nombre: 'Shot + Michelada', precio: 15 },
+      { nombre: 'Doble Escarchado', precio: 5 },
+    ]);
+
+    const group = Array.from(db.groups.values())[0];
+    expect(group.name).toBe('Adicionales');
+    expect(group.type).toBe('multi');
+    expect(group.required).toBe(0);
+    expect(group.max_select).toBe(2);
+
+    const byName = Object.fromEntries(Array.from(db.options.values()).map(o => [o.name, o]));
+    expect(byName['Shot + Michelada'].price_adjustment).toBe(15);
+    expect(byName['Doble Escarchado'].price_adjustment).toBe(5);
+  });
+
+  it('re-run es idempotente: actualiza el grupo existente sin duplicar opciones', () => {
+    const additions = [
+      { nombre: 'Shot + Michelada', precio: 15 },
+      { nombre: 'Doble Escarchado', precio: 5 },
+    ];
+    createAdditionsModifiersForItem(db, 'bar-002', additions);
+    const firstGroupId = Array.from(db.groups.values())[0].id;
+
+    // Restart del server — load-menu re-corre con el mismo catálogo
+    createAdditionsModifiersForItem(db, 'bar-002', additions);
+
+    expect(db.groups.size).toBe(1);
+    expect(db.options.size).toBe(2);
+    expect(Array.from(db.groups.values())[0].id).toBe(firstGroupId);
+  });
+
+  it('actualiza el precio de una opción existente cuando el seed cambia', () => {
+    createAdditionsModifiersForItem(db, 'bar-003', [{ nombre: 'Shot + Michelada', precio: 15 }]);
+    createAdditionsModifiersForItem(db, 'bar-003', [{ nombre: 'Shot + Michelada', precio: 18 }]);
+
+    const opt = Array.from(db.options.values())[0];
+    expect(opt.name).toBe('Shot + Michelada');
+    expect(opt.price_adjustment).toBe(18);
+    expect(db.options.size).toBe(1); // sin duplicados
+  });
+
+  it('adicionales vacíos o sin nombre → no-op', () => {
+    expect(createAdditionsModifiersForItem(db, 'bar-004', [])).toBeNull();
+    expect(createAdditionsModifiersForItem(db, 'bar-004', null)).toBeNull();
+    expect(createAdditionsModifiersForItem(db, 'bar-004', [{ nombre: '  ', precio: 5 }])).toBeNull();
+    expect(db.groups.size).toBe(0);
+    expect(db.options.size).toBe(0);
   });
 });

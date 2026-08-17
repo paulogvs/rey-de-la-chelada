@@ -103,3 +103,77 @@ export function createModifierGroupsForItem(db, menuItemId, sizeVariants) {
 
   return groupId;
 }
+
+/**
+ * Create an "Adicionales" modifier group for a bar item (Sprint 1 D).
+ *
+ * Los adicionales del menú físico (Shot + Michelada, Doble Escarchado, ...)
+ * se modelan como modifier_options del grupo multi "Adicionales" — el mesero
+ * los agrega al pedido como cualquier modifier y el pricing server-side los
+ * suma por nombre (order-pricing.js).
+ *
+ * Idempotente: UPSERT por (menu_item_id, name) para el grupo y por
+ * (group_id, name) para las opciones → IDs estables, sin duplicados.
+ *
+ * @param {object} db — better-sqlite3 database instance
+ * @param {string} menuItemId — the menu_items.id
+ * @param {Array<{nombre: string, precio: number}>} additions — catálogo
+ * @returns {string|null} groupId if created/updated, null if skipped
+ */
+export function createAdditionsModifiersForItem(db, menuItemId, additions) {
+  if (!db || !menuItemId || !Array.isArray(additions) || additions.length === 0) {
+    return null;
+  }
+  // Filtra opciones válidas (nombre no vacío) — si no queda ninguna → no-op
+  const valid = additions
+    .map(add => ({ name: String(add.nombre || '').trim(), price: Number(add.precio) }))
+    .filter(a => a.name.length > 0);
+  if (valid.length === 0) return null;
+
+  const existing = db.prepare(
+    'SELECT id FROM modifier_groups WHERE menu_item_id = ? AND name = ?'
+  ).get(menuItemId, 'Adicionales');
+
+  let groupId;
+  if (existing) {
+    groupId = existing.id;
+    db.prepare(`
+      UPDATE modifier_groups
+      SET type = 'multi', required = 0, min_select = 0, max_select = ?
+      WHERE id = ?
+    `).run(valid.length, groupId);
+  } else {
+    groupId = randomUUID();
+    db.prepare(`
+      INSERT INTO modifier_groups (id, menu_item_id, name, type, required, min_select, max_select, sort_order)
+      VALUES (?, ?, 'Adicionales', 'multi', 0, 0, ?, 1)
+    `).run(groupId, menuItemId, valid.length);
+  }
+
+  const findOption = db.prepare(
+    'SELECT id, price_adjustment FROM modifier_options WHERE group_id = ? AND name = ?'
+  );
+  const updateOption = db.prepare(`
+    UPDATE modifier_options SET price_adjustment = ?, sort_order = ?
+    WHERE id = ?
+  `);
+  const insertOption = db.prepare(`
+    INSERT INTO modifier_options (id, group_id, name, price_adjustment, is_default, sort_order)
+    VALUES (?, ?, ?, ?, 0, ?)
+  `);
+
+  let sortOrder = 0;
+  for (const add of valid) {
+    const finalPrice = Number.isFinite(add.price) ? add.price : 0;
+
+    const existingOpt = findOption.get(groupId, add.name);
+    if (existingOpt) {
+      updateOption.run(finalPrice, sortOrder, existingOpt.id);
+    } else {
+      insertOption.run(randomUUID(), groupId, add.name, finalPrice, sortOrder);
+    }
+    sortOrder++;
+  }
+
+  return groupId;
+}
