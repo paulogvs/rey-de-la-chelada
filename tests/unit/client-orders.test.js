@@ -27,6 +27,7 @@ function createMockDb() {
     { id: 'o2', group_id: 'g1', name: 'Familiar', price_adjustment: 15, is_default: 0 },
     { id: 'o3', group_id: 'g1', name: 'Familiar XL', price_adjustment: 30, is_default: 0 },
   ];
+  const modifierGroups = [{ id: 'g1', menu_item_id: 'm3' }];
   const orders = [];
   const orderItems = [];
   const calls = [];
@@ -88,7 +89,14 @@ function createMockDb() {
       if (sql.includes('FROM order_items')) {
         return orderItems.filter(oi => oi.order_id === params[0]);
       }
-      if (sql.includes('FROM modifier_options') && sql.includes('IN')) {
+      if (sql.includes('FROM modifier_groups')) {
+        // resolveModifierAdjustment: grupos de un menu_item
+        return modifierGroups.filter(g => g.menu_item_id === params[0]);
+      }
+      if (sql.includes('FROM modifier_options') && sql.includes('group_id IN')) {
+        return modifierOptions.filter(o => params.includes(o.group_id));
+      }
+      if (sql.includes('FROM modifier_options') && sql.includes('id IN')) {
         return modifierOptions.filter(o => params.includes(o.id));
       }
       return [];
@@ -174,7 +182,9 @@ describe('createPublicOrder service', () => {
     expect(mockDb._state.orderItems).toHaveLength(2);
   });
 
-  it('uses price 0 when menu item price is null (size-variant item)', async () => {
+  it('rejects size-variant item WITHOUT size (price null, no manual) → PRICE_REQUIRED_MANUAL', async () => {
+    // Sprint 1 (B): el server NUNCA factura 0. Un item de precio null sin
+    // manual_price (clientes no lo mandan) ni tamaño es rechazado.
     const { createPublicOrder } = await import('../../server/services/client-orders.js');
     const result = createPublicOrder(mockDb, {
       table_number: 1,
@@ -182,11 +192,9 @@ describe('createPublicOrder service', () => {
       items: [{ menu_item_id: 'm3', quantity: 1 }],
     });
 
-    expect(result.success).toBe(true);
-    const order = mockDb._state.orders[0];
-    // m3 price null → 0 (sin IVA, total 0)
-    expect(order.subtotal).toBe(0);
-    expect(order.total).toBe(0);
+    expect(result.success).toBe(false);
+    expect(result.code).toBe('PRICE_REQUIRED_MANUAL');
+    expect(mockDb._state.orders).toHaveLength(0);
   });
 
   it('rejects when table does not exist', async () => {

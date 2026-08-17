@@ -16,6 +16,7 @@
 import { randomUUID } from 'node:crypto';
 import { computeTotals, round2 } from '../../src/core/config/iva.js';
 import { localDateTimeStr } from '../utils/date-utils.js'; // P2-4: hora local La Paz
+import { resolveItemUnitPrice } from './order-pricing.js'; // Sprint 1 (B): SSOT precios
 
 /**
  * Create a public order from the clientes PWA.
@@ -47,7 +48,7 @@ export function createPublicOrder(db, input) {
   let subtotal = 0;
   const orderItems = [];
   const findItem = db.prepare(
-    'SELECT id, name, price, area, category_id FROM menu_items WHERE id = ? AND is_active = 1 AND is_available = 1'
+    'SELECT id, name, price, price_variable, promo_price, area, category_id FROM menu_items WHERE id = ? AND is_active = 1 AND is_available = 1'
   );
 
   for (const item of items) {
@@ -65,38 +66,52 @@ export function createPublicOrder(db, input) {
       return { success: false, code: 'INVALID_QUANTITY', error: 'Cantidad inválida (debe ser ≥ 1)' };
     }
 
-    // Resolve unit price: base price (null = size-variant item) + modifier adjustments.
+    // Resolve unit price (SSOT server-side) — Sprint 1 (B): los items
+    // "Consultar precio" (price_variable=1) y los display no facturables son
+    // SOLO LECTURA en clientes (el cliente no manda manual_price) → el
+    // resolver rechaza con PRICE_REQUIRED_MANUAL. Cero promos en clientes.
     // Contrato SSOT: modifiers llegan como [{ option_id }] (camelCase en el
     // payload público clientes → snake_case opción única). Ya NO se tolera
     // el doble-nombre modifier_option_id.
-    let modifierAdjustment = 0;
     let modifierSummary = [];
+    const optionNames = [];
     const rawModifiers = Array.isArray(item.modifiers) ? item.modifiers : [];
-    if (rawModifiers.length > 0) {
-      const optionIds = rawModifiers.map(m => m.option_id).filter(Boolean);
-      let options = [];
-      if (optionIds.length > 0) {
-        const placeholders = optionIds.map(() => '?').join(',');
-        options = db.prepare(
-          `SELECT id, name, price_adjustment FROM modifier_options WHERE id IN (${placeholders})`
-        ).all(...optionIds);
+    const optionIds = rawModifiers.map(m => m.option_id).filter(Boolean);
+    let options = [];
+    if (optionIds.length > 0) {
+      const placeholders = optionIds.map(() => '?').join(',');
+      options = db.prepare(
+        `SELECT id, name, price_adjustment FROM modifier_options WHERE id IN (${placeholders})`
+      ).all(...optionIds);
+    }
+    for (const m of rawModifiers) {
+      const opt = options.find(o => o.id === m.option_id);
+      if (!opt) {
+        return {
+          success: false,
+          code: 'INVALID_MODIFIER_OPTION',
+          error: `Opción inválida: ${m.option_id}`,
+        };
       }
-      for (const m of rawModifiers) {
-        const opt = options.find(o => o.id === m.option_id);
-        if (!opt) {
-          return {
-            success: false,
-            code: 'INVALID_MODIFIER_OPTION',
-            error: `Opción inválida: ${m.option_id}`,
-          };
-        }
-        modifierAdjustment += Number(opt.price_adjustment || 0);
-        modifierSummary.push({ option_id: opt.id, name: opt.name, price_adjustment: opt.price_adjustment });
-      }
+      modifierSummary.push({ option_id: opt.id, name: opt.name, price_adjustment: opt.price_adjustment });
+      optionNames.push({ optionName: opt.name, groupName: '' });
     }
 
-    const basePrice = menuItem.price ?? 0;
-    const unitPrice = round2(basePrice + modifierAdjustment);
+    const pricing = resolveItemUnitPrice(db, menuItem, {
+      manualPrice: item.manual_price,
+      applyPromo: false, // clientes: cero promos
+      modifiers: optionNames,
+    });
+    if (pricing.error) {
+      return {
+        success: false,
+        code: pricing.error.code,
+        error: pricing.error.message,
+        menu_item_id: item.menu_item_id,
+      };
+    }
+
+    const unitPrice = pricing.unitPrice;
     const itemSubtotal = round2(unitPrice * quantity);
     subtotal += itemSubtotal;
 
@@ -107,6 +122,7 @@ export function createPublicOrder(db, input) {
       quantity,
       unit_price: unitPrice,
       subtotal: itemSubtotal,
+      promo_label: pricing.promoLabel,
       modifiers_json: modifierSummary.length > 0 ? JSON.stringify(modifierSummary) : null,
       // Contrato SSOT: el campo de notas es `notes` (único). No se tolera
       // el doble-nombre preparation_notes en la entrada pública.
@@ -198,12 +214,13 @@ export function createPublicOrder(db, input) {
 
   const insertItem = db.prepare(`
     INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
-                             unit_price, modifiers_json, subtotal, status, preparation_notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             unit_price, modifiers_json, subtotal, status, preparation_notes, promo_label)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   for (const oi of orderItems) {
     insertItem.run(oi.id, orderId, oi.menu_item_id, oi.menu_item_name, oi.quantity,
-                   oi.unit_price, oi.modifiers_json, oi.subtotal, oi.status, oi.preparation_notes);
+                   oi.unit_price, oi.modifiers_json, oi.subtotal, oi.status, oi.preparation_notes,
+                   oi.promo_label);
   }
 
   // Mark table as occupied

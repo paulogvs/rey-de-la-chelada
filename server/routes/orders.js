@@ -27,7 +27,7 @@ import { logger } from '../utils/logger.js'; // S1/T2: errores de pedidos al log
 import { broadcastOrderCreated, broadcastOrderStatusChange, broadcastOrderComplete, isOrderFullyReady, isModuleFullyReady, broadcastModuleReady } from '../services/order-broadcaster.js';
 import { broadcaster, buildKDSEvent, KDSEventType } from '../services/websocket-broadcaster.js';
 import { computeTotals, round2 } from '../../src/core/config/iva.js';
-import { resolveModifierAdjustment, recalcOrder } from '../services/order-pricing.js';
+import { resolveModifierAdjustment, resolveItemUnitPrice, recalcOrder } from '../services/order-pricing.js';
 import { recalcOrderStatus, resolveRound } from '../services/order-status.js';
 
 const router = Router();
@@ -204,7 +204,7 @@ router.get('/kds/:module', requireAuth, requireRole('admin', 'kds'), (req, res) 
       let itemSql = `
         SELECT oi.id, oi.menu_item_id, mi.name as item_name, oi.quantity,
                oi.unit_price, oi.preparation_notes as item_notes, oi.status as item_status,
-               oi.modifiers_json, oi.created_at, oi.round, mi.area as kds_module
+               oi.modifiers_json, oi.created_at, oi.round, oi.promo_label, mi.area as kds_module
         FROM order_items oi
         JOIN menu_items mi ON oi.menu_item_id = mi.id
         WHERE oi.order_id = ?
@@ -308,14 +308,29 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
       }
 
       const menuItem = db.prepare(
-        'SELECT id, name, price, category_id, area FROM menu_items WHERE id = ? AND is_active = 1'
+        'SELECT id, name, price, price_variable, promo_price, category_id, area FROM menu_items WHERE id = ? AND is_active = 1'
       ).get(item.menu_item_id);
       if (!menuItem) {
         return res.status(400).json({ success: false, error: `Item inválido: ${item.menu_item_id}`, code: 'INVALID_MENU_ITEM' });
       }
 
-      const { adjustment, summary } = resolveModifierAdjustment(db, menuItem.id, item.modifiers);
-      const unitPrice = round2((menuItem.price || 0) + adjustment);
+      // Sprint 1 (B/E): precio manual "Consultar precio" + promo manual.
+      // SSOT: el server resuelve unit_price (nunca acepta precios del cliente).
+      const pricing = resolveItemUnitPrice(db, menuItem, {
+        manualPrice: item.manual_price,
+        applyPromo: item.apply_promo === true,
+        modifiers: item.modifiers,
+      });
+      if (pricing.error) {
+        return res.status(400).json({
+          success: false,
+          error: pricing.error.message,
+          code: pricing.error.code,
+          menu_item_id: item.menu_item_id,
+        });
+      }
+      const { summary } = resolveModifierAdjustment(db, menuItem.id, item.modifiers);
+      const unitPrice = pricing.unitPrice;
       const itemSubtotal = round2(unitPrice * quantity);
 
       subtotal += itemSubtotal;
@@ -327,6 +342,7 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
         quantity,
         unit_price: unitPrice,
         subtotal: itemSubtotal,
+        promo_label: pricing.promoLabel,
         modifiers_json: summary.length > 0 ? JSON.stringify(summary) : null,
         preparation_notes: item.notes || '',
         status: 'pending',
@@ -356,12 +372,13 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
 
     const insertItem = db.prepare(`
       INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
-                               unit_price, modifiers_json, subtotal, status, round, preparation_notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               unit_price, modifiers_json, subtotal, status, round, preparation_notes, promo_label)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const oi of orderItems) {
       insertItem.run(oi.id, orderId, oi.menu_item_id, oi.menu_item_name, oi.quantity,
-                     oi.unit_price, oi.modifiers_json, oi.subtotal, oi.status, 1, oi.preparation_notes);
+                     oi.unit_price, oi.modifiers_json, oi.subtotal, oi.status, 1, oi.preparation_notes,
+                     oi.promo_label);
     }
 
     // Mark table as ordered (pedido confirmado en cocina/bar)
@@ -435,13 +452,27 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
             });
           }
           const menuItem = db.prepare(
-            'SELECT id, name, price FROM menu_items WHERE id = ? AND is_active = 1'
+            'SELECT id, name, price, price_variable, promo_price FROM menu_items WHERE id = ? AND is_active = 1'
           ).get(item.menu_item_id);
           if (!menuItem) {
             return res.status(400).json({
               success: false,
               error: `Item inválido: ${item.menu_item_id}`,
               code: 'INVALID_MENU_ITEM',
+            });
+          }
+          // Sprint 1 (B/E): validar pricing (manual/promo) ANTES de la transacción
+          const pricing = resolveItemUnitPrice(db, menuItem, {
+            manualPrice: item.manual_price,
+            applyPromo: item.apply_promo === true,
+            modifiers: item.modifiers,
+          });
+          if (pricing.error) {
+            return res.status(400).json({
+              success: false,
+              error: pricing.error.message,
+              code: pricing.error.code,
+              menu_item_id: item.menu_item_id,
             });
           }
         }
@@ -462,17 +493,18 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
         // 2) Upsert incremental por item
         if (Array.isArray(items) && items.length > 0) {
           const getMenuItem = db.prepare(
-            'SELECT id, name, price FROM menu_items WHERE id = ? AND is_active = 1'
+            'SELECT id, name, price, price_variable, promo_price FROM menu_items WHERE id = ? AND is_active = 1'
           );
           const updateItem = db.prepare(`
             UPDATE order_items
-            SET quantity = ?, unit_price = ?, modifiers_json = ?, subtotal = ?, preparation_notes = ?
+            SET quantity = ?, unit_price = ?, modifiers_json = ?, subtotal = ?,
+                preparation_notes = ?, promo_label = ?
             WHERE id = ? AND order_id = ?
           `);
           const insertItem = db.prepare(`
             INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
-                                     unit_price, modifiers_json, subtotal, status, round, preparation_notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+                                     unit_price, modifiers_json, subtotal, status, round, preparation_notes, promo_label)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
           `);
 
           // FASE 4B: los items NUEVOS de esta tanda van a la MISMA ronda.
@@ -490,19 +522,30 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
             const quantity = item.quantity ?? 1;
             if (!Number.isFinite(quantity) || quantity < 1) continue;
 
-            const { adjustment, summary } = resolveModifierAdjustment(db, menuItem.id, item.modifiers);
-            const unitPrice = round2((menuItem.price || 0) + adjustment);
+            // Sprint 1 (B/E): pricing server-side (manual + promo) — ya validado
+            // arriba en la pre-validación; aquí se recalcula para persistir.
+            const pricing = resolveItemUnitPrice(db, menuItem, {
+              manualPrice: item.manual_price,
+              applyPromo: item.apply_promo === true,
+              modifiers: item.modifiers,
+            });
+            if (pricing.error) continue; // defensivo — la pre-validación ya lo rechazó
+
+            const { summary } = resolveModifierAdjustment(db, menuItem.id, item.modifiers);
+            const unitPrice = pricing.unitPrice;
             const itemSubtotal = round2(unitPrice * quantity);
             const modifiersJson = summary.length > 0 ? JSON.stringify(summary) : null;
             const notesField = item.notes || '';
 
             if (item.id && currentIdSet.has(item.id)) {
-              updateItem.run(quantity, unitPrice, modifiersJson, itemSubtotal, notesField, item.id, req.params.id);
+              updateItem.run(quantity, unitPrice, modifiersJson, itemSubtotal, notesField,
+                             pricing.promoLabel, item.id, req.params.id);
             } else {
               // sin id, o id que no pertenece a este pedido → nuevo
               if (newItemsRound === null) newItemsRound = resolveRound(db, req.params.id);
               insertItem.run(item.id || randomUUID(), req.params.id, menuItem.id, menuItem.name,
-                             quantity, unitPrice, modifiersJson, itemSubtotal, newItemsRound, notesField);
+                             quantity, unitPrice, modifiersJson, itemSubtotal, newItemsRound, notesField,
+                             pricing.promoLabel);
               insertedNew = true;
             }
           }
@@ -723,7 +766,7 @@ router.post('/:id/items', requireAuth, requireRole('admin', 'mesero'), (req, res
       return res.status(409).json({ success: false, error: 'Pedido cerrado', code: 'ORDER_CLOSED' });
     }
 
-    const menuItem = db.prepare('SELECT id, name, price FROM menu_items WHERE id = ? AND is_active = 1').get(menu_item_id);
+    const menuItem = db.prepare('SELECT id, name, price, price_variable, promo_price FROM menu_items WHERE id = ? AND is_active = 1').get(menu_item_id);
     if (!menuItem) {
       return res.status(404).json({ success: false, error: 'Item de menú no encontrado', code: 'MENU_ITEM_NOT_FOUND' });
     }
@@ -736,18 +779,33 @@ router.post('/:id/items', requireAuth, requireRole('admin', 'mesero'), (req, res
         code: 'INVALID_QUANTITY',
       });
     }
-    const { adjustment } = resolveModifierAdjustment(db, menuItem.id, modifiers);
-    const unitPrice = round2((menuItem.price || 0) + adjustment);
+
+    // Sprint 1 (B/E): pricing server-side (manual + promo)
+    const pricing = resolveItemUnitPrice(db, menuItem, {
+      manualPrice: req.body.manual_price,
+      applyPromo: req.body.apply_promo === true,
+      modifiers,
+    });
+    if (pricing.error) {
+      return res.status(400).json({
+        success: false,
+        error: pricing.error.message,
+        code: pricing.error.code,
+        menu_item_id,
+      });
+    }
+    const unitPrice = pricing.unitPrice;
     const itemSubtotal = round2(unitPrice * qty);
 
     // FASE 4B: ronda — misma si hay trabajo sin procesar, nueva si todo se procesó
     const round = resolveRound(db, req.params.id);
     db.prepare(`
       INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
-                               unit_price, modifiers_json, subtotal, status, round, preparation_notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+                               unit_price, modifiers_json, subtotal, status, round, preparation_notes, promo_label)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
     `).run(randomUUID(), req.params.id, menuItem.id, menuItem.name, qty, unitPrice,
-           modifiers ? JSON.stringify(modifiers) : null, itemSubtotal, round, notes || '');
+           modifiers ? JSON.stringify(modifiers) : null, itemSubtotal, round, notes || '',
+           pricing.promoLabel);
 
     recalcOrder(db, req.params.id);
     // FASE 4B: estados derivados (reactiva a 'confirmed' si estaba served/ready)

@@ -24,7 +24,7 @@ import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { computeTotals, round2 } from '../../src/core/config/iva.js';
-import { resolveModifierAdjustment } from '../services/order-pricing.js';
+import { resolveModifierAdjustment, resolveItemUnitPrice } from '../services/order-pricing.js';
 
 const router = Router();
 
@@ -228,12 +228,13 @@ router.post('/push', requireAuth, (req, res) => {
           const waiterName = order.waiter_name || req.user.displayName || req.user.username;
 
           // ── 2.2 PRECIOS SERVER-SIDE (SSOT): ignoramos subtotal/iva/total/
-          // unit_price del cliente — recalculamos desde menu_items.price +
-          // modificadores por NOMBRE, igual que POST /api/orders.
+          // unit_price del cliente — recalculamos con resolveItemUnitPrice
+          // (base + modificadores por NOMBRE + manual "Consultar precio" +
+          // promo manual), igual que POST /api/orders (Sprint 1 B/E).
           let grossSubtotal = 0;
           const orderItems = [];
           const findMenuItem = db.prepare(
-            'SELECT id, name, price, area FROM menu_items WHERE id = ? AND is_active = 1'
+            'SELECT id, name, price, price_variable, promo_price, area FROM menu_items WHERE id = ? AND is_active = 1'
           );
           const rawItems = Array.isArray(order.items) ? order.items : [];
           for (const item of rawItems) {
@@ -245,8 +246,18 @@ router.post('/push', requireAuth, (req, res) => {
             if (!Number.isFinite(quantity) || quantity < 1) {
               throw new Error(`Cantidad inválida: ${item.quantity}`);
             }
-            const { adjustment, summary } = resolveModifierAdjustment(db, menuItem.id, item.modifiers);
-            const unitPrice = round2((menuItem.price || 0) + adjustment);
+            const pricing = resolveItemUnitPrice(db, menuItem, {
+              manualPrice: item.manual_price,
+              applyPromo: item.apply_promo === true,
+              modifiers: item.modifiers,
+            });
+            if (pricing.error) {
+              const err = new Error(`${pricing.error.message} (${menuItem.name})`);
+              err.code = pricing.error.code;
+              throw err;
+            }
+            const { summary } = resolveModifierAdjustment(db, menuItem.id, item.modifiers);
+            const unitPrice = pricing.unitPrice;
             const itemSubtotal = round2(unitPrice * quantity);
             grossSubtotal += itemSubtotal;
             orderItems.push({
@@ -259,6 +270,7 @@ router.post('/push', requireAuth, (req, res) => {
               subtotal: itemSubtotal,
               status: ITEM_STATUS_MAP[item.status] || 'pending',
               preparation_notes: item.preparation_notes || item.notes || '',
+              promo_label: pricing.promoLabel,
             });
           }
 
@@ -293,13 +305,14 @@ router.post('/push', requireAuth, (req, res) => {
           if (orderItems.length > 0) {
             const insertItem = db.prepare(`
               INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
-                                       unit_price, modifiers_json, subtotal, status, preparation_notes)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                       unit_price, modifiers_json, subtotal, status, preparation_notes, promo_label)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
             for (const oi of orderItems) {
               insertItem.run(
                 oi.id, orderId, oi.menu_item_id, oi.menu_item_name, oi.quantity,
-                oi.unit_price, oi.modifiers_json, oi.subtotal, oi.status, oi.preparation_notes
+                oi.unit_price, oi.modifiers_json, oi.subtotal, oi.status, oi.preparation_notes,
+                oi.promo_label
               );
             }
           }

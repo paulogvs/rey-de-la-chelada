@@ -63,6 +63,7 @@ router.get('/items', (req, res) => {
       SELECT mi.id, mi.name, mi.subtitle, mi.description, mi.price, mi.currency,
              mi.iva_percentage, mi.image_url, mi.is_active, mi.is_available,
              mi.preparation_time, mi.sort_order, mi.area,
+             mi.price_variable, mi.promo_price,
              mc.id as category_id, mc.name as category_name
       FROM menu_items mi
       JOIN menu_categories mc ON mi.category_id = mc.id
