@@ -22,9 +22,10 @@ import { Loader } from '@/ui/components/Loader';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { PriceDisplay } from '@/ui/components/PriceDisplay';
 import { MoneyInput } from '@/ui/components/MoneyInput';
-import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
+import { AppIcon, type AppIconName } from '@/ui/components/AppIcon/AppIcon';
 import { formatMoney } from '../_shared/utils/format';
 import { filterMenuItems } from '../_shared/utils/filterMenuItems';
+import { getCategoriesForArea, type AreaTab } from '../_shared/utils/menuAreas';
 import { fetchMenuCategories, fetchMenuItems, fetchMenuItemDetail, type MenuItem } from '../_shared/api/menuApi';
 import { createOrder, fetchOrderById, deliverOrder, addOrderItem, removeOrderItem, type Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
@@ -44,6 +45,13 @@ const ORDER_STATUS_BADGE: Record<string, { variant: 'pending' | 'preparing' | 'r
 };
 
 const ACTIVE_ORDER_STATUSES = new Set(['called', 'confirmed', 'preparing', 'ready', 'served']);
+
+/** S2-Tabs (2026-08-17): tabs de área del panel de meseros (nivel 1). */
+const AREA_TABS: { key: AreaTab; label: string; icon: AppIconName }[] = [
+  { key: 'barra', label: 'Barra', icon: 'beer' },
+  { key: 'cocina', label: 'Cocina', icon: 'utensils' },
+  { key: 'promos', label: 'Promos', icon: 'tag' },
+];
 
 /** Totales de comanda con modelo SSOT EXTRACTIVO (precio incluye IVA). */
 function orderPanelTotals(cartTotal: number) {
@@ -110,6 +118,8 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  // S2-Tabs: área activa (Barra | Cocina | Promos), default 'barra'
+  const [activeArea, setActiveArea] = useState<AreaTab>('barra');
   // Sprint 1 (C): buscador de meseros — filtra por nombre/descripción/categoría
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -265,12 +275,19 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
     return () => { disposed = true; };
   }, []);
 
-  // Sprint 1 (C): búsqueda global (todas las áreas) o filtro por categoría
+  // S2-Tabs: categorías del área activa (Barra | Cocina | Promos).
+  // El área se infiere del primer item de cada categoría (menu_categories
+  // no tiene columna `area` — ver utils/menuAreas.ts).
+  const areaCategories = getCategoriesForArea(categories, items, activeArea);
+  const areaCategoryIds = new Set(areaCategories.map(c => c.id));
+
+  // Sprint 1 (C): búsqueda global (todas las áreas) — ignora tabs.
+  // Sin query: filtrar por categoría seleccionada, o por el área activa.
   const filteredItems = searchQuery.trim()
     ? filterMenuItems(items, searchQuery)
     : activeCategory
       ? items.filter(i => i.category_id === activeCategory)
-      : items;
+      : items.filter(i => areaCategoryIds.has(i.category_id));
 
   // Load modifiers when an item is opened
   const openItem = useCallback(async (item: MenuItem) => {
@@ -619,7 +636,22 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
         )}
       </div>
 
-      {/* Category bar */}
+      {/* S2-Tabs: nivel 1 (tabs de área) + nivel 2 (chips de categoría) */}
+      <div className="order-panel__area-tabs" role="tablist" aria-label="Áreas del menú">
+        {AREA_TABS.map(tab => (
+          <button
+            key={tab.key}
+            role="tab"
+            aria-selected={!searchQuery.trim() && activeArea === tab.key}
+            className={`order-panel__area-tab ${!searchQuery.trim() && activeArea === tab.key ? 'active' : ''}`}
+            onClick={() => { setActiveArea(tab.key); setActiveCategory(null); setSearchQuery(''); }}
+          >
+            <AppIcon name={tab.icon} size="sm" /> {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Category bar (nivel 2) */}
       <nav className="order-panel__categories">
         <button
           className={`order-panel__cat-btn ${!activeCategory && !searchQuery.trim() ? 'active' : ''}`}
@@ -627,7 +659,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
         >
           Todo
         </button>
-        {categories.map(cat => (
+        {areaCategories.map(cat => (
           <button
             key={cat.id}
             className={`order-panel__cat-btn ${activeCategory === cat.id && !searchQuery.trim() ? 'active' : ''}`}

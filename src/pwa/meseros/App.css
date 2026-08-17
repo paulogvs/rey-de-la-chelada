@@ -337,6 +337,53 @@
   box-shadow: var(--focus-ring);
 }
 
+/* ---- S2-Tabs: nivel 1 (tabs de área Barra/Cocina/Promos) ---- */
+
+.order-panel__area-tabs {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) 0;
+  flex-shrink: 0;
+}
+
+.order-panel__area-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-height: var(--touch-primary-action);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface-elevated);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.order-panel__area-tab.active {
+  background: linear-gradient(180deg, var(--dorado-rey) 0%, var(--dorado-rey-hover) 100%);
+  color: var(--madera-oscura);
+  border-color: color-mix(in srgb, var(--dorado-rey-hover) 80%, transparent);
+  box-shadow: var(--shadow-golden-strong);
+}
+
+.order-panel__area-tab:hover:not(.active) {
+  border-color: var(--dorado-rey);
+  color: var(--text-strong);
+  background: var(--surface-hover);
+}
+
+.order-panel__area-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 /* ---- Contenido (2 columnas landscape) ---- */
 
 .order-panel__content {
