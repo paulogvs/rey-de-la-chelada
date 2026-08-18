@@ -1,0 +1,49 @@
+/*
+ * Responsive foundation — shared by all six PWAs.
+ *
+ * This layer only establishes viewport primitives and safe defaults. PWA
+ * profiles remain responsible for their own density and interaction model.
+ * Do not put business rules or module-specific layout here.
+ */
+
+:root {
+  --viewport-block-size: 100vh;
+  --viewport-inline-size: 100vw;
+  --responsive-safe-top: env(safe-area-inset-top, 0px);
+  --responsive-safe-right: env(safe-area-inset-right, 0px);
+  --responsive-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --responsive-safe-left: env(safe-area-inset-left, 0px);
+  --responsive-vertical-gap: var(--space-4);
+}
+
+@supports (height: 100svh) {
+  :root { --viewport-block-size: 100svh; }
+}
+
+@supports (height: 100dvh) {
+  :root { --viewport-block-size: 100dvh; }
+}
+
+.pwa-shell {
+  min-width: 0;
+  min-height: var(--viewport-block-size);
+  width: var(--viewport-inline-size);
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.pwa-shell > * {
+  min-width: 0;
+}
+
+@media (orientation: landscape) {
+  .pwa-shell {
+    --responsive-vertical-gap: var(--space-2);
+  }
+}
+
+@media (max-height: 700px) {
+  .pwa-shell {
+    --responsive-vertical-gap: var(--space-2);
+  }
+}

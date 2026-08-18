@@ -260,3 +260,27 @@
     animation: none;
   }
 }
+
+@media (orientation: landscape) and (max-height: 700px) {
+  .clientes-detail {
+    max-height: 94dvh;
+    padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .clientes-detail__image {
+    height: 132px;
+    margin-bottom: var(--space-3);
+  }
+
+  .clientes-detail__name {
+    font-size: var(--text-2xl);
+  }
+
+  .clientes-detail__mod-option {
+    min-height: var(--touch-min-target);
+  }
+
+  .clientes-detail__add-btn {
+    margin-top: var(--space-3);
+  }
+}

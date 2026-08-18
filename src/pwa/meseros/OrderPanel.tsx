@@ -131,6 +131,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
   // Sprint 1 (B/E): precio manual "Consultar precio" + toggle promo
   const [itemManualPrice, setItemManualPrice] = useState(0);
   const [itemApplyPromo, setItemApplyPromo] = useState(false);
+  const [cartExpanded, setCartExpanded] = useState(false);
   const [loadingMenu, setLoadingMenu] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
@@ -711,10 +712,25 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
         </div>
 
         {/* Cart */}
-        <div className="order-panel__cart">
-          <h3 className="order-panel__cart-title">
-            {editMode ? `Agregar al pedido de Mesa ${table.number} (${cart.length} items)` : `Pedido actual (${cart.length} items)`}
-          </h3>
+        <div className={`order-panel__cart${cartExpanded ? ' order-panel__cart--expanded' : ''}`}>
+          <button
+            type="button"
+            className="order-panel__cart-summary"
+            onClick={() => setCartExpanded(value => !value)}
+            aria-expanded={cartExpanded}
+            aria-controls="order-panel-cart-body"
+          >
+            <span className="order-panel__cart-title">
+              {editMode ? `Agregar al pedido de Mesa ${table.number}` : 'Pedido actual'}
+              <span className="order-panel__cart-count">{cart.length} items</span>
+            </span>
+            <span className="order-panel__cart-summary-right">
+              {cart.length > 0 && <span className="order-panel__cart-summary-total">{formatMoney(cartTotal)}</span>}
+              <AppIcon name={cartExpanded ? 'chevron-down' : 'chevron-up'} size="sm" />
+            </span>
+          </button>
+
+          <div id="order-panel-cart-body" className="order-panel__cart-body">
 
           {cart.length === 0 && (
             <p className="order-panel__cart-empty">
@@ -808,6 +824,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                 {submitting ? 'Enviando…' : 'Confirmar Pedido'}
               </Button>
             )}
+          </div>
           </div>
         </div>
       </div>

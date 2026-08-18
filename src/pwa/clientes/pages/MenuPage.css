@@ -8,7 +8,7 @@
 .clientes-page {
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  min-height: var(--viewport-block-size, 100dvh);
   background-color: var(--bg);
   background-image:
     linear-gradient(180deg, color-mix(in srgb, var(--dorado-rey-soft) 12%, transparent) 0%, transparent 36%),
@@ -370,6 +370,29 @@
     height: 170px;
   }
 
+  .clientes-header {
+    padding-top: var(--space-3);
+    padding-bottom: var(--space-4);
+  }
+
+  .clientes-header__brand {
+    gap: var(--space-2);
+  }
+
+  .clientes-items {
+    padding: var(--space-4) var(--space-3);
+    padding-bottom: calc(136px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .clientes-category-title {
+    font-size: var(--text-xl);
+    margin-bottom: var(--space-3);
+  }
+
+  .clientes-category-group {
+    margin-bottom: var(--space-6);
+  }
+
   .clientes-header__logo {
     height: 48px;
   }
@@ -381,6 +404,8 @@
   .clientes-actions {
     flex-direction: column;
     gap: var(--space-2);
+    padding: var(--space-3);
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -404,11 +429,60 @@
 
 /* ---- Responsive: Escritorio ---- */
 @media (min-width: 1025px) {
+  .clientes-items {
+    max-width: 1200px;
+  }
+
+  .clientes-items__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .clientes-actions {
     justify-content: center;
   }
 
   .clientes-actions__btn {
     max-width: 320px;
+  }
+}
+
+/* Landscape / low-height devices: preserve the menu as the primary content. */
+@media (orientation: landscape) and (max-height: 700px) {
+  .clientes-banner {
+    height: 112px;
+  }
+
+  .clientes-header {
+    padding-top: var(--space-2);
+    padding-bottom: var(--space-3);
+  }
+
+  .clientes-header__logo {
+    height: 40px;
+  }
+
+  .clientes-header__brand {
+    flex-direction: row;
+    justify-content: center;
+    gap: var(--space-3);
+  }
+
+  .clientes-header__brand h1 {
+    font-size: var(--text-2xl);
+  }
+
+  .clientes-items {
+    padding-top: var(--space-3);
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .clientes-actions {
+    flex-direction: row;
+    padding-top: var(--space-2);
+    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .clientes-actions__btn {
+    min-height: var(--touch-min-target);
   }
 }

@@ -9,6 +9,7 @@
 
 import React, { type ReactNode } from 'react';
 import '@/ui/tokens/tokens.css';
+import '@/ui/tokens/responsive.css';
 
 interface PwaLayoutProps {
   children: ReactNode;
@@ -17,7 +18,7 @@ interface PwaLayoutProps {
 
 export function PwaLayout({ children, title: _title }: PwaLayoutProps) {
   return (
-    <div className="pwa-root" data-pwa-root>
+    <div className="pwa-root pwa-shell" data-pwa-root>
       <main className="pwa-main">
         {children}
       </main>
