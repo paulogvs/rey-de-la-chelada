@@ -15,6 +15,8 @@ import Database from 'better-sqlite3';
 import {
   localDateStr,
   localDateExpr,
+  businessDayDateStr,
+  businessDayExpr,
   BUSINESS_TIMEZONE,
   SQL_UTC_OFFSET_MODIFIER,
 } from '../../server/utils/date-utils.js';
@@ -59,5 +61,43 @@ describe('SQL modifier — UTC almacenado → fecha local', () => {
   it('el modifier es el offset fijo -4 horas (UTC-4, sin DST)', () => {
     expect(BUSINESS_TIMEZONE).toBe('America/La_Paz');
     expect(SQL_UTC_OFFSET_MODIFIER).toBe('-4 hours');
+  });
+});
+
+describe('businessDayDateStr / businessDayExpr — día laboral 15:00→06:00', () => {
+  // "Hoy" del negocio (turno): local hora >= 15:00 → su fecha local;
+  // local hora < 15:00 → fecha local del día ANTERIOR (termina 06:00 del día siguiente).
+  // America/La_Paz = UTC-4 → local = UTC - 4h.
+
+  it('local mié 19:00 (UTC 2026-08-19T23:00:00Z) → 2026-08-19', () => {
+    expect(businessDayDateStr(new Date('2026-08-19T23:00:00Z'))).toBe('2026-08-19');
+  });
+
+  it('local jue 03:00 (UTC 2026-08-20T07:00:00Z) → 2026-08-19 (pertenece al turno del miércoles)', () => {
+    expect(businessDayDateStr(new Date('2026-08-20T07:00:00Z'))).toBe('2026-08-19');
+  });
+
+  it('local jue 06:00 (UTC 2026-08-20T10:00:00Z) → 2026-08-19 (fin del turno)', () => {
+    expect(businessDayDateStr(new Date('2026-08-20T10:00:00Z'))).toBe('2026-08-19');
+  });
+
+  it('local jue 15:00 (UTC 2026-08-20T19:00:00Z) → 2026-08-20 (inicio del turno)', () => {
+    expect(businessDayDateStr(new Date('2026-08-20T19:00:00Z'))).toBe('2026-08-20');
+  });
+
+  it('local jue 14:59 (UTC 2026-08-20T18:59:00Z) → 2026-08-19 (1 min antes del inicio)', () => {
+    expect(businessDayDateStr(new Date('2026-08-20T18:59:00Z'))).toBe('2026-08-19');
+  });
+
+  it('businessDayExpr("created_at") → DATE(created_at, \'-4 hours\', \'-15 hours\')', () => {
+    expect(businessDayExpr('created_at')).toBe("DATE(created_at, '-4 hours', '-15 hours')");
+  });
+
+  it('SQL: DATE(ts, "-4 hours", "-15 hours") agrupa por día laboral', () => {
+    const db = new Database(':memory:');
+    // local jue 03:00 = UTC jue 07:00 → -19h = UTC mié 12:00 → miércoles
+    expect(db.prepare(`SELECT ${businessDayExpr('?')} as d`).get('2026-08-20 07:00:00').d).toBe('2026-08-19');
+    // local jue 15:00 = UTC jue 19:00 → -19h = UTC jue 00:00 → jueves
+    expect(db.prepare(`SELECT ${businessDayExpr('?')} as d`).get('2026-08-20 19:00:00').d).toBe('2026-08-20');
   });
 });

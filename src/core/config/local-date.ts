@@ -21,6 +21,14 @@
 export const BUSINESS_TIMEZONE = 'America/La_Paz';
 
 /**
+ * Hora local en la que inicia el DÍA LABORAL (turno 15:00 → termina 06:00
+ * del día siguiente). DEBE coincidir con server/utils/date-utils.js
+ * BUSINESS_DAY_START_HOUR (env con fallback 15) — se mantienen en sync
+ * manualmente, igual que hoy con la zona horaria.
+ */
+export const BUSINESS_DAY_START_HOUR = 15;
+
+/**
  * Fecha local YYYY-MM-DD de America/La_Paz para un Date (default: ahora).
  * @param date — fecha a convertir (default: ahora)
  * @returns string 'YYYY-MM-DD' local del negocio
@@ -71,6 +79,59 @@ export function localTimeStr(date: Date = new Date()): string {
   }).formatToParts(date);
   const get = (type: string) => (parts.find(p => p.type === type) || {}).value;
   return `${get('hour')}:${get('minute')}`;
+}
+
+/**
+ * Hora local 'HH' (0-23) de America/La_Paz (default: ahora).
+ * @param date — fecha a convertir (default: ahora)
+ * @returns string hora local '00'..'23'
+ */
+export function localHour(date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: BUSINESS_TIMEZONE,
+    hour: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const h = parts.find(p => p.type === 'hour')?.value || '00';
+  // Intl puede emitir '24' a medianoche (hourCycle h24) → normalizar a '00'
+  return h === '24' ? '00' : h;
+}
+
+/**
+ * Suma/resta días a una fecha local 'YYYY-MM-DD' y devuelve la fecha local
+ * resultante (mismo formato que localDateStr). Usa MEDIODÍA UTC + Date.UTC
+ * (NUNCA toISOString): a mediodía UTC la fecha local en La Paz (UTC-4 →
+ * 08:00 local) nunca cruza de día, así que formatear con el MISMO Intl
+ * devuelve el día exacto.
+ * @param dateStr — fecha local 'YYYY-MM-DD'
+ * @param deltaDays — días a sumar (negativo = restar)
+ * @returns string 'YYYY-MM-DD' local
+ */
+export function addDaysLocal(dateStr: string, deltaDays: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return localDateStr(new Date(Date.UTC(y, m - 1, d + deltaDays, 12)));
+}
+
+/**
+ * Fecha 'YYYY-MM-DD' del DÍA LABORAL (turno del negocio) para un Date
+ * (default: ahora).
+ *
+ * Concepto (Opción B — 2026-08-19): "hoy" para cortes/reportes.
+ *   - Hora local >= 15:00 → pertenece al día laboral de su fecha local.
+ *   - Hora local < 15:00 → pertenece al día laboral ANTERIOR
+ *     (ej. 03:00 jue → miércoles; 06:00 jue → miércoles = fin del turno).
+ *
+ * Misma lógica que server/utils/date-utils.js businessDayDateStr (sync manual).
+ * localDateStr (calendario) sigue existiendo para pedidos/meseros.
+ * @param date — fecha a convertir (default: ahora)
+ * @returns string 'YYYY-MM-DD' del día laboral
+ */
+export function businessDayDateStr(date: Date = new Date()): string {
+  const local = localDateStr(date);
+  if (Number(localHour(date)) < BUSINESS_DAY_START_HOUR) {
+    return addDaysLocal(local, -1);
+  }
+  return local;
 }
 
 export default localDateStr;

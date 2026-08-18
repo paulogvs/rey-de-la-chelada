@@ -11,5 +11,5 @@
  *   const today = localDateStr(); // 'YYYY-MM-DD' local del negocio
  */
 
-export { BUSINESS_TIMEZONE, localDateStr, localDateTimeStr, localTimeStr } from '@/core/config/local-date';
+export { BUSINESS_TIMEZONE, localDateStr, localDateTimeStr, localTimeStr, businessDayDateStr } from '@/core/config/local-date';
 export { default } from '@/core/config/local-date';

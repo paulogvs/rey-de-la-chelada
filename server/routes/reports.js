@@ -15,7 +15,7 @@
 import { Router } from 'express';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
-import { localDateStr, localDateExpr, localHourExpr } from '../utils/date-utils.js';
+import { businessDayDateStr, businessDayExpr, localHourExpr } from '../utils/date-utils.js';
 
 const router = Router();
 
@@ -26,8 +26,9 @@ const router = Router();
 router.get('/sales/daily', requireAuth, requireRole('admin', 'caja'), (req, res) => {
   try {
     const { date } = req.query;
-    // C1: "hoy" local America/La_Paz (UTC-4); si llega fecha explícita se usa tal cual
-    const targetDate = date || localDateStr();
+    // Opción B (2026-08-19): "hoy" = DÍA LABORAL (turno 15:00 → 06:00 del
+    // día siguiente); si llega fecha explícita (día laboral YYYY-MM-DD) se usa tal cual.
+    const targetDate = date || businessDayDateStr();
 
     const db = getDb();
 
@@ -40,25 +41,26 @@ router.get('/sales/daily', requireAuth, requireRole('admin', 'caja'), (req, res)
         SUM(total) as gross_revenue,
         SUM(CASE WHEN status = 'paid' THEN total ELSE 0 END) as net_revenue
       FROM orders
-      WHERE ${localDateExpr('created_at')} = ?
+      WHERE ${businessDayExpr('created_at')} = ?
     `).get(targetDate);
 
     // By payment method (C2: solo completed; FASE 3: sin propina → SUM(amount))
     const byMethod = db.prepare(`
       SELECT p.method, COUNT(*) as count, SUM(p.amount) as total
       FROM payments p
-      WHERE ${localDateExpr('p.processed_at')} = ? AND p.status = 'completed'
+      WHERE ${businessDayExpr('p.processed_at')} = ? AND p.status = 'completed'
       GROUP BY p.method
     `).all(targetDate);
 
-    // Hourly breakdown (hora local del negocio)
+    // Hourly breakdown (hora local del negocio — el GROUP BY por hora local
+    // sigue siendo correcto dentro del día laboral)
     const hourly = db.prepare(`
       SELECT
         CAST(${localHourExpr('created_at')} AS INTEGER) as hour,
         COUNT(*) as orders,
         SUM(total) as revenue
       FROM orders
-      WHERE ${localDateExpr('created_at')} = ?
+      WHERE ${businessDayExpr('created_at')} = ?
       GROUP BY hour
       ORDER BY hour
     `).all(targetDate);
@@ -97,13 +99,13 @@ router.get('/sales/range', requireAuth, requireRole('admin', 'caja'), (req, res)
 
     const daily = db.prepare(`
       SELECT
-        ${localDateExpr('created_at')} as date,
+        ${businessDayExpr('created_at')} as date,
         COUNT(*) as orders,
         SUM(total) as revenue,
         SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled
       FROM orders
-      WHERE ${localDateExpr('created_at')} >= ? AND ${localDateExpr('created_at')} <= ?
-      GROUP BY ${localDateExpr('created_at')}
+      WHERE ${businessDayExpr('created_at')} >= ? AND ${businessDayExpr('created_at')} <= ?
+      GROUP BY ${businessDayExpr('created_at')}
       ORDER BY date
     `).all(from, to);
 
@@ -113,7 +115,7 @@ router.get('/sales/range', requireAuth, requireRole('admin', 'caja'), (req, res)
         SUM(total) as total_revenue,
         AVG(total) as avg_order
       FROM orders
-      WHERE ${localDateExpr('created_at')} >= ? AND ${localDateExpr('created_at')} <= ? AND status = 'paid'
+      WHERE ${businessDayExpr('created_at')} >= ? AND ${businessDayExpr('created_at')} <= ? AND status = 'paid'
     `).get(from, to);
 
     res.json({
@@ -146,7 +148,7 @@ router.get('/items/popular', requireAuth, requireRole('admin', 'caja'), (req, re
     const params = [];
 
     if (from && to) {
-      dateFilter = ` AND ${localDateExpr('o.created_at')} >= ? AND ${localDateExpr('o.created_at')} <= ?`;
+      dateFilter = ` AND ${businessDayExpr('o.created_at')} >= ? AND ${businessDayExpr('o.created_at')} <= ?`;
       params.push(from, to);
     }
 
@@ -187,7 +189,7 @@ router.get('/staff/performance', requireAuth, requireRole('admin'), (req, res) =
     let dateFilter = '';
     const params = [];
     if (from && to) {
-      dateFilter = ` AND ${localDateExpr('o.created_at')} >= ? AND ${localDateExpr('o.created_at')} <= ?`;
+      dateFilter = ` AND ${businessDayExpr('o.created_at')} >= ? AND ${businessDayExpr('o.created_at')} <= ?`;
       params.push(from, to);
     }
 

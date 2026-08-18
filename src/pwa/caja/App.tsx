@@ -22,7 +22,7 @@ import { Loader } from '@/ui/components/Loader';
 import { SegmentedControl, type SegmentedOption } from '@/ui/components/SegmentedControl';
 import { ToastProvider, useToast } from '@/ui/components/Toast';
 import { appConfig } from '@/core/config';
-import { localDateStr } from '../_shared/utils/localDate';
+import { businessDayDateStr } from '../_shared/utils/localDate';
 import { SummaryView } from './SummaryView';
 import { ClosingView } from './ClosingView';
 import { InvoiceView } from './InvoiceView';
@@ -45,8 +45,11 @@ function CajaApp() {
   const [view, setView] = useState<ViewState>('summary');
   const [refreshTick, setRefreshTick] = useState(0);
 
-  // C1/2.1: "hoy" = fecha LOCAL America/La_Paz (NUNCA toISOString — corta a las 20:00 local)
-  const today = localDateStr();
+  // Opción B (2026-08-19): "hoy" = DÍA LABORAL 15:00→06:00 (el turno del
+  // miércoles 15:00 termina jueves 06:00 = UN solo corte con closing_date
+  // del miércoles). El header badge, SummaryView y ClosingView usan el
+  // día laboral; los pedidos/meseros siguen con fecha calendario local.
+  const today = businessDayDateStr();
   const ivaRate = appConfig.all.taxes.iva.percentage / 100;
 
   // Auth gate: el módulo Caja admite los roles 'caja' y 'admin'

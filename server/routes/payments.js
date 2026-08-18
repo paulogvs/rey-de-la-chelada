@@ -34,7 +34,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
-import { localDateStr, localDateExpr } from '../utils/date-utils.js';
+import { businessDayDateStr, businessDayExpr } from '../utils/date-utils.js';
 import { logger } from '../utils/logger.js'; // S1/T2: errores de pago/corte al log diario
 import { broadcastOrderToCaja } from '../services/order-broadcaster.js'; // S2-D: caja real-time
 
@@ -476,24 +476,25 @@ router.get('/closing/current', requireAuth, requireRole('admin', 'caja'), (req, 
       'SELECT * FROM cash_closings WHERE closed_at IS NULL ORDER BY opened_at DESC LIMIT 1'
     ).get();
 
-    // C1: "hoy" local America/La_Paz (no UTC) — ver server/utils/date-utils.js
-    const today = localDateStr();
+    // Opción B (2026-08-19): "hoy" = DÍA LABORAL (turno 15:00 → 06:00 del
+    // día siguiente) — un solo corte de caja por turno. Ver date-utils.js.
+    const today = businessDayDateStr();
     // C2: solo completed. C5: cash = solo efectivo. FASE 3: sin propina → SUM(amount).
     const summary = db.prepare(`
       SELECT p.method, COUNT(*) as count, SUM(p.amount) as total
       FROM payments p
-      WHERE ${localDateExpr('p.processed_at')} = ? AND p.status = 'completed'
+      WHERE ${businessDayExpr('p.processed_at')} = ? AND p.status = 'completed'
       GROUP BY p.method
     `).all(today);
 
     const totalToday = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total FROM payments
-      WHERE ${localDateExpr('processed_at')} = ? AND status = 'completed'
+      WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed'
     `).get(today);
 
     const cashToday = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total FROM payments
-      WHERE ${localDateExpr('processed_at')} = ? AND status = 'completed' AND method = 'cash'
+      WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed' AND method = 'cash'
     `).get(today);
 
     // F3-2: efectivo al centavo — lo que el cliente entregó (received) y el vuelto
@@ -501,7 +502,7 @@ router.get('/closing/current', requireAuth, requireRole('admin', 'caja'), (req, 
     const cashFlowToday = db.prepare(`
       SELECT COALESCE(SUM(received), 0) as received, COALESCE(SUM(change), 0) as change
       FROM payments
-      WHERE ${localDateExpr('processed_at')} = ? AND status = 'completed' AND method = 'cash'
+      WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed' AND method = 'cash'
     `).get(today);
 
     // Orders summary
@@ -509,7 +510,7 @@ router.get('/closing/current', requireAuth, requireRole('admin', 'caja'), (req, 
       SELECT COUNT(*) as total,
              SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as completed,
              SUM(total) as revenue
-      FROM orders WHERE ${localDateExpr('created_at')} = ?
+      FROM orders WHERE ${businessDayExpr('created_at')} = ?
     `).get(today);
 
     res.json({
@@ -545,12 +546,13 @@ router.post('/closing', requireAuth, requireRole('admin', 'caja'), (req, res) =>
       return res.status(409).json({ success: false, error: 'Ya hay un corte de caja abierto', code: 'CLOSING_ALREADY_OPEN' });
     }
 
-    // C1: "hoy" local America/La_Paz. C5: expected_cash = SOLO method='cash'
-    // (QR es "ya depositado" — el cajero cuadra únicamente el efectivo).
-    const today = localDateStr();
+    // Opción B (2026-08-19): "hoy" = DÍA LABORAL (turno 15:00 → 06:00).
+    // closing_date = día laboral (mié 15:00 → jue 06:00 = UN corte del miércoles).
+    // C5: expected_cash = SOLO method='cash' (QR es "ya depositado").
+    const today = businessDayDateStr();
     const expected = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total FROM payments
-      WHERE ${localDateExpr('processed_at')} = ? AND status = 'completed' AND method = 'cash'
+      WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed' AND method = 'cash'
     `).get(today);
 
     const id = randomUUID();

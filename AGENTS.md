@@ -26,7 +26,7 @@
 
 | Framework | Ubicación | Estado |
 |-----------|-----------|--------|
-| Vitest (unit + integration) | `tests/unit/`, `tests/integration/` | ✅ 505 tests — `hookTimeout`/`testTimeout` 60s + `pool: forks` (F1 2026-08-10, elimina flakiness) |
+| Vitest (unit + integration) | `tests/unit/`, `tests/integration/` | ✅ 675 tests — `hookTimeout`/`testTimeout` 60s + `pool: forks` (F1 2026-08-10, elimina flakiness) |
 | Playwright (e2e) | `tests/e2e/` | ⏳ **En progreso** — carpeta vacía, sin `playwright.config`. Los e2e reales hoy son scripts manuales en `scripts/e2e-*.mjs` (requieren server arriba) |
 
 ## 2b. FASE 2 — CONTRATOS DE DATOS (2026-08-06)
@@ -35,7 +35,7 @@ Decisiones SSOT documentadas en código (NO romper en FASE 3):
 
 | Área | Contrato |
 |------|----------|
-| **Fecha local** | `src/core/config/local-date.ts` (client) + `scripts/date-utils.mjs` (Node). `BUSINESS_TIMEZONE='America/La_Paz'` (UTC-4 fijo). NUNCA `toISOString().split('T')[0]` para "hoy" local. |
+| **Fecha local** | `src/core/config/local-date.ts` (client) + `scripts/date-utils.mjs` (Node). `BUSINESS_TIMEZONE='America/La_Paz'` (UTC-4 fijo). NUNCA `toISOString().split('T')[0]` para "hoy" local.<br>• `Día laboral (Opción B 2026-08-19): inicia 15:00, termina 06:00 (+1). businessDayExpr/businessDayDateStr en server/utils/date-utils.js (+ cliente src/core/config/local-date.ts, sync manual). BUSINESS_DAY_START_HOUR env (fallback 15). Cortes y reportes agrupan por día laboral; los pedidos/meseros siguen usando fecha calendario local.` |
 | **Precios** | `server/services/order-pricing.js` (`resolveModifierAdjustment`, `recalcOrder`). Precio SIEMPRE del server (`menu_items.price` + ajustes por nombre de opción); el server IGNORA precios del cliente. |
 | **Sync push** | `server/routes/sync.js`: idempotente por UUID cliente (`orders.id`/`payments.id` → `skipped` + `duplicate_*_already_exists`). Errores parciales → HTTP 200, `success:false`, `code:'SYNC_PARTIAL_ERRORS'`. |
 | **PUT /orders/:id** | INCREMENTAL: item con `id` → update; sin `id` → insert; `remove_item_ids` → delete explícito; NO mencionados → se conservan. Pedido `paid`/`cancelled` → `409 ORDER_CLOSED`. |

@@ -14,11 +14,14 @@
 
 import { describe, it, expect } from 'vitest';
 import { localDateStr as clientLocalDateStr, BUSINESS_TIMEZONE as CLIENT_TZ } from '../../src/pwa/_shared/utils/localDate';
-import { localDateStr as coreLocalDateStr } from '../../src/core/config/local-date';
 import {
+  localDateStr as coreLocalDateStr,
   localDateTimeStr,
   localTimeStr,
+  businessDayDateStr as coreBusinessDayDateStr,
+  BUSINESS_DAY_START_HOUR,
 } from '../../src/core/config/local-date';
+import { businessDayDateStr as clientBusinessDayDateStr } from '../../src/pwa/_shared/utils/localDate';
 
 describe('localDateStr (cliente) — "hoy" local America/La_Paz', () => {
   it('23:30 UTC = 19:30 local → mismo día (2026-08-06)', () => {
@@ -86,5 +89,39 @@ describe('localDateTimeStr / localTimeStr (core) — P1-1: fecha-hora y hora loc
     }).formatToParts(now);
     const get = (t: string) => expected.find(p => p.type === t)?.value;
     expect(localDateTimeStr()).toBe(`${get('day')}/${get('month')}/${get('year')} ${get('hour')}:${get('minute')}`);
+  });
+});
+
+describe('businessDayDateStr (cliente) — día laboral 15:00→06:00', () => {
+  // MISMO contrato que el server (server/utils/date-utils.js businessDayDateStr):
+  // America/La_Paz = UTC-4; hora local >= 15:00 → fecha local; < 15:00 → día anterior.
+
+  it('local mié 19:00 (UTC 2026-08-19T23:00:00Z) → 2026-08-19', () => {
+    expect(clientBusinessDayDateStr(new Date('2026-08-19T23:00:00Z'))).toBe('2026-08-19');
+  });
+
+  it('local jue 03:00 (UTC 2026-08-20T07:00:00Z) → 2026-08-19 (turno del miércoles)', () => {
+    expect(clientBusinessDayDateStr(new Date('2026-08-20T07:00:00Z'))).toBe('2026-08-19');
+  });
+
+  it('local jue 06:00 (UTC 2026-08-20T10:00:00Z) → 2026-08-19 (fin del turno)', () => {
+    expect(clientBusinessDayDateStr(new Date('2026-08-20T10:00:00Z'))).toBe('2026-08-19');
+  });
+
+  it('local jue 15:00 (UTC 2026-08-20T19:00:00Z) → 2026-08-20 (inicio del turno)', () => {
+    expect(clientBusinessDayDateStr(new Date('2026-08-20T19:00:00Z'))).toBe('2026-08-20');
+  });
+
+  it('local jue 14:59 (UTC 2026-08-20T18:59:00Z) → 2026-08-19 (1 min antes del inicio)', () => {
+    expect(clientBusinessDayDateStr(new Date('2026-08-20T18:59:00Z'))).toBe('2026-08-19');
+  });
+
+  it('BUSINESS_DAY_START_HOUR = 15 (sync manual con server)', () => {
+    expect(BUSINESS_DAY_START_HOUR).toBe(15);
+  });
+
+  it('core businessDayDateStr tiene el mismo comportamiento que el del cliente', () => {
+    expect(coreBusinessDayDateStr(new Date('2026-08-20T07:00:00Z'))).toBe('2026-08-19');
+    expect(coreBusinessDayDateStr(new Date('2026-08-20T19:00:00Z'))).toBe('2026-08-20');
   });
 });

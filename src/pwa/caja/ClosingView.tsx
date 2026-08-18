@@ -196,7 +196,7 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
       </Card>
 
       <Card className="caja-close__history">
-        <h3>Resumen de hoy</h3>
+        <h3>Resumen del día laboral (15:00 → 06:00)</h3>
         <div className="caja-close__stats">
           <StatCard
             label="Total ventas"
