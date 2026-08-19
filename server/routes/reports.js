@@ -85,6 +85,68 @@ router.get('/sales/daily', requireAuth, requireRole('admin', 'caja'), (req, res)
 });
 
 // ============================================================
+// GET /api/reports/orders — Historial operativo pedido por pedido
+// ============================================================
+
+router.get('/orders', requireAuth, requireRole('admin', 'caja'), (req, res) => {
+  try {
+    const db = getDb();
+    const businessDay = req.query.business_day || businessDayDateStr();
+    const status = req.query.status || 'paid';
+    const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 50, 1), 200);
+
+    let sql = `
+      SELECT o.id, o.table_id, t.number as table_number, o.status, o.total,
+             o.created_at, o.paid_at, o.payment_method, o.waiter_id,
+             s.display_name as waiter_name,
+             COALESCE((SELECT SUM(p.amount) FROM payments p
+               WHERE p.order_id = o.id AND p.status = 'completed'), 0) as paid_amount
+      FROM orders o
+      LEFT JOIN tables t ON o.table_id = t.id
+      LEFT JOIN staff s ON o.waiter_id = s.id
+      WHERE ${businessDayExpr('o.created_at')} = ?
+    `;
+    const params = [businessDay];
+    if (status !== 'all') {
+      sql += ' AND o.status = ?';
+      params.push(status);
+    }
+    sql += ' ORDER BY o.created_at DESC LIMIT ?';
+    params.push(limit);
+
+    const orders = db.prepare(sql).all(...params);
+    for (const order of orders) {
+      order.items = db.prepare(`
+        SELECT oi.id, oi.menu_item_name, oi.quantity, oi.unit_price, oi.subtotal,
+               oi.notes, oi.round, oi.promo_label, mi.area as kds_module
+        FROM order_items oi
+        LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+        WHERE oi.order_id = ?
+        ORDER BY oi.round ASC, oi.created_at ASC
+      `).all(order.id);
+      order.payments = db.prepare(`
+        SELECT id, method, amount, received, change, reference, status, processed_at,
+               processor, proof_photo
+        FROM payments
+        WHERE order_id = ?
+        ORDER BY processed_at ASC
+      `).all(order.id);
+      order.payment_summary = db.prepare(`
+        SELECT method, SUM(amount) as total, COUNT(*) as count
+        FROM payments
+        WHERE order_id = ? AND status = 'completed'
+        GROUP BY method
+      `).all(order.id);
+    }
+
+    res.json({ success: true, business_day: businessDay, orders, count: orders.length });
+  } catch (err) {
+    console.error('[Reports] Orders history error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al obtener historial de pedidos', code: 'ORDERS_HISTORY_ERROR' });
+  }
+});
+
+// ============================================================
 // GET /api/reports/sales/range — Ventas por rango
 // ============================================================
 

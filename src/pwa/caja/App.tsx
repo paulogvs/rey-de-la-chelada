@@ -27,13 +27,15 @@ import { SummaryView } from './SummaryView';
 import { ClosingView } from './ClosingView';
 import { InvoiceView } from './InvoiceView';
 import { CollectView } from './CollectView';
+import { OrderHistoryView } from '../_shared/components/OrderHistoryView';
 import './App.css';
 
-type ViewState = 'summary' | 'collect' | 'close' | 'invoice';
+type ViewState = 'summary' | 'collect' | 'history' | 'close' | 'invoice';
 
 const VIEW_OPTIONS: SegmentedOption[] = [
   { value: 'summary', label: 'Resumen' },
   { value: 'collect', label: 'Cobrar' },
+  { value: 'history', label: 'Pedidos' },
   { value: 'close', label: 'Cierre' },
   { value: 'invoice', label: 'Facturación' },
 ];
@@ -151,6 +153,8 @@ function CajaApp() {
           {view === 'collect' && (
             <CollectView token={token} refreshTick={refreshTick} onPaid={handlePaid} />
           )}
+
+          {view === 'history' && <OrderHistoryView token={token} businessDay={today} refreshTick={refreshTick} />}
 
           {view === 'close' && (
             <ClosingView

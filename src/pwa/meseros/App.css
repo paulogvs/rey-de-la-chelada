@@ -449,6 +449,14 @@
   gap: var(--space-3);
 }
 
+.order-panel__item-price-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  gap: 1px;
+}
+
 .order-panel__item-name {
   font-weight: 600;
   color: var(--text-strong);
@@ -462,6 +470,13 @@
   font-size: var(--text-base);
   white-space: nowrap;
   text-shadow: 0 0 18px color-mix(in srgb, var(--dorado-rey) 35%, transparent);
+}
+
+.order-panel__item-tax {
+  color: var(--text-faint);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 .order-panel__item-subtitle {
@@ -683,6 +698,20 @@
   font-weight: 500;
 }
 
+.order-panel__cart-review-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.order-panel__cart-review-heading strong {
+  color: var(--text-strong);
+  font-size: var(--text-sm);
+}
+
 .order-panel__cart-summary-right {
   display: inline-flex;
   align-items: center;
@@ -793,6 +822,34 @@
   border-top: 2px solid var(--dorado-rey);
   font-weight: 700;
   color: var(--text-strong);
+}
+
+.order-panel__cart-total-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.order-panel__cart-total-breakdown span {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.order-panel__cart-total-breakdown strong {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.order-panel__cart-total-final {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  white-space: nowrap;
 }
 
 .order-panel__cart-total-amount {
@@ -1860,6 +1917,10 @@
     gap: var(--space-2);
   }
 
+  .order-panel__item-price-stack {
+    align-items: flex-end;
+  }
+
   .order-panel__item-name,
   .order-panel__item-price {
     font-size: var(--text-sm);
@@ -1880,6 +1941,10 @@
     padding: 0;
     overflow: hidden;
     border-radius: var(--radius-lg);
+    position: sticky;
+    bottom: 0;
+    z-index: var(--z-content);
+    box-shadow: 0 -8px 24px -18px color-mix(in srgb, var(--overlay) 80%, transparent);
   }
 
   .order-panel__cart-summary {

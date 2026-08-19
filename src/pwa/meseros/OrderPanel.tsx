@@ -31,6 +31,7 @@ import { createOrder, fetchOrderById, deliverOrder, addOrderItem, removeOrderIte
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
 import { computeTotals } from '@/core/config/iva';
+import { summarizeOrderReview } from './orderReview';
 
 /** Badge de estado del pedido (S2-B) */
 const ORDER_STATUS_BADGE: Record<string, { variant: 'pending' | 'preparing' | 'ready' | 'paid' | 'cancelled' | 'info'; label: string }> = {
@@ -335,6 +336,13 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
     const unit = resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdjustment) ?? 0;
     return sum + unit * ci.quantity;
   }, 0);
+  const cartSummary = summarizeOrderReview(cart.map(ci => {
+    const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
+    return {
+      quantity: ci.quantity,
+      unitPrice: resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdjustment) ?? 0,
+    };
+  }));
 
   const addToCart = useCallback(() => {
     if (!itemDetail) return;
@@ -691,18 +699,21 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                     <span className="order-panel__item-badge order-panel__item-badge--manual">Consultar precio</span>
                   )}
                 </span>
-                <span className="order-panel__item-price">
-                  {item.price_variable === 1
-                    ? 'Precio a definir'
-                    : item.price != null
-                      ? formatMoney(item.price)
-                      : 'Ver variantes'}
-                </span>
-                {item.promo_price != null && (
-                  <span className="order-panel__item-promo">
-                    {formatMoney(item.promo_price)} <span className="order-panel__item-badge order-panel__item-badge--promo">PROMO</span>
+                <span className="order-panel__item-price-stack">
+                  <span className="order-panel__item-price">
+                    {item.price_variable === 1
+                      ? 'Precio a definir'
+                      : item.price != null
+                        ? formatMoney(item.price)
+                        : 'Ver variantes'}
                   </span>
-                )}
+                  {item.price != null && item.price_variable !== 1 && <span className="order-panel__item-tax">IVA incluido</span>}
+                  {item.promo_price != null && (
+                    <span className="order-panel__item-promo">
+                      {formatMoney(item.promo_price)} <span className="order-panel__item-badge order-panel__item-badge--promo">PROMO</span>
+                    </span>
+                  )}
+                </span>
               </div>
               {item.subtitle && (
                 <span className="order-panel__item-subtitle">{item.subtitle}</span>
@@ -722,7 +733,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
           >
             <span className="order-panel__cart-title">
               {editMode ? `Agregar al pedido de Mesa ${table.number}` : 'Pedido actual'}
-              <span className="order-panel__cart-count">{cart.length} items</span>
+              <span className="order-panel__cart-count">{cartSummary.totalQuantity} unidades</span>
             </span>
             <span className="order-panel__cart-summary-right">
               {cart.length > 0 && <span className="order-panel__cart-summary-total">{formatMoney(cartTotal)}</span>}
@@ -731,6 +742,10 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
           </button>
 
           <div id="order-panel-cart-body" className="order-panel__cart-body">
+          <div className="order-panel__cart-review-heading">
+            <strong>Revisar antes de enviar</strong>
+            <span>Confirma los productos con el cliente</span>
+          </div>
 
           {cart.length === 0 && (
             <p className="order-panel__cart-empty">
@@ -787,8 +802,14 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
 
           {cart.length > 0 && (
             <div className="order-panel__cart-total">
-              <span>Total</span>
-              <span className="order-panel__cart-total-amount">{formatMoney(cartTotal)}</span>
+              <div className="order-panel__cart-total-breakdown">
+                <span>Subtotal sin IVA <strong>{formatMoney(orderPanelTotals(cartTotal).subtotal)}</strong></span>
+                <span>IVA incluido <strong>{formatMoney(orderPanelTotals(cartTotal).ivaAmount)}</strong></span>
+              </div>
+              <span className="order-panel__cart-total-final">
+                <span>Total</span>
+                <strong className="order-panel__cart-total-amount">{formatMoney(cartTotal)}</strong>
+              </span>
             </div>
           )}
 
@@ -821,7 +842,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                 loading={submitting}
                 fullWidth
               >
-                {submitting ? 'Enviando…' : 'Confirmar Pedido'}
+                {submitting ? 'Enviando…' : 'Confirmar y enviar'}
               </Button>
             )}
           </div>

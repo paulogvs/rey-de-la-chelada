@@ -280,6 +280,22 @@
 .admin-stat--items .stat-card__value { color: var(--dorado-rey); }
 .admin-stat--revenue .stat-card__value { color: var(--verde-esmeralda); }
 
+.admin-section__heading { display: flex; justify-content: space-between; gap: var(--space-3); align-items: flex-start; }
+.admin-section__heading h3 { margin-bottom: var(--space-1); }
+.admin-popular__list { display: flex; flex-direction: column; margin-top: var(--space-3); }
+.admin-popular__row { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+.admin-popular__row:last-child { border-bottom: 0; }
+.admin-popular__rank { color: var(--dorado-rey); font-family: var(--font-mono); font-weight: 700; }
+.admin-popular__name { display: flex; flex-direction: column; min-width: 0; color: var(--text-strong); }
+.admin-popular__name small { color: var(--text-muted); font-size: var(--text-xs); }
+.admin-popular__qty { color: var(--text-muted); font-size: var(--text-sm); white-space: nowrap; }
+.admin-popular__row > strong { color: var(--dorado-rey); font-family: var(--font-mono); white-space: nowrap; }
+
+@media (max-width: 600px) {
+  .admin-popular__row { grid-template-columns: 28px minmax(0, 1fr) auto; }
+  .admin-popular__row > strong { grid-column: 2 / -1; }
+}
+
 /* ============================================================
    RESPONSIVE — <1024px: sidebar → pills glass en topbar
    ============================================================ */

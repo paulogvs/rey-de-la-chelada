@@ -29,6 +29,8 @@ import { ModifierOptionsView } from './views/ModifierOptionsView';
 import { StaffView } from './views/StaffView';
 import { TablesView } from './views/TablesView';
 import { ClosingsView } from './views/ClosingsView';
+import { OrderHistoryView } from '../_shared/components/OrderHistoryView';
+import { businessDayDateStr } from '../_shared/utils/localDate';
 import './App.css';
 import './views/views.css';
 
@@ -39,7 +41,8 @@ type AdminView =
   | 'modifiers'
   | 'staff'
   | 'tables'
-  | 'closings';
+  | 'closings'
+  | 'orders';
 
 const NAV_ITEMS: { id: AdminView; label: string; icon: AppIconName }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -49,6 +52,7 @@ const NAV_ITEMS: { id: AdminView; label: string; icon: AppIconName }[] = [
   { id: 'staff', label: 'Personal', icon: 'users' },
   { id: 'tables', label: 'Mesas', icon: 'armchair' },
   { id: 'closings', label: 'Cortes', icon: 'receipt' },
+  { id: 'orders', label: 'Pedidos', icon: 'receipt' },
 ];
 
 function AdminApp() {
@@ -152,6 +156,7 @@ function AdminApp() {
           {view === 'staff' && <StaffView token={token} onToast={handleToast} />}
           {view === 'tables' && <TablesView token={token} onToast={handleToast} />}
           {view === 'closings' && <ClosingsView token={token} onToast={handleToast} />}
+          {view === 'orders' && <OrderHistoryView token={token} businessDay={businessDayDateStr()} title="Historial de pedidos" />}
         </main>
       </div>
     </PwaLayout>

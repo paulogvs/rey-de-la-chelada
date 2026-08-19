@@ -30,6 +30,59 @@ export interface DailySalesResult extends ApiResult<{ daily?: DailySales }> {
   daily: DailySales | null;
 }
 
+export interface OrderHistoryItem {
+  id: string;
+  menu_item_name: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+  notes?: string | null;
+  round: number;
+  promo_label?: string | null;
+  kds_module?: string | null;
+}
+
+export interface OrderHistoryPayment {
+  id: string;
+  method: string;
+  amount: number;
+  received: number;
+  change: number;
+  reference?: string | null;
+  status: string;
+  processed_at: string;
+  processor?: string | null;
+  proof_photo?: string | null;
+}
+
+export interface OrderHistoryRow {
+  id: string;
+  table_number?: number | null;
+  status: string;
+  total: number;
+  paid_amount: number;
+  created_at: string;
+  paid_at?: string | null;
+  waiter_name?: string | null;
+  items: OrderHistoryItem[];
+  payments: OrderHistoryPayment[];
+  payment_summary: { method: string; total: number; count: number }[];
+}
+
+export interface OrderHistoryResult extends ApiResult<{ orders?: OrderHistoryRow[] }> {
+  businessDay: string;
+  orders: OrderHistoryRow[];
+}
+
+export interface PopularItem {
+  id: string;
+  item_name: string;
+  category_name?: string | null;
+  times_ordered: number;
+  total_quantity: number;
+  total_revenue: number;
+}
+
 interface ServerDailyReport {
   success: boolean;
   date: string;
@@ -88,4 +141,32 @@ export async function fetchDailySales(
   return { ...result, daily } as DailySalesResult;
 }
 
-export default { fetchDailySales, fetchClosingCurrent, openClosing, closeClosing };
+/** GET /api/reports/orders — paid order history for the current business day. */
+export async function fetchOrderHistory(
+  token: string,
+  businessDay: string,
+  status = 'paid',
+  fetchImpl: typeof fetch = fetch
+): Promise<OrderHistoryResult> {
+  const query = new URLSearchParams({ business_day: businessDay, status, limit: '100' });
+  const result = await apiFetch<{ success: boolean; business_day?: string; orders?: OrderHistoryRow[] }>(
+    `/api/reports/orders?${query.toString()}`,
+    { token, fetchImpl }
+  );
+  if (!result.ok || !result.data) {
+    return { ...result, data: null, businessDay, orders: [] } as OrderHistoryResult;
+  }
+  return { ...result, businessDay: result.data.business_day ?? businessDay, orders: result.data.orders ?? [] } as OrderHistoryResult;
+}
+
+export async function fetchPopularItems(
+  token: string,
+  businessDay: string,
+  limit = 5,
+  fetchImpl: typeof fetch = fetch
+): Promise<ApiResult<{ items: PopularItem[] }>> {
+  const query = new URLSearchParams({ from: businessDay, to: businessDay, limit: String(limit) });
+  return apiFetch<{ success: boolean; items?: PopularItem[] }>(`/api/reports/items/popular?${query.toString()}`, { token, fetchImpl }) as Promise<ApiResult<{ items: PopularItem[] }>>;
+}
+
+export default { fetchDailySales, fetchOrderHistory, fetchPopularItems, fetchClosingCurrent, openClosing, closeClosing };

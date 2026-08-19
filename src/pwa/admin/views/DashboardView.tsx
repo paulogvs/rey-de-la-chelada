@@ -16,8 +16,8 @@ import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { fetchAdminMenuItems } from '../../_shared/api/adminApi';
 import { fetchTables } from '../../_shared/api/tablesApi';
 import { fetchClosings } from '../../_shared/api/adminApi';
-import { fetchDailySales } from '../../_shared/api/reportsApi';
-import { localDateStr } from '../../_shared/utils/localDate';
+import { fetchDailySales, fetchPopularItems, type PopularItem } from '../../_shared/api/reportsApi';
+import { businessDayDateStr } from '../../_shared/utils/localDate';
 import { formatMoney } from '../../_shared/utils/format';
 
 interface DashboardViewProps {
@@ -32,6 +32,7 @@ interface Stats {
   freeTables: number;
   closingsToday: number;
   revenueToday: number;
+  popularItems: PopularItem[];
 }
 
 function emptyStats(): Stats {
@@ -42,6 +43,7 @@ function emptyStats(): Stats {
     freeTables: 0,
     closingsToday: 0,
     revenueToday: 0,
+    popularItems: [],
   };
 }
 
@@ -53,21 +55,21 @@ export function DashboardView({ token, onToast }: DashboardViewProps) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // C1/2.1: "hoy" = fecha LOCAL America/La_Paz (NUNCA toISOString — corta a las 20:00 local)
-      const day = localDateStr();
+      const day = businessDayDateStr();
       setToday(day);
 
-      const [items, tables, closings, daily] = await Promise.all([
+      const [items, tables, closings, daily, popular] = await Promise.all([
         fetchAdminMenuItems(token),
         fetchTables(token),
         fetchClosings(token),
         fetchDailySales(token, day, 0.13),
+        fetchPopularItems(token, day, 5),
       ]);
 
       const nullPrice = items.items.filter(i => i.price == null).length;
       const free = tables.tables.filter(t => t.status === 'free').length;
       const closingsToday = closings.closings.filter(c =>
-        (c.closed_at || '').slice(0, 10) === day
+        c.closing_date === day
       ).length;
 
       setStats({
@@ -77,6 +79,7 @@ export function DashboardView({ token, onToast }: DashboardViewProps) {
         freeTables: free,
         closingsToday,
         revenueToday: daily.daily?.totalSales ?? 0,
+        popularItems: popular.data?.items ?? [],
       });
 
       if (nullPrice > 0) {
@@ -136,7 +139,7 @@ export function DashboardView({ token, onToast }: DashboardViewProps) {
 
             <StatCard
               className="admin-stat admin-stat--revenue"
-              label={`Ventas ${today}`}
+               label={`Ventas día laboral ${today}`}
               value={formatMoney(stats.revenueToday)}
               delta={`${stats.closingsToday} corte(s) hoy`}
               deltaTone={stats.revenueToday > 0 ? 'up' : 'neutral'}
@@ -156,6 +159,28 @@ export function DashboardView({ token, onToast }: DashboardViewProps) {
                 ? 'No hay cortes de caja cerrados hoy aún (el corte actual se maneja en /caja).'
                 : `${stats.closingsToday} corte(s) de caja cerrado(s) hoy — ver historial en "Cortes".`}
             </p>
+          </Card>
+          <Card className="admin-section admin-popular">
+            <div className="admin-section__heading">
+              <div>
+                <h3>Productos más vendidos</h3>
+                <p className="admin-muted">Pedidos pagados del día laboral</p>
+              </div>
+            </div>
+            {stats.popularItems.length === 0 ? (
+              <p className="admin-muted">Todavía no hay ventas para rankear.</p>
+            ) : (
+              <div className="admin-popular__list">
+                {stats.popularItems.map((item, index) => (
+                  <div className="admin-popular__row" key={item.id}>
+                    <span className="admin-popular__rank">{index + 1}</span>
+                    <span className="admin-popular__name">{item.item_name}<small>{item.category_name || 'Sin categoría'}</small></span>
+                    <span className="admin-popular__qty">{item.total_quantity} uds.</span>
+                    <strong>{formatMoney(item.total_revenue)}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         </>
       )}
