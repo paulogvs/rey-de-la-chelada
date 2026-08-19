@@ -707,7 +707,6 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                         ? formatMoney(item.price)
                         : 'Ver variantes'}
                   </span>
-                  {item.price != null && item.price_variable !== 1 && <span className="order-panel__item-tax">IVA incluido</span>}
                   {item.promo_price != null && (
                     <span className="order-panel__item-promo">
                       {formatMoney(item.promo_price)} <span className="order-panel__item-badge order-panel__item-badge--promo">PROMO</span>
@@ -760,7 +759,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
 
             return (
               <Card key={index} padded={false} className="order-panel__cart-item">
-                <div className="order-panel__cart-item-header">
+                <div className="order-panel__cart-item-line">
                   <span className="order-panel__cart-item-name">
                     {ci.menuItem.name}
                     {ci.applyPromo && (
@@ -770,20 +769,25 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                       <span className="order-panel__item-badge order-panel__item-badge--manual">Bs {ci.manualPrice}</span>
                     )}
                   </span>
-                  <button
-                    className="order-panel__cart-item-remove"
-                    onClick={() => removeFromCart(index)}
-                    aria-label="Eliminar"
-                  >
-                    <AppIcon name="x" size="sm" />
-                  </button>
+                  <span className="order-panel__cart-item-total">
+                    {unit == null ? <span className="order-panel__cart-item-total--missing">Precio requerido</span> : formatMoney(lineTotal)}
+                  </span>
                 </div>
+                {unit != null && (
+                  <span className="order-panel__cart-item-math">
+                    {ci.quantity > 1 ? `${ci.quantity} × ${formatMoney(unit)}` : formatMoney(unit)}
+                  </span>
+                )}
                 {ci.selectedModifiers.length > 0 && (
                   <div className="order-panel__cart-item-mods">
-                    {ci.selectedModifiers.map(m => m.name).join(', ')}
+                    {ci.selectedModifiers.map(m => (
+                      <span key={m.id} className="order-panel__cart-item-mod">
+                        + {m.name}{m.priceAdjustment ? ` (${formatMoney(m.priceAdjustment)})` : ''}
+                      </span>
+                    ))}
                   </div>
                 )}
-                {ci.notes && <div className="order-panel__cart-item-notes">{ci.notes}</div>}
+                {ci.notes && <div className="order-panel__cart-item-notes">Nota: {ci.notes}</div>}
                 <div className="order-panel__cart-item-footer">
                   <QuantityStepper
                     value={ci.quantity}
@@ -792,9 +796,14 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                     onChange={(q) => updateQuantity(index, q)}
                     size="md"
                   />
-                  <span className="order-panel__cart-item-total">
-                    {unit == null ? <span className="order-panel__cart-item-total--missing">Precio requerido</span> : formatMoney(lineTotal)}
-                  </span>
+                  <button
+                    className="order-panel__cart-item-remove"
+                    onClick={() => removeFromCart(index)}
+                    aria-label={`Quitar ${ci.menuItem.name}`}
+                    title="Quitar item"
+                  >
+                    <AppIcon name="trash" size="sm" />
+                  </button>
                 </div>
               </Card>
             );
@@ -802,14 +811,8 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
 
           {cart.length > 0 && (
             <div className="order-panel__cart-total">
-              <div className="order-panel__cart-total-breakdown">
-                <span>Subtotal sin IVA <strong>{formatMoney(orderPanelTotals(cartTotal).subtotal)}</strong></span>
-                <span>IVA incluido <strong>{formatMoney(orderPanelTotals(cartTotal).ivaAmount)}</strong></span>
-              </div>
-              <span className="order-panel__cart-total-final">
-                <span>Total</span>
-                <strong className="order-panel__cart-total-amount">{formatMoney(cartTotal)}</strong>
-              </span>
+              <span>Total</span>
+              <span className="order-panel__cart-total-amount">{formatMoney(cartTotal)}</span>
             </div>
           )}
 
