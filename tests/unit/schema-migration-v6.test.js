@@ -1,17 +1,17 @@
 /**
- * Schema migration v5 → v6 (FASE 3 — Simplificación de pagos)
+ * Schema migration v5 â†’ v6 (FASE 3 â€” SimplificaciÃ³n de pagos)
  *
- * v6 elimina la propina (tip) y deja SOLO 2 métodos de pago:
- *  - payments.method  CHECK IN ('cash','qr')  — antes 5 métodos (qr_yape, qr_simple, card, transfer).
- *  - payments.tip      ELIMINADA — la propina se da directo al mesero, fuera de la app.
- *  - payments.received REAL DEFAULT 0 — efectivo: lo que el cliente ENTREGA (ej. 50 por 34.50).
- *  - payments.change   REAL DEFAULT 0 — efectivo: vuelto = received - amount (ej. 15.50).
+ * v6 elimina la propina (tip) y deja SOLO 2 mÃ©todos de pago:
+ *  - payments.method  CHECK IN ('cash','qr')  â€” antes 5 mÃ©todos (qr_yape, qr_simple, card, transfer).
+ *  - payments.tip      ELIMINADA â€” la propina se da directo al mesero, fuera de la app.
+ *  - payments.received REAL DEFAULT 0 â€” efectivo: lo que el cliente ENTREGA (ej. 50 por 34.50).
+ *  - payments.change   REAL DEFAULT 0 â€” efectivo: vuelto = received - amount (ej. 15.50).
  *
- * Migración debe:
+ * MigraciÃ³n debe:
  *  - Recrear payments con el CHECK nuevo (SQLite no altera CHECK).
- *  - Consolidar métodos legacy: qr_yape/qr_simple/card/transfer → 'qr' (todo no-efectivo es QR).
+ *  - Consolidar mÃ©todos legacy: qr_yape/qr_simple/card/transfer â†’ 'qr' (todo no-efectivo es QR).
  *  - Absorber el tip legacy dentro de amount (amount' = amount + tip) para NO falsear
- *    los totales históricos del día (SUM(amount) nuevo == SUM(amount+tip) viejo).
+ *    los totales histÃ³ricos del dÃ­a (SUM(amount) nuevo == SUM(amount+tip) viejo).
  *  - Preservar idempotencia (2 aplicaciones seguidas no rompen nada).
  */
 
@@ -19,7 +19,7 @@ import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
 import { applySchema, SCHEMA_VERSION } from '../../server/db/schema.js';
 
-// DDL de payments en SCHEMA_VERSION 5 (tip + 5 métodos)
+// DDL de payments en SCHEMA_VERSION 5 (tip + 5 mÃ©todos)
 const V5_PAYMENTS_DDL = `
   CREATE TABLE payments (
     id            TEXT PRIMARY KEY,
@@ -55,9 +55,9 @@ function seedMiniWorld(db) {
   `).run();
 }
 
-describe('Migración v6 — sin propina, solo cash|qr, received/change', () => {
-  it('SCHEMA_VERSION ahora es 9 (v9: price_variable/promo_price/promo_label)', () => {
-    expect(SCHEMA_VERSION).toBe(9);
+describe('MigraciÃ³n v6 â€” sin propina, solo cash|qr, received/change', () => {
+  it('SCHEMA_VERSION ahora es 10 (v10: promo_type en order_items)', () => {
+    expect(SCHEMA_VERSION).toBe(10);
   });
 
   it('DB nueva: payments SIN columna tip, CON received/change y CHECK cash|qr', () => {
@@ -67,7 +67,7 @@ describe('Migración v6 — sin propina, solo cash|qr, received/change', () => {
     expect(hasColumn(db, 'payments', 'received')).toBe(true);
     expect(hasColumn(db, 'payments', 'change')).toBe(true);
     expect(hasColumn(db, 'payments', 'proof_photo')).toBe(true);
-    expect(currentVersion(db)).toBe(9);
+    expect(currentVersion(db)).toBe(10);
     // El CHECK solo acepta cash|qr
     const ddl = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='payments'").get().sql;
     expect(ddl).toMatch(/method\s+TEXT NOT NULL CHECK\(method IN \('cash','qr'\)\)/);
@@ -78,9 +78,9 @@ describe('Migración v6 — sin propina, solo cash|qr, received/change', () => {
     db.close();
   });
 
-  it('upgrade desde v5: elimina tip, consolida métodos legacy → qr y absorbe tip en amount', () => {
+  it('upgrade desde v5: elimina tip, consolida mÃ©todos legacy â†’ qr y absorbe tip en amount', () => {
     const db = new Database(':memory:');
-    // Simular DB en SCHEMA_VERSION 5 (payments con tip + 5 métodos + pagos viejos)
+    // Simular DB en SCHEMA_VERSION 5 (payments con tip + 5 mÃ©todos + pagos viejos)
     db.prepare(`
       CREATE TABLE schema_version (
         version INTEGER PRIMARY KEY,
@@ -111,8 +111,8 @@ describe('Migración v6 — sin propina, solo cash|qr, received/change', () => {
     applySchema(db);
 
     expect(hasColumn(db, 'payments', 'tip')).toBe(false);
-    expect(currentVersion(db)).toBe(9);
-    // Métodos consolidados → qr; amount absorbe el tip (70+2=72)
+    expect(currentVersion(db)).toBe(10);
+    // MÃ©todos consolidados â†’ qr; amount absorbe el tip (70+2=72)
     const qr = db.prepare('SELECT * FROM payments WHERE id = ?').get('legacy-qr');
     expect(qr.method).toBe('qr');
     expect(qr.amount).toBe(72);
@@ -138,11 +138,11 @@ describe('Migración v6 — sin propina, solo cash|qr, received/change', () => {
     expect(p.method).toBe('cash');
     expect(p.received).toBe(50);
     expect(p.change).toBe(15.5);
-    expect(currentVersion(db)).toBe(9);
+    expect(currentVersion(db)).toBe(10);
     db.close();
   });
 
-  it('upgrade v6→v7: ADD COLUMN round en order_items preserva items existentes (round=1)', () => {
+  it('upgrade v6â†’v7: ADD COLUMN round en order_items preserva items existentes (round=1)', () => {
     const db = new Database(':memory:');
     // Simular DB v6 (order_items SIN round) + 1 item existente
     db.prepare(`
@@ -168,22 +168,22 @@ describe('Migración v6 — sin propina, solo cash|qr, received/change', () => {
     seedMiniWorld(db);
     db.prepare(`
       INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity, unit_price, subtotal, status)
-      VALUES ('it1', 'o1', 'm1', 'Chelada Clásica', 2, 15, 30, 'delivered')
+      VALUES ('it1', 'o1', 'm1', 'Chelada ClÃ¡sica', 2, 15, 30, 'delivered')
     `).run();
 
     applySchema(db);
 
     expect(hasColumn(db, 'order_items', 'round')).toBe(true);
-    expect(currentVersion(db)).toBe(9);
+    expect(currentVersion(db)).toBe(10);
     // El item existente queda en ronda 1 (no destructivo)
     const item = db.prepare('SELECT * FROM order_items WHERE id = ?').get('it1');
     expect(item.round).toBe(1);
-    expect(item.menu_item_name).toBe('Chelada Clásica');
+    expect(item.menu_item_name).toBe('Chelada ClÃ¡sica');
     expect(item.status).toBe('delivered');
     db.close();
   });
 
-  it('upgrade v7→v8: ADD COLUMN proof_photo en payments preserva pagos existentes', () => {
+  it('upgrade v7â†’v8: ADD COLUMN proof_photo en payments preserva pagos existentes', () => {
     const db = new Database(':memory:');
     // Simular DB v7 (payments SIN proof_photo) + 1 pago existente
     db.prepare(`
@@ -217,7 +217,7 @@ describe('Migración v6 — sin propina, solo cash|qr, received/change', () => {
     applySchema(db);
 
     expect(hasColumn(db, 'payments', 'proof_photo')).toBe(true);
-    expect(currentVersion(db)).toBe(9);
+    expect(currentVersion(db)).toBe(10);
     // El pago existente queda con proof_photo '' (no destructivo)
     const p = db.prepare('SELECT * FROM payments WHERE id = ?').get('p-v7');
     expect(p.proof_photo).toBe('');

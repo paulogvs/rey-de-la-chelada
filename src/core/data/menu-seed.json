@@ -16,7 +16,6 @@
                 "nombre": "Isla Dorada",
                 "descripcion": "Dulce, cítrica y muy refrescante. Piña, maracuyá, limón y agave, escarchado de sal de Tajín y coco tostado.",
                 "precio": 40,
-                "promo_price": 25,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
@@ -35,7 +34,6 @@
                 "nombre": "Mango Sunset",
                 "descripcion": "Tropical, dulce y ligeramente picante. Mango, limón, naranja y un toque de chamoy.",
                 "precio": 40,
-                "promo_price": 25,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
@@ -581,21 +579,18 @@
                 "id": "BAR-052",
                 "nombre": "Negra",
                 "precio": 15,
-                "promo_price": 12,
                 "area": "bar"
               },
               {
                 "id": "BAR-053",
                 "nombre": "Rubia",
                 "precio": 15,
-                "promo_price": 12,
                 "area": "bar"
               },
               {
                 "id": "BAR-054",
                 "nombre": "Roja",
                 "precio": 15,
-                "promo_price": 12,
                 "area": "bar"
               },
               {
@@ -603,7 +598,6 @@
                 "nombre": "Choleada",
                 "descripcion": "Rubia y negra.",
                 "precio": 15,
-                "promo_price": 12,
                 "area": "bar"
               }
             ]

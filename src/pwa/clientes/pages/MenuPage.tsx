@@ -10,7 +10,7 @@
  * - Tap item → detail view (modifiers, description, photo)
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { MenuItem } from '@/core/types';
 import { useTableSession } from '../hooks/useTableSession';
 import { useMenu } from '../hooks/useMenu';
@@ -22,6 +22,8 @@ import { ItemDetailModal } from '../components/ItemDetailModal';
 import { CategoryButton, MenuBanner, PageHeader, CustomerActions } from '../components/MenuChrome';
 import { canSubmitClientOrder } from '../utils/orderSendGate';
 import { computeTotals } from '@/core/config/iva';
+import { businessDayDateStr } from '@/core/config/local-date';
+import { activePromotionsForDay } from '@/core/config/promotions.js';
 import './MenuPage.css';
 
 /** Draft item type for local state */
@@ -81,6 +83,20 @@ export function MenuPage({
   const [draftItems, setDraftItems] = useState<DraftItem[]>([]);
   const [showSummary, setShowSummary] = useState(false);
   const [sending, setSending] = useState(false);
+
+  // ── Sprint Promos (2026-08-19): banner de promos del día laboral + badge
+  // "PROMO HOY" en los items de las categorías cubiertas. Informativo —
+  // el cobro de promos es manual del mesero (nunca automático).
+  const businessDay = useMemo(() => businessDayDateStr(), []);
+  const activePromos = useMemo(() => activePromotionsForDay(businessDay), [businessDay]);
+  const promoCats = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of activePromos) {
+      if (p.categoryName) set.add(p.categoryName);
+    }
+    return set;
+  }, [activePromos]);
+  const bannerText = activePromos.map(p => p.name).join(' · ');
 
   // Map API shape (snake_case) → UI shape (camelCase)
   const cats = (selectedCategory
@@ -205,6 +221,16 @@ export function MenuPage({
         sessionError={session.error}
       />
 
+      {/* Sprint Promos: banner informativo "Promos de hoy" (día laboral) */}
+      {activePromos.length > 0 && (
+        <div className="clientes-promo-banner" role="status">
+          <span className="clientes-promo-banner__icon" aria-hidden="true">🏆</span>
+          <span className="clientes-promo-banner__text">
+            <strong>Promos de hoy:</strong> {bannerText}
+          </span>
+        </div>
+      )}
+
       {/* Feedback toasts */}
       {(callFeedback || billFeedback) && (
         <div className="clientes-feedback">
@@ -270,6 +296,7 @@ export function MenuPage({
                         key={item.id}
                         item={item}
                         onSelect={() => setDetailItem(item)}
+                        promoBadge={item.category_name && promoCats.has(item.category_name) ? 'PROMO HOY' : undefined}
                       />
                     ))}
                   </div>

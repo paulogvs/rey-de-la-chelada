@@ -16,6 +16,7 @@ import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { buildDailySalesCsv, downloadCsv, dailyCsvFilename } from '../_shared/utils/csvExport';
 import { METHOD_LABELS, methodIcon } from '../_shared/utils/paymentMethods';
 import { formatMoney } from '../_shared/utils/format';
+import { PromotionsToday } from '../_shared/components/PromotionsToday';
 
 interface SummaryViewProps {
   token: string;
@@ -91,6 +92,7 @@ export function SummaryView({ token, today, ivaRate, refreshTick }: SummaryViewP
 
   return (
     <div className="caja-summary">
+      <PromotionsToday />
       <div className="caja-summary__toolbar">
         <Button variant="secondary" size="sm" onClick={handleExportCsv} loading={exporting} disabled={!summary}>
           <AppIcon name="download" size="sm" /> Exportar CSV

@@ -31,6 +31,9 @@ export interface MenuItemCardProps {
   /** Visual variant: text (default) or photo (full-width image) */
   variant?: 'text' | 'photo';
   className?: string;
+  /** Sprint Promos (2026-08-19): badge "PROMO HOY" para items cubiertos por
+   *  una promo activa del día laboral (clientes). */
+  promoBadge?: string;
 }
 
 export function MenuItemCard({
@@ -40,6 +43,7 @@ export function MenuItemCard({
   selected = false,
   variant = 'text',
   className = '',
+  promoBadge,
 }: MenuItemCardProps) {
   // Image load state — if it errors (404 / network), fall back to placeholder.
   // `loaded` starts false so we don't briefly show a broken image icon.
@@ -129,6 +133,11 @@ export function MenuItemCard({
           <h3 className="menu-item-card__name">{item.name}</h3>
           <span className="menu-item-card__price">{priceLabel}</span>
         </div>
+
+        {/* Sprint Promos: badge "PROMO HOY" (items cubiertos por promo activa) */}
+        {promoBadge && (
+          <span className="menu-item-card__promo-badge">{promoBadge}</span>
+        )}
 
         <p className="menu-item-card__desc">{item.description}</p>
 

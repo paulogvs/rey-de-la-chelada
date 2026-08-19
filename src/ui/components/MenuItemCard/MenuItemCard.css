@@ -142,6 +142,21 @@
   letter-spacing: 0.02em;
 }
 
+/* Sprint Promos (2026-08-19): badge "PROMO HOY" en el menú de clientes */
+.menu-item-card__promo-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #fff;
+  background: linear-gradient(135deg, var(--dorado-rey, #c9a227), #a07d1c);
+  border-radius: 999px;
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--dorado-rey, #c9a227) 45%, transparent);
+}
+
 .menu-item-card__unavailable-badge {
   font-size: 11px;
   color: var(--status-cancelled);

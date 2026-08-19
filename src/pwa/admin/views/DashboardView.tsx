@@ -19,6 +19,7 @@ import { fetchClosings } from '../../_shared/api/adminApi';
 import { fetchDailySales, fetchPopularItems, type PopularItem } from '../../_shared/api/reportsApi';
 import { businessDayDateStr } from '../../_shared/utils/localDate';
 import { formatMoney } from '../../_shared/utils/format';
+import { PromotionsToday } from '../../_shared/components/PromotionsToday';
 
 interface DashboardViewProps {
   token: string;
@@ -109,7 +110,9 @@ export function DashboardView({ token, onToast }: DashboardViewProps) {
         <Loader label="Cargando estadísticas…" />
       ) : (
         <>
+          <PromotionsToday />
           <div className="admin-dashboard__grid">
+            <PromotionsToday />
             <StatCard
               className={stats.nullPriceCount > 0 ? 'admin-stat admin-stat--alert' : 'admin-stat admin-stat--items'}
               label="Items del menú"

@@ -54,11 +54,13 @@ describe('ensureBootstrap', () => {
     expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND price_variable = 0').get().n).toBe(1);
     // El demo rellenó TODA la cocina (39 items con price null → precio)
     expect(db.prepare("SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND area = 'cocina'").get().n).toBe(0);
-    // Promos con precio (Isla Dorada 40 → promo 25; Cerveza Artesanal 15 → promo 12)
-    expect(db.prepare("SELECT promo_price FROM menu_items WHERE name = 'Isla Dorada'").get().promo_price).toBe(25);
+    // Sprint Promos (2026-08-19): Opción A aprobada — el seed ya NO trae
+    // promo_price en Signature (Isla Dorada 40) ni artesanales (Negra 15).
+    // El descuento vive en las promos por día laboral (botones manuales).
+    expect(db.prepare("SELECT promo_price FROM menu_items WHERE name = 'Isla Dorada'").get().promo_price).toBe(null);
     expect(db.prepare(
       "SELECT promo_price FROM menu_items WHERE name = 'Negra' AND category_id = (SELECT id FROM menu_categories WHERE name = 'Cerveza Artesanal')"
-    ).get().promo_price).toBe(12);
+    ).get().promo_price).toBe(null);
 
     // Sprint 1 (D): adicionales como modifiers — grupo "Adicionales" en las
     // micheladas (Shot +15, Doble Escarchado +5), siembra idempotente.

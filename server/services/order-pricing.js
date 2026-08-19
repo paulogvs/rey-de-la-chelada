@@ -14,6 +14,13 @@
  */
 
 import { computeTotals, round2 } from '../../src/core/config/iva.js';
+import {
+  promoById,
+  promoUnitPrice,
+  isPromotionActiveForDay,
+  SIGNATURE_CATEGORY,
+  ARTESANAL_CATEGORY,
+} from '../../src/core/config/promotions.js';
 
 /**
  * Resolve modifier adjustments for an order item from the DB.
@@ -145,4 +152,128 @@ export function recalcOrder(db, orderId) {
   db.prepare('UPDATE orders SET subtotal = ?, iva_amount = ?, total = ? WHERE id = ?')
     .run(subtotal, iva, total, orderId);
   return { subtotal, iva, total };
+}
+
+/**
+ * Nombre de la categoría de un menu_item (para resolver promos por
+ * categoría — SSOT por nombre, igual que load-menu.js).
+ * @param {object} db — better-sqlite3
+ * @param {object} menuItem — { category_id }
+ * @returns {string|null}
+ */
+export function categoryNameOf(db, menuItem) {
+  const row = db.prepare('SELECT name FROM menu_categories WHERE id = ?').get(menuItem.category_id);
+  return row ? row.name : null;
+}
+
+/**
+ * Resuelve el unit_price de una línea con PROMO (Sprint Promos 2026-08-19).
+ *
+ * Contrato (aprobado con el dueño):
+ *   - La línea con `promo_type` se factura con el precio de la promo
+ *     (2x1 → 0, Miércoles de Barra → 12, Primera Visita → 25,
+ *     Combo → 30 Signature / 15 Cerveza). NUNCA acepta precios del cliente.
+ *   - Valida: tipo conocido → día laboral activo → categoría elegible.
+ *   - Las reglas de CONTEXTO (par 2x1, una vez primera visita, par combo)
+ *     las valida validatePromoContext() en el route (necesitan el pedido).
+ *
+ * @param {object} db — better-sqlite3
+ * @param {object} menuItem — { id, category_id }
+ * @param {string} promoType — '2x1' | 'barra' | 'combo' | 'primera-visita'
+ * @param {{ businessDay?: string }} opts — 'YYYY-MM-DD' del día laboral
+ * @returns {{ unitPrice: number|null, promoLabel: string|null, error: { code: string, message: string }|null }}
+ */
+export function resolvePromoUnitPrice(db, menuItem, promoType, { businessDay } = {}) {
+  const promo = promoById(promoType);
+  if (!promo) {
+    return { unitPrice: null, promoLabel: null, error: { code: 'INVALID_PROMO_TYPE', message: `Tipo de promo inválido: ${promoType}` } };
+  }
+  if (promo.promoType === 'MODIFIER') {
+    return { unitPrice: null, promoLabel: null, error: { code: 'PROMO_NOT_A_LINE', message: `${promo.name} es un adicional del item, no una línea propia` } };
+  }
+  if (!isPromotionActiveForDay(promoType, businessDay)) {
+    return { unitPrice: null, promoLabel: null, error: { code: 'PROMO_NOT_ACTIVE', message: `${promo.name} no está activa este día laboral` } };
+  }
+  const categoryName = categoryNameOf(db, menuItem);
+  if (promo.categoryName && categoryName !== promo.categoryName) {
+    return { unitPrice: null, promoLabel: null, error: { code: 'PROMO_ITEM_NOT_ELIGIBLE', message: `${promo.name} aplica solo a ${promo.categoryName}` } };
+  }
+  if (promo.promoType === 'COMBO' && !promo.comboPrices?.[categoryName]) {
+    return { unitPrice: null, promoLabel: null, error: { code: 'PROMO_ITEM_NOT_ELIGIBLE', message: `${promo.name} aplica solo a Signature + Cerveza Artesanal` } };
+  }
+  const price = promoUnitPrice(promo, categoryName);
+  if (price == null) {
+    return { unitPrice: null, promoLabel: null, error: { code: 'PROMO_NOT_A_LINE', message: `${promo.name} no define precio de línea` } };
+  }
+  return { unitPrice: round2(price), promoLabel: promo.label || promo.name, promoCategory: categoryName, error: null };
+}
+
+/**
+ * Valida las reglas de CONTEXTO de una promo contra TODAS las líneas del
+ * pedido (existentes + nuevas). Se llama UNA vez por tipo de promo en el
+ * route, después de pre-validar cada línea con resolvePromoUnitPrice.
+ *
+ * Líneas: [{ categoryName, promoType, quantity }] (sin importar db).
+ *
+ * Reglas (SSOT):
+ *   - BOGO (2x1): unidades gratis ≤ unidades pagadas de la categoría.
+ *   - PRICE_OVERRIDE con oncePerOrder (Primera Visita): máx 1 unidad.
+ *   - COMBO: pares Signature/Cerveza balanceados (misma cantidad, ≥1).
+ *
+ * @param {Array<{categoryName?: string|null, promoType?: string|null, quantity?: number}>} allLines
+ * @param {string} promoType
+ * @param {string} businessDay — 'YYYY-MM-DD' del día laboral
+ * @returns {{ valid: boolean, code?: string, message?: string }}
+ */
+export function validatePromoContext(allLines, promoType, businessDay) {
+  const promo = promoById(promoType);
+  // Tipo desconocido o sin reglas de contexto → el route ya lo rechazó/no aplica.
+  if (!promo) return { valid: true };
+  const lines = (Array.isArray(allLines) ? allLines : []).filter(l => l && l.promoType === promoType);
+  if (lines.length === 0) return { valid: true };
+  // Si la promo no está activa hoy, el route lo rechaza antes (resolvePromoUnitPrice).
+  if (!isPromotionActiveForDay(promoType, businessDay)) return { valid: true };
+
+  const units = lines.reduce((s, l) => s + (l.quantity || 1), 0);
+  const otherLines = (Array.isArray(allLines) ? allLines : []).filter(l => l && l.promoType !== promoType);
+
+  switch (promo.promoType) {
+    case 'BOGO': {
+      const paidUnits = otherLines
+        .filter(l => l.categoryName === promo.categoryName)
+        .reduce((s, l) => s + (l.quantity || 1), 0);
+      if (units > paidUnits) {
+        return {
+          valid: false,
+          code: 'PROMO_CONTEXT_VIOLATION',
+          message: 'El 2x1 requiere una Michelada Signature pagada por cada unidad gratis',
+        };
+      }
+      return { valid: true };
+    }
+    case 'PRICE_OVERRIDE': {
+      if (promo.oncePerOrder && units > 1) {
+        return {
+          valid: false,
+          code: 'PROMO_CONTEXT_VIOLATION',
+          message: `${promo.name} solo se aplica una vez por pedido`,
+        };
+      }
+      return { valid: true };
+    }
+    case 'COMBO': {
+      const sigUnits = lines.filter(l => l.categoryName === SIGNATURE_CATEGORY).reduce((s, l) => s + (l.quantity || 1), 0);
+      const artUnits = lines.filter(l => l.categoryName === ARTESANAL_CATEGORY).reduce((s, l) => s + (l.quantity || 1), 0);
+      if (sigUnits < 1 || artUnits < 1 || sigUnits !== artUnits) {
+        return {
+          valid: false,
+          code: 'PROMO_CONTEXT_VIOLATION',
+          message: 'El combo requiere 1 Michelada Signature + 1 Cerveza Artesanal por par',
+        };
+      }
+      return { valid: true };
+    }
+    default:
+      return { valid: true };
+  }
 }

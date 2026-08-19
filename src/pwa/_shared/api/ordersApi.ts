@@ -107,6 +107,8 @@ export interface OrderItemPayload {
   manual_price?: number;
   /** Sprint 1 (E): aplicar promo manual (item con promo_price, solo meseros) */
   apply_promo?: boolean;
+  /** Sprint Promos (2026-08-19): tipo de promo por día laboral aplicada a la línea */
+  promo_type?: string;
 }
 
 export interface OrderPayload {

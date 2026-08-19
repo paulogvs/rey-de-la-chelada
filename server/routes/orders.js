@@ -27,14 +27,25 @@ import { logger } from '../utils/logger.js'; // S1/T2: errores de pedidos al log
 import { broadcastOrderCreated, broadcastOrderStatusChange, broadcastOrderComplete, isOrderFullyReady, isModuleFullyReady, broadcastModuleReady } from '../services/order-broadcaster.js';
 import { broadcaster, buildKDSEvent, KDSEventType } from '../services/websocket-broadcaster.js';
 import { computeTotals, round2 } from '../../src/core/config/iva.js';
-import { resolveModifierAdjustment, resolveItemUnitPrice, recalcOrder } from '../services/order-pricing.js';
+import { resolveModifierAdjustment, resolveItemUnitPrice, resolvePromoUnitPrice, validatePromoContext, categoryNameOf, recalcOrder } from '../services/order-pricing.js';
 import { recalcOrderStatus, resolveRound } from '../services/order-status.js';
+import { businessDayDateStr } from '../utils/date-utils.js';
 
 const router = Router();
 
 // ============================================================
 // Helpers
 // ============================================================
+
+/**
+ * Día laboral para promos: override `business_day` (YYYY-MM-DD) opcional
+ * en el body (tests/e2e con día fijo) o el día laboral real del server.
+ */
+function promoBusinessDay(body) {
+  const override = body && body.business_day;
+  if (override && /^\d{4}-\d{2}-\d{2}$/.test(String(override))) return String(override);
+  return businessDayDateStr();
+}
 
 // Mapeo de estados al schema (se acepta español o canónico)
 const ORDER_STATUS_MAP = {
@@ -316,11 +327,20 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
 
       // Sprint 1 (B/E): precio manual "Consultar precio" + promo manual.
       // SSOT: el server resuelve unit_price (nunca acepta precios del cliente).
-      const pricing = resolveItemUnitPrice(db, menuItem, {
-        manualPrice: item.manual_price,
-        applyPromo: item.apply_promo === true,
-        modifiers: item.modifiers,
-      });
+      // Sprint Promos (2026-08-19): si la línea trae `promo_type`, se factura
+      // con el precio de la PROMO (0 2x1, 12 barra, 25 primera visita, 30/15
+      // combo) — validado contra la config SSOT + día laboral activo.
+      const businessDay = promoBusinessDay(req.body);
+      let pricing;
+      if (item.promo_type) {
+        pricing = resolvePromoUnitPrice(db, menuItem, item.promo_type, { businessDay });
+      } else {
+        pricing = resolveItemUnitPrice(db, menuItem, {
+          manualPrice: item.manual_price,
+          applyPromo: item.apply_promo === true,
+          modifiers: item.modifiers,
+        });
+      }
       if (pricing.error) {
         return res.status(400).json({
           success: false,
@@ -343,11 +363,27 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
         unit_price: unitPrice,
         subtotal: itemSubtotal,
         promo_label: pricing.promoLabel,
+        promo_type: item.promo_type || null,
+        promo_category: categoryNameOf(db, menuItem),
         modifiers_json: summary.length > 0 ? JSON.stringify(summary) : null,
         preparation_notes: item.notes || '',
         status: 'pending',
         kds_module: item.kds_module || menuItem.area || 'cocina',
       });
+    }
+
+    // Sprint Promos: validar reglas de contexto por tipo de promo (par 2x1,
+    // una vez primera visita, par combo) sobre el pedido completo.
+    const promoTypes = [...new Set(orderItems.map(oi => oi.promo_type).filter(Boolean))];
+    for (const promoType of promoTypes) {
+      const ctx = validatePromoContext(
+        orderItems.map(oi => ({ categoryName: oi.promo_category, promoType: oi.promo_type, quantity: oi.quantity })),
+        promoType,
+        promoBusinessDay(req.body)
+      );
+      if (!ctx.valid) {
+        return res.status(400).json({ success: false, error: ctx.message, code: ctx.code });
+      }
     }
 
     // Modelo SSOT EXTRACTIVO (precio INCLUYE IVA): `subtotal` acumulado es
@@ -372,13 +408,13 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
 
     const insertItem = db.prepare(`
       INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
-                               unit_price, modifiers_json, subtotal, status, round, preparation_notes, promo_label)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               unit_price, modifiers_json, subtotal, status, round, preparation_notes, promo_label, promo_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const oi of orderItems) {
       insertItem.run(oi.id, orderId, oi.menu_item_id, oi.menu_item_name, oi.quantity,
                      oi.unit_price, oi.modifiers_json, oi.subtotal, oi.status, 1, oi.preparation_notes,
-                     oi.promo_label);
+                     oi.promo_label, oi.promo_type);
     }
 
     // Mark table as ordered (pedido confirmado en cocina/bar)
@@ -462,11 +498,16 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
             });
           }
           // Sprint 1 (B/E): validar pricing (manual/promo) ANTES de la transacción
-          const pricing = resolveItemUnitPrice(db, menuItem, {
-            manualPrice: item.manual_price,
-            applyPromo: item.apply_promo === true,
-            modifiers: item.modifiers,
-          });
+          // Sprint Promos: si la línea trae `promo_type` se valida contra la
+          // config SSOT + día laboral activo (nunca acepta precios del cliente).
+          const businessDay = promoBusinessDay(req.body);
+          const pricing = item.promo_type
+            ? resolvePromoUnitPrice(db, menuItem, item.promo_type, { businessDay })
+            : resolveItemUnitPrice(db, menuItem, {
+                manualPrice: item.manual_price,
+                applyPromo: item.apply_promo === true,
+                modifiers: item.modifiers,
+              });
           if (pricing.error) {
             return res.status(400).json({
               success: false,
@@ -475,6 +516,7 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
               menu_item_id: item.menu_item_id,
             });
           }
+          item._promoCategory = item.promo_type ? pricing.promoCategory : null;
         }
       }
 
@@ -498,13 +540,13 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
           const updateItem = db.prepare(`
             UPDATE order_items
             SET quantity = ?, unit_price = ?, modifiers_json = ?, subtotal = ?,
-                preparation_notes = ?, promo_label = ?
+                preparation_notes = ?, promo_label = ?, promo_type = ?
             WHERE id = ? AND order_id = ?
           `);
           const insertItem = db.prepare(`
             INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
-                                     unit_price, modifiers_json, subtotal, status, round, preparation_notes, promo_label)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+                                     unit_price, modifiers_json, subtotal, status, round, preparation_notes, promo_label, promo_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
           `);
 
           // FASE 4B: los items NUEVOS de esta tanda van a la MISMA ronda.
@@ -524,11 +566,14 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
 
             // Sprint 1 (B/E): pricing server-side (manual + promo) — ya validado
             // arriba en la pre-validación; aquí se recalcula para persistir.
-            const pricing = resolveItemUnitPrice(db, menuItem, {
-              manualPrice: item.manual_price,
-              applyPromo: item.apply_promo === true,
-              modifiers: item.modifiers,
-            });
+            const businessDay = promoBusinessDay(req.body);
+            const pricing = item.promo_type
+              ? resolvePromoUnitPrice(db, menuItem, item.promo_type, { businessDay })
+              : resolveItemUnitPrice(db, menuItem, {
+                  manualPrice: item.manual_price,
+                  applyPromo: item.apply_promo === true,
+                  modifiers: item.modifiers,
+                });
             if (pricing.error) continue; // defensivo — la pre-validación ya lo rechazó
 
             const { summary } = resolveModifierAdjustment(db, menuItem.id, item.modifiers);
@@ -536,17 +581,42 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
             const itemSubtotal = round2(unitPrice * quantity);
             const modifiersJson = summary.length > 0 ? JSON.stringify(summary) : null;
             const notesField = item.notes || '';
+            const promoTypeField = item.promo_type || null;
 
             if (item.id && currentIdSet.has(item.id)) {
               updateItem.run(quantity, unitPrice, modifiersJson, itemSubtotal, notesField,
-                             pricing.promoLabel, item.id, req.params.id);
+                             pricing.promoLabel, promoTypeField, item.id, req.params.id);
             } else {
               // sin id, o id que no pertenece a este pedido → nuevo
               if (newItemsRound === null) newItemsRound = resolveRound(db, req.params.id);
               insertItem.run(item.id || randomUUID(), req.params.id, menuItem.id, menuItem.name,
                              quantity, unitPrice, modifiersJson, itemSubtotal, newItemsRound, notesField,
-                             pricing.promoLabel);
+                             pricing.promoLabel, promoTypeField);
               insertedNew = true;
+            }
+          }
+
+          // Sprint Promos: validar reglas de contexto (par 2x1, una vez
+          // primera visita, par combo) contra el estado REAL post-cambios.
+          // Si falla → throw → rollback de la transacción completa.
+          const promoLines = db.prepare(`
+            SELECT oi.promo_type, oi.quantity, mc.name as categoryName
+            FROM order_items oi
+            LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+            LEFT JOIN menu_categories mc ON mi.category_id = mc.id
+            WHERE oi.order_id = ?
+          `).all(req.params.id);
+          const promoTypes = [...new Set(promoLines.map(l => l.promo_type).filter(Boolean))];
+          for (const promoType of promoTypes) {
+            const ctx = validatePromoContext(
+              promoLines.map(l => ({ categoryName: l.categoryName, promoType: l.promo_type, quantity: l.quantity })),
+              promoType,
+              promoBusinessDay(req.body)
+            );
+            if (!ctx.valid) {
+              const err = new Error(ctx.message);
+              err.code = ctx.code;
+              throw err;
             }
           }
           return { insertedNew };
@@ -575,6 +645,9 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
       res.json({ success: true, order: updated });
     }
   } catch (err) {
+    if (err?.code === 'PROMO_CONTEXT_VIOLATION') {
+      return res.status(400).json({ success: false, error: err.message, code: err.code });
+    }
     logger.error('[Orders] Update error:', err.message);
     res.status(500).json({ success: false, error: 'Error al actualizar pedido', code: 'ORDER_UPDATE_ERROR' });
   }
@@ -751,6 +824,7 @@ router.patch('/:id/status', requireAuth, requireRole('admin', 'mesero'), (req, r
 router.post('/:id/items', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
   try {
     const { menu_item_id, quantity, notes, modifiers } = req.body;
+    const promoType = req.body.promo_type || null;
 
     if (!menu_item_id) {
       return res.status(400).json({ success: false, error: 'Item requerido', code: 'ITEM_REQUIRED' });
@@ -781,11 +855,16 @@ router.post('/:id/items', requireAuth, requireRole('admin', 'mesero'), (req, res
     }
 
     // Sprint 1 (B/E): pricing server-side (manual + promo)
-    const pricing = resolveItemUnitPrice(db, menuItem, {
-      manualPrice: req.body.manual_price,
-      applyPromo: req.body.apply_promo === true,
-      modifiers,
-    });
+    // Sprint Promos: si viene `promo_type` se factura con el precio de la
+    // promo (validado contra la config SSOT + día laboral activo).
+    const businessDay = promoBusinessDay(req.body);
+    const pricing = promoType
+      ? resolvePromoUnitPrice(db, menuItem, promoType, { businessDay })
+      : resolveItemUnitPrice(db, menuItem, {
+          manualPrice: req.body.manual_price,
+          applyPromo: req.body.apply_promo === true,
+          modifiers,
+        });
     if (pricing.error) {
       return res.status(400).json({
         success: false,
@@ -797,15 +876,36 @@ router.post('/:id/items', requireAuth, requireRole('admin', 'mesero'), (req, res
     const unitPrice = pricing.unitPrice;
     const itemSubtotal = round2(unitPrice * qty);
 
+    // Sprint Promos: validar contexto (par 2x1, una vez primera visita,
+    // par combo) contra el estado REAL del pedido + el item nuevo.
+    if (promoType) {
+      const promoLines = db.prepare(`
+        SELECT oi.promo_type, oi.quantity, mc.name as categoryName
+        FROM order_items oi
+        LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+        LEFT JOIN menu_categories mc ON mi.category_id = mc.id
+        WHERE oi.order_id = ?
+      `).all(req.params.id);
+      promoLines.push({ promo_type: promoType, quantity: qty, categoryName: pricing.promoCategory });
+      const ctx = validatePromoContext(
+        promoLines.map(l => ({ categoryName: l.categoryName, promoType: l.promo_type, quantity: l.quantity })),
+        promoType,
+        businessDay
+      );
+      if (!ctx.valid) {
+        return res.status(400).json({ success: false, error: ctx.message, code: ctx.code });
+      }
+    }
+
     // FASE 4B: ronda — misma si hay trabajo sin procesar, nueva si todo se procesó
     const round = resolveRound(db, req.params.id);
     db.prepare(`
       INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
-                               unit_price, modifiers_json, subtotal, status, round, preparation_notes, promo_label)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+                               unit_price, modifiers_json, subtotal, status, round, preparation_notes, promo_label, promo_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
     `).run(randomUUID(), req.params.id, menuItem.id, menuItem.name, qty, unitPrice,
            modifiers ? JSON.stringify(modifiers) : null, itemSubtotal, round, notes || '',
-           pricing.promoLabel);
+           pricing.promoLabel, promoType);
 
     recalcOrder(db, req.params.id);
     // FASE 4B: estados derivados (reactiva a 'confirmed' si estaba served/ready)

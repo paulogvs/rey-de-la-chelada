@@ -234,6 +234,7 @@ import reportsRoutes from './routes/reports.js';
 import waiterCallsRoutes from './routes/waiter-calls.js';
 import clientOrdersRoutes from './routes/client-orders.js';
 import clientSessionsRoutes from './routes/client-sessions.js';
+import promotionsRoutes from './routes/promotions.js'; // Sprint Promos 2026-08-19
 
 // ── Route registration ────────────────────────────────────
 app.use('/api/auth', authLimiter, authRoutes);
@@ -250,6 +251,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/waiter-calls', waiterCallsRoutes);
 app.use('/api/client-orders', clientOrdersRoutes);  // PUBLIC — clientes PWA (sin JWT)
 app.use('/api/client-sessions', clientSessionsRoutes); // POST admin + GET validate público
+app.use('/api/promotions', promotionsRoutes);          // PUBLIC — promos del día laboral
 
 // ============================================================
 // WebSocket — KDS Real-Time (delegated to broadcaster SSOT)

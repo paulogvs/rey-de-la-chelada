@@ -10,7 +10,7 @@
  * Replaces the in-memory orderEngine/tableEngine flow.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Table, ModifierOption } from '@/core/types';
 import { useToast } from '@/ui/components/Toast';
 import { Card } from '@/ui/components/Card';
@@ -32,6 +32,9 @@ import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
 import { computeTotals } from '@/core/config/iva';
 import { summarizeOrderReview } from './orderReview';
+import { businessDayDateStr } from '@/core/config/local-date';
+import { activePromotionsForDay, PROMOTIONS_BY_ID, businessDayName } from '@/core/config/promotions.js';
+import { canApplyPromo, applyPromoToCart, clearPromoFromCart, resolveCartPromoUnitPrice, cartSavings, type PromoCartItem } from './promoCart';
 
 /** Badge de estado del pedido (S2-B) */
 const ORDER_STATUS_BADGE: Record<string, { variant: 'pending' | 'preparing' | 'ready' | 'paid' | 'cancelled' | 'info'; label: string }> = {
@@ -79,6 +82,9 @@ interface CartItem {
   manualPrice?: number;
   /** Sprint 1 (E): aplicar promo manual */
   applyPromo?: boolean;
+  /** Sprint Promos (2026-08-19): promo por día laboral aplicada a la línea
+   *  ('2x1' | 'barra' | 'combo' | 'primera-visita'). El server la re-valida. */
+  promoType?: string;
 }
 
 /**
@@ -145,6 +151,33 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
   const [activeOrderTick, setActiveOrderTick] = useState(0);
   // FASE 4A: modo edición del pedido activo (agregar items → nueva ronda)
   const [editMode, setEditMode] = useState(false);
+
+  // ── Sprint Promos (2026-08-19): día laboral + promos activas ──
+  const businessDay = useMemo(() => businessDayDateStr(), []);
+  const activePromos = useMemo(() => activePromotionsForDay(businessDay), [businessDay]);
+  const businessDayNameLabel = businessDayName(businessDay);
+
+  /** Aplica una promo al carrito (botones del panel "Promos de hoy") */
+  const handleApplyPromo = useCallback((promoId: string) => {
+    const check = canApplyPromo(cart, promoId, businessDay);
+    if (!check.ok) {
+      addToast({ type: 'warning', message: check.reason || 'No se puede aplicar esta promo', duration: 3500 });
+      return;
+    }
+    setCart(prev => applyPromoToCart(prev, promoId, businessDay));
+    addToast({ type: 'success', message: `Promo aplicada: ${PROMOTIONS_BY_ID[promoId]?.label || promoId}`, duration: 2500 });
+  }, [cart, businessDay, addToast]);
+
+  /** Quita una promo del carrito */
+  const handleClearPromo = useCallback((promoId: string) => {
+    setCart(prev => clearPromoFromCart(prev, promoId));
+  }, []);
+
+  /** Preview de ahorro del carrito (promos ya marcadas) */
+  const savings = useMemo(
+    () => cartSavings(cart as PromoCartItem[], businessDay),
+    [cart, businessDay]
+  );
 
   // Si la mesa ya tiene currentOrderId, cargar el pedido y mostrar su estado
   // en lugar de crear uno nuevo (el mesero ve items/listos y puede entregar).
@@ -236,6 +269,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
           notes: ci.notes || undefined,
           manual_price: ci.manualPrice,
           apply_promo: ci.applyPromo,
+          promo_type: ci.promoType,
           modifiers: ci.selectedModifiers.map(m => ({
             groupName: (detailGroups.find(g => g.options.some(o => o.option_id === m.id))?.name) || '',
             optionName: m.name,
@@ -330,19 +364,30 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
     setItemApplyPromo(false);
   }, []);
 
-  // Cart totals (Sprint 1 B/E: promo/manual resueltos como el server)
-  const cartTotal = cart.reduce((sum, ci) => {
-    const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
-    const unit = resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdjustment) ?? 0;
-    return sum + unit * ci.quantity;
-  }, 0);
-  const cartSummary = summarizeOrderReview(cart.map(ci => {
-    const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
+// Cart totals (Sprint 1 B/E: promo/manual resueltos como el server;
+// Sprint Promos: líneas con promoType se resuelven con la config SSOT)
+const cartTotal = cart.reduce((sum, ci) => {
+  if (ci.promoType) {
+    const unit = resolveCartPromoUnitPrice(ci as PromoCartItem, businessDay);
+    return sum + (unit ?? 0) * ci.quantity;
+  }
+  const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
+  const unit = resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdjustment) ?? 0;
+  return sum + unit * ci.quantity;
+}, 0);
+const cartSummary = summarizeOrderReview(cart.map(ci => {
+  if (ci.promoType) {
     return {
       quantity: ci.quantity,
-      unitPrice: resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdjustment) ?? 0,
+      unitPrice: resolveCartPromoUnitPrice(ci as PromoCartItem, businessDay) ?? 0,
     };
-  }));
+  }
+  const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
+  return {
+    quantity: ci.quantity,
+    unitPrice: resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdjustment) ?? 0,
+  };
+}));
 
   const addToCart = useCallback(() => {
     if (!itemDetail) return;
@@ -412,6 +457,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
           notes: ci.notes || undefined,
           manual_price: ci.manualPrice,
           apply_promo: ci.applyPromo,
+          promo_type: ci.promoType,
           modifiers: ci.selectedModifiers.map(m => ({
             groupName: (detailGroups.find(g => g.options.some(o => o.option_id === m.id))?.name) || '',
             optionName: m.name,
@@ -746,6 +792,35 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
             <span>Confirma los productos con el cliente</span>
           </div>
 
+          {/* ── Sprint Promos: promos activas del día laboral (botones) ── */}
+          {activePromos.length > 0 && (
+            <div className="order-panel__promos">
+              <p className="order-panel__promos-title">
+                Promos de hoy ({businessDayNameLabel}) — aplicate al carrito
+              </p>
+              {activePromos.map(promo => {
+                const applied = cart.some(ci => ci.promoType === promo.id);
+                return (
+                  <button
+                    key={promo.id}
+                    className={`order-panel__promo-btn${applied ? ' order-panel__promo-btn--applied' : ''}`}
+                    onClick={() => (applied ? handleClearPromo(promo.id) : handleApplyPromo(promo.id))}
+                    title={promo.description}
+                  >
+                    <span className="order-panel__promo-btn-name">{promo.label}</span>
+                    <span className="order-panel__promo-btn-desc">{promo.description}</span>
+                    <span className="order-panel__promo-btn-action">{applied ? 'Quitar' : 'Aplicar'}</span>
+                  </button>
+                );
+              })}
+              {savings.savings > 0 && (
+                <p className="order-panel__promos-savings">
+                  Ahorro aplicado: <strong>{formatMoney(savings.savings)}</strong>
+                </p>
+              )}
+            </div>
+          )}
+
           {cart.length === 0 && (
             <p className="order-panel__cart-empty">
               Selecciona items del menú para agregar al pedido
@@ -754,14 +829,22 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
 
           {cart.map((ci, index) => {
             const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
-            const unit = resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdjustment) ?? 0;
+            const unit = ci.promoType
+              ? (resolveCartPromoUnitPrice(ci as PromoCartItem, businessDay) ?? 0)
+              : (resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdjustment) ?? 0);
             const lineTotal = unit * ci.quantity;
+            const promoLabel = ci.promoType ? PROMOTIONS_BY_ID[ci.promoType]?.label : null;
 
             return (
               <Card key={index} padded={false} className="order-panel__cart-item">
                 <div className="order-panel__cart-item-line">
                   <span className="order-panel__cart-item-name">
                     {ci.menuItem.name}
+                    {ci.promoType && (
+                      <span className="order-panel__item-badge order-panel__item-badge--promo">
+                        {promoLabel || ci.promoType}
+                      </span>
+                    )}
                     {ci.applyPromo && (
                       <span className="order-panel__item-badge order-panel__item-badge--promo">Promo</span>
                     )}
@@ -775,8 +858,17 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
                 </div>
                 {unit != null && (
                   <span className="order-panel__cart-item-math">
-                    {ci.quantity > 1 ? `${ci.quantity} × ${formatMoney(unit)}` : formatMoney(unit)}
+                    {ci.promoType && unit === 0 ? 'GRATIS' : (ci.quantity > 1 ? `${ci.quantity} × ${formatMoney(unit)}` : formatMoney(unit))}
                   </span>
+                )}
+                {ci.promoType && (
+                  <button
+                    className="order-panel__cart-item-unpromo"
+                    onClick={() => handleClearPromo(ci.promoType!)}
+                    title={`Quitar promo ${promoLabel || ci.promoType}`}
+                  >
+                    Quitar promo
+                  </button>
                 )}
                 {ci.selectedModifiers.length > 0 && (
                   <div className="order-panel__cart-item-mods">
@@ -812,7 +904,12 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
           {cart.length > 0 && (
             <div className="order-panel__cart-total">
               <span>Total</span>
-              <span className="order-panel__cart-total-amount">{formatMoney(cartTotal)}</span>
+              <span className="order-panel__cart-total-amount">
+                {savings.savings > 0 && (
+                  <span className="order-panel__cart-total-original">{formatMoney(savings.originalTotal)}</span>
+                )}
+                {formatMoney(cartTotal)}
+              </span>
             </div>
           )}
 
