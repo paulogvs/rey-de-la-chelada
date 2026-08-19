@@ -52,7 +52,6 @@
                 "nombre": "Maracuyá Paradise",
                 "descripcion": "Ácida, aromática y muy fresca, con pulpa de maracuyá, jugo de limón, jarabe simple y cerveza.",
                 "precio": 35,
-                "promo_price": 25,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
@@ -71,7 +70,6 @@
                 "nombre": "Sandía Beach",
                 "descripcion": "Muy refrescante, ideal para el verano. Cerveza rubia, jugo natural de sandía, jugo de limón, jarabe simple y un toque de salsa inglesa.",
                 "precio": 35,
-                "promo_price": 25,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
@@ -90,7 +88,6 @@
                 "nombre": "Tamarindo Vulcano",
                 "descripcion": "Dulce, ácida y con un toque picante. Pulpa de tamarindo, jugo de limón, salsa inglesa, chamoy y salsa picante.",
                 "precio": 35,
-                "promo_price": 25,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
@@ -109,7 +106,6 @@
                 "nombre": "Costa Tropical",
                 "descripcion": "Combinación de mango, piña, jugo de limón y maracuyá con un toque de chamoy y escarchado de coco.",
                 "precio": 35,
-                "promo_price": 25,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
@@ -128,7 +124,6 @@
                 "nombre": "Marea Roja",
                 "descripcion": "Cerveza roja, sandía y tamarindo con jugo de limón en un intenso color, con toque de chamoy y Tajín.",
                 "precio": 35,
-                "promo_price": 25,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
@@ -147,7 +142,6 @@
                 "nombre": "Paraíso Maya",
                 "descripcion": "Piña, jugo de limón, mango y tamarindo sobre cerveza clara, coronada con piña deshidratada y canela.",
                 "precio": 35,
-                "promo_price": 25,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
