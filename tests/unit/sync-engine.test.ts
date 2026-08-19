@@ -200,11 +200,16 @@ describe('SyncEngine', () => {
 
       network.set(true);
 
-      // el engine reacciona asíncronamente
-      await new Promise(resolve => setTimeout(resolve, 20));
-      const urls = fetchMock.mock.calls.map(c => c[0]);
-      expect(urls).toContain('/api/sync/push');
-      expect(await engine.getPending()).toEqual([]);
+      // El engine reacciona asíncronamente (pull + flush con IndexedDB). En vez
+      // de un sleep fijo (flaky bajo carga de la suite), esperamos de forma
+      // determinista a que el push quede registrado y la cola se vacíe.
+      await vi.waitFor(() => {
+        const urls = fetchMock.mock.calls.map(c => c[0]);
+        expect(urls).toContain('/api/sync/push');
+      });
+      await vi.waitFor(async () => {
+        expect(await engine.getPending()).toEqual([]);
+      });
     });
 
     it('should emit online-changed events', async () => {
