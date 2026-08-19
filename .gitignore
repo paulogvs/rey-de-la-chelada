@@ -68,5 +68,10 @@ secrets/
 # E2E session tokens (rate-limit safe login)
 scripts/.e2e-session.json
 
+# Playwright e2e artifacts
+test-results/
+playwright-report/
+/data/test-e2e.db*
+
 # Freebuff runtime (frontend adicional del ecosistema)
 .freebuff/

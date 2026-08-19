@@ -26,7 +26,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
+    "test:e2e": "npm run build && playwright test",
     "test:build": "npm run build && vitest run tests/build-output.test.js",
     "verify:pwas": "node scripts/verify-pwas.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
