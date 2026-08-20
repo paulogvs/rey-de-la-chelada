@@ -2161,13 +2161,17 @@
 }
 
 /* ============================================================
-   FASE E — Mobile bottom-sheet (≤1023px) — carrito colapsable fijo
+   FASE E — Mobile bottom-sheet (≤768px) — carrito colapsable fijo
    al pie. Reusa el estado cartExpanded existente en OrderPanel.tsx
    (toggle ya aplica la clase `--expanded` al contenedor; sin JSX).
    Solo layout visual — contratos de datos intactos.
+   Nota (ajuste 2026-08-20): breakpoint bajado de 1023px a 768px
+   para que el rango tablet 769–1023px recupere el layout 2-col
+   (ver @media 769–1023px arriba) y el bottom-sheet quede solo
+   en móvil. Desktop ≥1024px intacto.
    ============================================================ */
 
-@media (max-width: 1023px) {
+@media (max-width: 768px) {
   .order-panel__content {
     grid-template-columns: 1fr;
     overflow-y: auto;
