@@ -7,13 +7,18 @@
  *  montos que vengan del cliente (unit_price/subtotal/total) se ignoran:
  *  un cliente comprometido no puede facturar Bs 0.01.
  *
+ *  MIGRACIÓN v11 (2026-08-19): REGLA MANDATORIA del ecosistema FORCH.iA
+ *  (money-minor-units) — TODO dinero es ENTERO en CENTAVOS. La DB almacena
+ *  INTEGER centavos y la config SSOT (promotions/iva) también. No hay
+ *  floats de dinero aquí. La conversión a decimal solo ocurre en display.
+ *
  *  Extraído de server/routes/orders.js (donde vivía resolveModifierAdjustment)
  *  para que sync.js (push offline) recalcule EXACTAMENTE igual que el
  *  POST /api/orders online. SSOT IVA: src/core/config/iva.js.
  * ═══════════════════════════════════════════════════════════
  */
 
-import { computeTotals, round2 } from '../../src/core/config/iva.js';
+import { computeTotals, round2, toCents } from '../../src/core/config/iva.js';
 import {
   promoById,
   promoUnitPrice,
@@ -54,25 +59,33 @@ export function resolveModifierAdjustment(db, menuItemId, modifiers) {
   for (const m of raw) {
     const opt = options.find(o => o.name === m.optionName);
     if (!opt) continue;
-    const adj = Number(opt.price_adjustment || 0);
+    const adj = Number(opt.price_adjustment || 0); // INTEGER centavos
     adjustment += adj;
     summary.push({ groupName: m.groupName || '', optionName: opt.name, priceAdjustment: adj });
   }
-  return { adjustment: Math.round(adjustment * 100) / 100, summary };
+  return { adjustment: Math.round(adjustment), summary };
 }
 
 /**
  * Normaliza un manualPrice del cliente (número o string "12,5" con coma
- * decimal del MoneyInput) → número finito, o null si no es válido.
+ * decimal del MoneyInput) → centavos enteros, o null si no es válido.
+ * v11: el API espera CENTAVOS (contrato SSOT). Por tolerancia con clientes
+ * legacy que aún manden Bs con decimales (ej. "10.5"), si el número NO es
+ * entero se convierte con toCents() (10.5 → 1050). Un entero (1050) se
+ * interpreta como centavos y pasa directo.
  * @param {*} value
- * @returns {number|null}
+ * @returns {number|null} centavos
  */
 function parseManualPrice(value) {
   if (value === null || value === undefined || value === '') return null;
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return null;
+    return Number.isInteger(value) ? value : toCents(value);
+  }
   const normalized = String(value).trim().replace(',', '.');
   const n = Number(normalized);
-  return Number.isFinite(n) ? n : null;
+  if (!Number.isFinite(n)) return null;
+  return Number.isInteger(n) ? n : toCents(n);
 }
 
 /**

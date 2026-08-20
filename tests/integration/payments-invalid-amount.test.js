@@ -156,8 +156,8 @@ describe('B2 — amount válido en POST /api/payments', () => {
   let stringTotal;
 
   beforeAll(async () => {
-    // Pedido con total ≥ 34.5 (cantidad calculada a runtime) → 34.5 es pagable
-    ({ orderId: numericOrderId, total: numericTotal } = await createOrder(34.5));
+    // Pedido con total ≥ 3450 (Bs 34.50, centavos; cantidad calculada a runtime)
+    ({ orderId: numericOrderId, total: numericTotal } = await createOrder(3450));
     // Pedido para probar tolerancia de strings numéricas
     ({ orderId: stringOrderId, total: stringTotal } = await createOrder());
   });
@@ -172,15 +172,15 @@ describe('B2 — amount válido en POST /api/payments', () => {
     }
   });
 
-  it('amount 34.5 (número) → 201 cuando 34.5 ≤ saldo del pedido', async () => {
-    expect(numericTotal).toBeGreaterThanOrEqual(34.5);
-    const r = await pay(numericOrderId, 34.5);
+  it('amount 3450 (número, centavos) → 201 cuando 3450 ≤ saldo del pedido', async () => {
+    expect(numericTotal).toBeGreaterThanOrEqual(3450);
+    const r = await pay(numericOrderId, 3450);
     expect(r.status).toBe(201);
     expect(r.json.success).toBe(true);
-    expect(r.json.payment.amount).toBe(34.5);
+    expect(r.json.payment.amount).toBe(3450);
   });
 
-  it('amount "34.5" (string numérica) → 201 (retrocompat legacy)', async () => {
+  it('amount string numérica (String(total), centavos) → 201 (retrocompat legacy)', async () => {
     const r = await pay(stringOrderId, String(stringTotal));
     expect(r.status).toBe(201);
     expect(r.json.success).toBe(true);

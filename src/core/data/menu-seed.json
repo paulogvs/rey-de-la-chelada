@@ -15,17 +15,17 @@
                 "id": "BAR-001",
                 "nombre": "Isla Dorada",
                 "descripcion": "Dulce, cítrica y muy refrescante. Piña, maracuyá, limón y agave, escarchado de sal de Tajín y coco tostado.",
-                "precio": 40,
+                "precio": 4000,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   },
                   {
                     "nombre": "Doble Escarchado",
-                    "precio": 5
+                    "precio": 500
                   }
                 ]
               },
@@ -33,17 +33,17 @@
                 "id": "BAR-002",
                 "nombre": "Mango Sunset",
                 "descripcion": "Tropical, dulce y ligeramente picante. Mango, limón, naranja y un toque de chamoy.",
-                "precio": 40,
+                "precio": 4000,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   },
                   {
                     "nombre": "Doble Escarchado",
-                    "precio": 5
+                    "precio": 500
                   }
                 ]
               },
@@ -51,17 +51,17 @@
                 "id": "BAR-003",
                 "nombre": "Maracuyá Paradise",
                 "descripcion": "Ácida, aromática y muy fresca, con pulpa de maracuyá, jugo de limón, jarabe simple y cerveza.",
-                "precio": 35,
+                "precio": 3500,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   },
                   {
                     "nombre": "Doble Escarchado",
-                    "precio": 5
+                    "precio": 500
                   }
                 ]
               },
@@ -69,17 +69,17 @@
                 "id": "BAR-004",
                 "nombre": "Sandía Beach",
                 "descripcion": "Muy refrescante, ideal para el verano. Cerveza rubia, jugo natural de sandía, jugo de limón, jarabe simple y un toque de salsa inglesa.",
-                "precio": 35,
+                "precio": 3500,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   },
                   {
                     "nombre": "Doble Escarchado",
-                    "precio": 5
+                    "precio": 500
                   }
                 ]
               },
@@ -87,17 +87,17 @@
                 "id": "BAR-005",
                 "nombre": "Tamarindo Vulcano",
                 "descripcion": "Dulce, ácida y con un toque picante. Pulpa de tamarindo, jugo de limón, salsa inglesa, chamoy y salsa picante.",
-                "precio": 35,
+                "precio": 3500,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   },
                   {
                     "nombre": "Doble Escarchado",
-                    "precio": 5
+                    "precio": 500
                   }
                 ]
               },
@@ -105,17 +105,17 @@
                 "id": "BAR-006",
                 "nombre": "Costa Tropical",
                 "descripcion": "Combinación de mango, piña, jugo de limón y maracuyá con un toque de chamoy y escarchado de coco.",
-                "precio": 35,
+                "precio": 3500,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   },
                   {
                     "nombre": "Doble Escarchado",
-                    "precio": 5
+                    "precio": 500
                   }
                 ]
               },
@@ -123,17 +123,17 @@
                 "id": "BAR-007",
                 "nombre": "Marea Roja",
                 "descripcion": "Cerveza roja, sandía y tamarindo con jugo de limón en un intenso color, con toque de chamoy y Tajín.",
-                "precio": 35,
+                "precio": 3500,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   },
                   {
                     "nombre": "Doble Escarchado",
-                    "precio": 5
+                    "precio": 500
                   }
                 ]
               },
@@ -141,17 +141,17 @@
                 "id": "BAR-008",
                 "nombre": "Paraíso Maya",
                 "descripcion": "Piña, jugo de limón, mango y tamarindo sobre cerveza clara, coronada con piña deshidratada y canela.",
-                "precio": 35,
+                "precio": 3500,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   },
                   {
                     "nombre": "Doble Escarchado",
-                    "precio": 5
+                    "precio": 500
                   }
                 ]
               }
@@ -164,17 +164,17 @@
                 "id": "BAR-009",
                 "nombre": "De Mar",
                 "descripcion": "Pulpa de maracuyá, cerveza rubia, Aperol, jarabe simple, toque de limón y salsa picante, con camarón bañado en salsa barbacoa.",
-                "precio": 40,
+                "precio": 4000,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   },
                   {
                     "nombre": "Doble Escarchado",
-                    "precio": 5
+                    "precio": 500
                   }
                 ]
               },
@@ -183,17 +183,17 @@
                 "nombre": "Elixir Azteca",
                 "subtitulo": "Pepino y Albahaca",
                 "descripcion": "Fresca y de color verde vibrante. Cerveza con pepino, jugo de limón, hierbabuena y sal de grano con ralladura de limón.",
-                "precio": 35,
+                "precio": 3500,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   },
                   {
                     "nombre": "Doble Escarchado",
-                    "precio": 5
+                    "precio": 500
                   }
                 ]
               },
@@ -209,11 +209,11 @@
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   },
                   {
                     "nombre": "Doble Escarchado",
-                    "precio": 5
+                    "precio": 500
                   }
                 ]
               }
@@ -226,13 +226,13 @@
                 "id": "BAR-012",
                 "nombre": "Negra",
                 "descripcion": "Cerveza negra con limón y sal al borde del vaso.",
-                "precio": 20,
+                "precio": 2000,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   }
                 ]
               },
@@ -240,13 +240,13 @@
                 "id": "BAR-013",
                 "nombre": "Rubia",
                 "descripcion": "Cerveza rubia con limón y sal al borde del vaso.",
-                "precio": 20,
+                "precio": 2000,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   }
                 ]
               },
@@ -254,13 +254,13 @@
                 "id": "BAR-014",
                 "nombre": "Roja",
                 "descripcion": "Cerveza roja con limón y sal al borde del vaso.",
-                "precio": 20,
+                "precio": 2000,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   }
                 ]
               },
@@ -268,13 +268,13 @@
                 "id": "BAR-015",
                 "nombre": "Choleada",
                 "descripcion": "Cerveza negra y rubia con limón y sal al borde del vaso.",
-                "precio": 20,
+                "precio": 2000,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   }
                 ]
               },
@@ -282,13 +282,13 @@
                 "id": "BAR-016",
                 "nombre": "Michelada Normal",
                 "descripcion": "Cerveza con limón, sal y merkén al borde del vaso.",
-                "precio": 25,
+                "precio": 2500,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   }
                 ]
               },
@@ -296,13 +296,13 @@
                 "id": "BAR-017",
                 "nombre": "Michelada Completa",
                 "descripcion": "Cerveza con limón, sal y merkén al borde, con tabasco y salsa inglesa.",
-                "precio": 30,
+                "precio": 3000,
                 "area": "bar",
                 "tiene_ice": true,
                 "adicionales": [
                   {
                     "nombre": "Shot + Michelada",
-                    "precio": 15
+                    "precio": 1500
                   }
                 ]
               }
@@ -314,7 +314,7 @@
               {
                 "id": "BAR-018",
                 "nombre": "Mojito Tradicional",
-                "precio": 30,
+                "precio": 3000,
                 "area": "bar",
                 "tiene_ice": true
               },
@@ -322,105 +322,105 @@
                 "id": "BAR-019",
                 "nombre": "Mojito de Sabores",
                 "descripcion": "Frutilla, mango, piña o maracuyá.",
-                "precio": 40,
+                "precio": 4000,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-020",
                 "nombre": "Chuflay",
-                "precio": 30,
+                "precio": 3000,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-021",
                 "nombre": "Margarita Tradicional",
-                "precio": 35,
+                "precio": 3500,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-022",
                 "nombre": "Margarita Blue",
-                "precio": 40,
+                "precio": 4000,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-023",
                 "nombre": "Orgasmo",
-                "precio": 35,
+                "precio": 3500,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-024",
                 "nombre": "Piña Colada",
-                "precio": 35,
+                "precio": 3500,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-025",
                 "nombre": "Mojito Cerveza",
-                "precio": 60,
+                "precio": 6000,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-026",
                 "nombre": "Cuba Libre",
-                "precio": 25,
+                "precio": 2500,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-027",
                 "nombre": "Fernet Cola",
-                "precio": 45,
+                "precio": 4500,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-028",
                 "nombre": "Pasión Boliviana",
-                "precio": 35,
+                "precio": 3500,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-029",
                 "nombre": "Sex on the Beach",
-                "precio": 35,
+                "precio": 3500,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-030",
                 "nombre": "Tequila Sunrise",
-                "precio": 40,
+                "precio": 4000,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-031",
                 "nombre": "Mimosa",
-                "precio": 25,
+                "precio": 2500,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-032",
                 "nombre": "Caipiroska",
-                "precio": 25,
+                "precio": 2500,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-033",
                 "nombre": "Tropical Gin",
-                "precio": 40,
+                "precio": 4000,
                 "area": "bar",
                 "tiene_ice": true
               }
@@ -433,7 +433,7 @@
                 "id": "BAR-034",
                 "nombre": "Paraíso Perdido",
                 "descripcion": "Jack Daniel's Apple, Aperol, pulpa de maracuyá, sirope de romero y ralladura de limón.",
-                "precio": 100,
+                "precio": 10000,
                 "area": "bar",
                 "tiene_ice": true
               },
@@ -441,7 +441,7 @@
                 "id": "BAR-035",
                 "nombre": "Sigo Siendo el Rey",
                 "descripcion": "Tequila reposado, limoncello, zumo de pomelo, sirope de miel y maracuyá, ralladura de limón.",
-                "precio": 70,
+                "precio": 7000,
                 "area": "bar",
                 "tiene_ice": true
               },
@@ -449,7 +449,7 @@
                 "id": "BAR-036",
                 "nombre": "Anhelo",
                 "descripcion": "Singani, Campari, triple sec, zumo de piña, sirope de canela y ralladura de limón.",
-                "precio": 65,
+                "precio": 6500,
                 "area": "bar",
                 "tiene_ice": true
               }
@@ -469,43 +469,43 @@
               {
                 "id": "BAR-038",
                 "nombre": "Fernet Menta",
-                "precio": 250,
+                "precio": 25000,
                 "area": "bar"
               },
               {
                 "id": "BAR-039",
                 "nombre": "Fernet Branca",
-                "precio": 230,
+                "precio": 23000,
                 "area": "bar"
               },
               {
                 "id": "BAR-040",
                 "nombre": "Havana Reserva 7 Años",
-                "precio": 350,
+                "precio": 35000,
                 "area": "bar"
               },
               {
                 "id": "BAR-041",
                 "nombre": "Havana Reserva",
-                "precio": 260,
+                "precio": 26000,
                 "area": "bar"
               },
               {
                 "id": "BAR-042",
                 "nombre": "Havana Especial",
-                "precio": 240,
+                "precio": 24000,
                 "area": "bar"
               },
               {
                 "id": "BAR-043",
                 "nombre": "Jägermeister",
-                "precio": 370,
+                "precio": 37000,
                 "area": "bar"
               },
               {
                 "id": "BAR-044",
                 "nombre": "Casa Real Etiqueta Negra",
-                "precio": 250,
+                "precio": 25000,
                 "area": "bar"
               }
             ]
@@ -516,28 +516,28 @@
               {
                 "id": "BAR-045",
                 "nombre": "Fernet",
-                "precio": 60,
+                "precio": 6000,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-046",
                 "nombre": "Chuflay",
-                "precio": 50,
+                "precio": 5000,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-047",
                 "nombre": "Mojito",
-                "precio": 50,
+                "precio": 5000,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-048",
                 "nombre": "Havana",
-                "precio": 55,
+                "precio": 5500,
                 "area": "bar",
                 "tiene_ice": true
               }
@@ -549,19 +549,19 @@
               {
                 "id": "BAR-049",
                 "nombre": "Tequila",
-                "precio": 25,
+                "precio": 2500,
                 "area": "bar"
               },
               {
                 "id": "BAR-050",
                 "nombre": "Jägermeister",
-                "precio": 35,
+                "precio": 3500,
                 "area": "bar"
               },
               {
                 "id": "BAR-051",
                 "nombre": "Casa Real Etiqueta Negra",
-                "precio": 20,
+                "precio": 2000,
                 "area": "bar"
               }
             ]
@@ -572,26 +572,26 @@
               {
                 "id": "BAR-052",
                 "nombre": "Negra",
-                "precio": 15,
+                "precio": 1500,
                 "area": "bar"
               },
               {
                 "id": "BAR-053",
                 "nombre": "Rubia",
-                "precio": 15,
+                "precio": 1500,
                 "area": "bar"
               },
               {
                 "id": "BAR-054",
                 "nombre": "Roja",
-                "precio": 15,
+                "precio": 1500,
                 "area": "bar"
               },
               {
                 "id": "BAR-055",
                 "nombre": "Choleada",
                 "descripcion": "Rubia y negra.",
-                "precio": 15,
+                "precio": 1500,
                 "area": "bar"
               }
             ]
@@ -602,13 +602,13 @@
               {
                 "id": "BAR-056",
                 "nombre": "Corona",
-                "precio": 25,
+                "precio": 2500,
                 "area": "bar"
               },
               {
                 "id": "BAR-057",
                 "nombre": "Huari",
-                "precio": 20,
+                "precio": 2000,
                 "area": "bar"
               }
             ]
@@ -619,42 +619,42 @@
               {
                 "id": "BAR-058",
                 "nombre": "Limonada",
-                "precio": 12,
+                "precio": 1200,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-059",
                 "nombre": "Maracuyá",
-                "precio": 12,
+                "precio": 1200,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-060",
                 "nombre": "Frutilla",
-                "precio": 12,
+                "precio": 1200,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-061",
                 "nombre": "Mango",
-                "precio": 12,
+                "precio": 1200,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-062",
                 "nombre": "Piña",
-                "precio": 12,
+                "precio": 1200,
                 "area": "bar",
                 "tiene_ice": true
               },
               {
                 "id": "BAR-063",
                 "nombre": "Limonada con Hierbabuena y Jengibre",
-                "precio": 15,
+                "precio": 1500,
                 "area": "bar",
                 "tiene_ice": true
               }
@@ -666,19 +666,19 @@
               {
                 "id": "BAR-064",
                 "nombre": "Coca-Cola",
-                "precio": 15,
+                "precio": 1500,
                 "area": "bar"
               },
               {
                 "id": "BAR-065",
                 "nombre": "Fanta",
-                "precio": 15,
+                "precio": 1500,
                 "area": "bar"
               },
               {
                 "id": "BAR-066",
                 "nombre": "Sprite",
-                "precio": 15,
+                "precio": 1500,
                 "area": "bar"
               }
             ]
@@ -689,7 +689,7 @@
               {
                 "id": "BAR-067",
                 "nombre": "Vital",
-                "precio": 10,
+                "precio": 1000,
                 "area": "bar"
               }
             ]
@@ -708,35 +708,35 @@
                 "id": "PROMO-002",
                 "nombre": "Miércoles de Barra",
                 "descripcion": "Cerveza Artesanal a precio especial. Solo los miércoles.",
-                "precio": 12,
+                "precio": 1200,
                 "area": "bar"
               },
               {
                 "id": "PROMO-003",
                 "nombre": "Combo Michelada + Cerveza",
                 "descripcion": "1 Michelada Signature + 1 Cerveza Artesanal. Miércoles, jueves y domingo.",
-                "precio": 45,
+                "precio": 4500,
                 "area": "bar"
               },
               {
                 "id": "PROMO-004",
                 "nombre": "Primera Visita",
                 "descripcion": "Michelada Signature para nuevos seguidores en Instagram. Miércoles, jueves y domingo.",
-                "precio": 25,
+                "precio": 2500,
                 "area": "bar"
               },
               {
                 "id": "PROMO-005",
                 "nombre": "Doble Escarchado",
                 "descripcion": "Súmale un segundo escarchado: Tajín, coco o chamoy. Miércoles, jueves y domingo.",
-                "precio": 5,
+                "precio": 500,
                 "area": "bar"
               },
               {
                 "id": "PROMO-006",
                 "nombre": "Shot + Michelada",
                 "descripcion": "Remátala con un shot a tu elección. Miércoles, jueves y domingo.",
-                "precio": 15,
+                "precio": 1500,
                 "area": "bar"
               }
             ]

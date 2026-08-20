@@ -22,7 +22,7 @@ beforeEach(() => {
   db.prepare("INSERT INTO tables (id, number, capacity) VALUES ('t1', 1, 4)").run();
   db.prepare(`
     INSERT INTO orders (id, table_id, table_number, waiter_id, waiter_name, status, total, iva_amount)
-    VALUES ('o1', 't1', 1, 'w1', 'Waiter', 'confirmed', 100, 11.5)
+    VALUES ('o1', 't1', 1, 'w1', 'Waiter', 'confirmed', 10000, 1150)
   `).run();
   orderId = 'o1';
 });
@@ -58,18 +58,18 @@ describe('processPayment — amount inválido (defensa en profundidad)', () => {
 });
 
 describe('processPayment — amount válido', () => {
-  it('amount 34.5 (número) → pago registrado con ese monto', () => {
-    const result = pay(34.5);
+  it('amount 3450 (entero, centavos) → pago registrado con ese monto', () => {
+    const result = pay(3450);
     expect(result.paymentId).toBeTruthy();
     expect(result.fullyPaid).toBe(false);
-    expect(result.remaining).toBe(65.5);
+    expect(result.remaining).toBe(6550);
     const row = db.prepare('SELECT amount FROM payments WHERE id = ?').get(result.paymentId);
-    expect(row.amount).toBe(34.5);
+    expect(row.amount).toBe(3450);
   });
 
-  it('amount "34.5" (string numérica) → aceptado (retrocompat legacy)', () => {
+  it('amount "34.5" (string decimal legacy) → 3450 centavos (retrocompat)', () => {
     const result = pay('34.5');
     expect(result.paymentId).toBeTruthy();
-    expect(result.remaining).toBe(65.5);
+    expect(result.remaining).toBe(6550);
   });
 });

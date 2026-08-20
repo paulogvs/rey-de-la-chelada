@@ -88,7 +88,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
 
   const amountToCollect = order?.total ?? 0;
   const change = method === 'cash' && received > amountToCollect
-    ? Math.round((received - amountToCollect) * 100) / 100
+    ? received - amountToCollect // v11: centavos exactos
     : 0;
 
   // Tomar foto del comprobante QR (FASE 5): lee el archivo y lo guarda en

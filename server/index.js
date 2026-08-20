@@ -30,6 +30,7 @@ import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import net from 'node:net'; // v11: check puerto antes de tocar la DB (race condition P0)
 
 // ── Middleware ────────────────────────────────────────────
 import { apiLimiter, readLimiter, authLimiter, kdsLimiter, corsOptions, helmetCspConfig, securityHeaders } from './middleware/security.js';
@@ -66,12 +67,34 @@ const wss = new WebSocketServer({ server });
 const PORT = process.env.PORT || 3002;
 const DIST_DIR = path.join(__dirname, '..', 'dist');
 
+// ── Race condition guard (P0) ──────────────────────────────
+// Dos procesos sobre la misma DB → SQLITE_BUSY (bootstrap corre ANTES de
+// listen). Si el puerto ya está ocupado por OTRO server, abortamos el
+// arranque ANTES de tocar la DB. Bypass: ALLOW_MULTIPLE_INSTANCES=1
+// (tests/CI levantan instancias en puertos distintos o secuenciales).
+function assertPortFree(port) {
+  if (process.env.ALLOW_MULTIPLE_INSTANCES === '1' || process.env.NODE_ENV === 'test') return;
+  return new Promise((resolve, reject) => {
+    const sock = net.connect({ port, host: '127.0.0.1' });
+    sock.once('connect', () => {
+      sock.destroy();
+      reject(new Error(
+        `Puerto ${port} ya está en uso por otro proceso (Rey de la Chelada ya corriendo?). ` +
+        'Detén el proceso anterior (scripts\\stop.bat) o usa PORT= diferente. ' +
+        'Abortando ANTES de tocar la DB para evitar SQLITE_BUSY.'
+      ));
+    });
+    sock.once('error', () => resolve()); // conexión rechazada → puerto libre
+  });
+}
+
 // ============================================================
 // Initialize Database
 // ============================================================
 
 let db;
 try {
+  await assertPortFree(PORT);
   db = getDb();
   logger.info('[DB] Database connected and schema applied');
   // Auto-seed idempotente: garantiza staff + mesas + menú + precios
@@ -82,6 +105,10 @@ try {
     logger.error('[Bootstrap] Error en auto-seed:', bootstrapErr.message);
   }
 } catch (err) {
+  if (err?.message?.includes('ya está en uso')) {
+    console.error(`\n[FATAL] ${err.message}\n`);
+    process.exit(1); // abortar ANTES de bootstrap → no tocar la DB
+  }
   logger.error('[DB] Failed to initialize database:', err.message);
   // Non-blocking — app can still run in dev mode
 }

@@ -16,11 +16,11 @@ import {
 
 describe('formatBs', () => {
   it('formats whole amounts with two decimals', () => {
-    expect(formatBs(25)).toBe('Bs 25,00');
+    expect(formatBs(2500)).toBe('Bs 25,00');
   });
 
   it('formats decimals', () => {
-    expect(formatBs(45.5)).toBe('Bs 45,50');
+    expect(formatBs(4550)).toBe('Bs 45,50');
   });
 
   it('formats zero', () => {
@@ -66,24 +66,24 @@ describe('buildReceiptData', () => {
     id: 'order-12345678-extra',
     tableNumber: 4,
     createdAt: '2026-08-03T14:30:00',
-    subtotal: 100,
-    ivaAmount: 13,
-    total: 113,
+    subtotal: 10000,
+    ivaAmount: 1300,
+    total: 11300,
     paymentMethod: 'cash',
     items: [
       {
         menuItemName: 'Cheve-Chango',
         quantity: 2,
-        unitPrice: 30,
-        subtotal: 60,
+        unitPrice: 3000,
+        subtotal: 6000,
         modifiers: [],
       },
       {
         menuItemName: 'La Rey',
         quantity: 1,
-        unitPrice: 75,
-        subtotal: 75,
-        modifiers: [{ groupName: 'Tamaño', optionName: 'Familiar', priceAdjustment: 20 }],
+        unitPrice: 7500,
+        subtotal: 7500,
+        modifiers: [{ groupName: 'Tamaño', optionName: 'Familiar', priceAdjustment: 2000 }],
       },
     ],
   };
@@ -93,9 +93,9 @@ describe('buildReceiptData', () => {
     expect(receipt.orderId).toBe('order-12345678-extra');
     expect(receipt.tableNumber).toBe(4);
     expect(receipt.createdAt).toBe('2026-08-03T14:30:00');
-    expect(receipt.total).toBe(113);
-    expect(receipt.subtotal).toBe(100);
-    expect(receipt.ivaAmount).toBe(13);
+    expect(receipt.total).toBe(11300);
+    expect(receipt.subtotal).toBe(10000);
+    expect(receipt.ivaAmount).toBe(1300);
     expect(receipt.paymentMethod).toBe('cash');
     expect(receipt.receiptCode).toBe(toReceiptCode(order.id));
   });
@@ -106,8 +106,8 @@ describe('buildReceiptData', () => {
     expect(receipt.items[0]).toMatchObject({
       name: 'Cheve-Chango',
       quantity: 2,
-      unitPrice: 30,
-      lineTotal: 60,
+      unitPrice: 3000,
+      lineTotal: 6000,
     });
     expect(receipt.items[0].modifiers).toBeUndefined();
   });
@@ -139,14 +139,14 @@ describe('buildReceiptData', () => {
 describe('computeReceiptTotals', () => {
   it('computes subtotal (base), extracted IVA and total (line total incluye IVA)', () => {
     const totals = computeReceiptTotals([
-      { name: 'A', quantity: 1, unitPrice: 60, lineTotal: 60 },
-      { name: 'B', quantity: 1, unitPrice: 40, lineTotal: 40 },
+      { name: 'A', quantity: 1, unitPrice: 6000, lineTotal: 6000 },
+      { name: 'B', quantity: 1, unitPrice: 4000, lineTotal: 4000 },
     ]);
-    // Modelo SSOT EXTRACTIVO: lineTotal ya incluye IVA → total 100,
-    // subtotal (base) 100/1.13 = 88.5, iva 11.5.
-    expect(totals.subtotal).toBe(88.5);
-    expect(totals.ivaAmount).toBe(11.5);
-    expect(totals.total).toBe(100);
+    // Modelo SSOT EXTRACTIVO en CENTAVOS: lineTotal ya incluye IVA → total 10000,
+    // subtotal (base) 10000/1.13 = 8850, iva 1150.
+    expect(totals.subtotal).toBe(8850);
+    expect(totals.ivaAmount).toBe(1150);
+    expect(totals.total).toBe(10000);
   });
 
   it('returns zeros for empty items', () => {

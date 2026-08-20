@@ -4,7 +4,7 @@
  *
  * Contrato:
  *   - La línea con `promo_type` se factura con el precio de la promo
- *     (0 para 2x1, 12 barra, 25 primera visita, 30/15 combo), NUNCA con
+ *     (0 para 2x1, 1200 barra, 2500 primera visita, 3000/1500 combo), NUNCA con
  *     precio del cliente. El server valida día laboral + categoría +
  *     reglas de contexto (par 2x1, una vez primera visita, par combo).
  */
@@ -35,26 +35,26 @@ describe('resolvePromoUnitPrice — precios de línea', () => {
     expect(r.promoLabel).toBe('2x1');
   });
 
-  it('barra (miércoles) + Artesanal → unit 12', () => {
+  it('barra (miércoles) + Artesanal → unit 1200', () => {
     const r = resolvePromoUnitPrice(mockDb('Cerveza Artesanal'), ARTESANAL_ITEM, 'barra', { businessDay: '2026-08-19' });
     expect(r.error).toBeNull();
-    expect(r.unitPrice).toBe(12);
+    expect(r.unitPrice).toBe(1200);
     expect(r.promoLabel).toBe('Miércoles de Barra');
   });
 
-  it('primera-visita (mié/jue/dom) + Signature → unit 25', () => {
+  it('primera-visita (mié/jue/dom) + Signature → unit 2500', () => {
     const r = resolvePromoUnitPrice(mockDb('Micheladas Signature'), SIGNATURE_ITEM, 'primera-visita', { businessDay: '2026-08-20' });
     expect(r.error).toBeNull();
-    expect(r.unitPrice).toBe(25);
+    expect(r.unitPrice).toBe(2500);
     expect(r.promoLabel).toBe('Primera Visita');
   });
 
-  it('combo: Signature → 30, Cerveza → 15 (suma 45)', () => {
+  it('combo: Signature → 3000, Cerveza → 1500 (suma 4500)', () => {
     const a = resolvePromoUnitPrice(mockDb('Micheladas Signature'), SIGNATURE_ITEM, 'combo', { businessDay: '2026-08-20' });
     const b = resolvePromoUnitPrice(mockDb('Cerveza Artesanal'), ARTESANAL_ITEM, 'combo', { businessDay: '2026-08-20' });
-    expect(a.unitPrice).toBe(30);
-    expect(b.unitPrice).toBe(15);
-    expect(a.unitPrice + b.unitPrice).toBe(45);
+    expect(a.unitPrice).toBe(3000);
+    expect(b.unitPrice).toBe(1500);
+    expect(a.unitPrice + b.unitPrice).toBe(4500);
   });
 
   it('día no activo → error PROMO_NOT_ACTIVE (2x1 un miércoles)', () => {

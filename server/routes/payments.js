@@ -35,6 +35,7 @@ import { fileURLToPath } from 'node:url';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { businessDayDateStr, businessDayExpr } from '../utils/date-utils.js';
+import { toCents } from '../../src/core/config/iva.js'; // v11: centavos
 import { logger } from '../utils/logger.js'; // S1/T2: errores de pago/corte al log diario
 import { broadcastOrderToCaja } from '../services/order-broadcaster.js'; // S2-D: caja real-time
 
@@ -94,12 +95,15 @@ export function processPayment(db, { order_id, method, amount, iva_amount, refer
   // pero este es el punto de entrada ÚNICO para registrar pagos. Antes
   // `Number(amount) || 0` convertía 'abc' o NaN en Bs 0 silenciosamente.
   // Ahora: throw claro (el catch de la ruta lo mapea). Se aceptan strings
-  // numéricas ("34.5") por retrocompat con clientes legacy.
+  // numéricas ("1050") por retrocompat con clientes legacy.
+  // v11 (2026-08-19): CENTAVOS — el API espera enteros en centavos. Por
+  // tolerancia con clientes legacy que aún manden Bs con decimales ("10.5"),
+  // si el número no es entero se convierte con toCents (10.5 → 1050).
   const rawAmount = Number(amount);
   if (!Number.isFinite(rawAmount) || rawAmount < 0) {
     throw new Error(`El monto es inválido: ${String(amount)} (debe ser un número ≥ 0)`);
   }
-  const amountValue = round2(rawAmount);
+  const amountValue = Number.isInteger(rawAmount) ? rawAmount : toCents(rawAmount);
 
   if (!canonicalMethod) {
     throw new Error(`Método de pago inválido: ${method}`);
@@ -110,14 +114,15 @@ export function processPayment(db, { order_id, method, amount, iva_amount, refer
   let receivedValue = amountValue;
   let changeValue = 0;
   if (received !== undefined && received !== null) {
-    receivedValue = round2(Number(received) || 0);
+    const rawReceived = Number(received);
+    receivedValue = Number.isInteger(rawReceived) ? rawReceived : toCents(rawReceived);
     if (canonicalMethod !== 'cash') {
       throw new Error('El campo received solo aplica a pagos en efectivo');
     }
     if (receivedValue < amountValue) {
       throw new Error('Cambio inválido: el monto recibido es menor al cobrado');
     }
-    changeValue = round2(receivedValue - amountValue);
+    changeValue = receivedValue - amountValue; // centavos enteros
   }
 
   const execute = db.transaction(() => {
@@ -134,13 +139,14 @@ export function processPayment(db, { order_id, method, amount, iva_amount, refer
       SELECT COALESCE(SUM(amount), 0) as total_paid FROM payments
       WHERE order_id = ? AND status = 'completed'
     `).get(order_id);
-    const remaining = round2((order.total || 0) - paid.total_paid);
+    const remaining = round2((order.total || 0) - paid.total_paid); // centavos enteros
 
     // C2: la constraint de saldo SOLO aplica a pagos que cuentan como
     // cobrados (completed). failed/refunded se registran sin tocar el saldo:
     // un refund se puede registrar aunque el pedido ya esté paid.
-    if (canonicalStatus === 'completed' && amountValue > remaining + 0.001) {
-      throw new Error(`El monto excede el saldo pendiente. Restante: Bs ${remaining.toFixed(2)}`);
+    // v11: enteros exactos — la tolerancia float (+0.001) ya no es necesaria.
+    if (canonicalStatus === 'completed' && amountValue > remaining) {
+      throw new Error(`El monto excede el saldo pendiente. Restante: Bs ${(remaining / 100).toFixed(2)}`);
     }
 
     const paymentId = randomUUID();
@@ -159,7 +165,7 @@ export function processPayment(db, { order_id, method, amount, iva_amount, refer
     // El nuevo pago solo aporta al saldo si es completed
     const isCompleted = canonicalStatus === 'completed';
     const totalPaid = paid.total_paid + (isCompleted ? amountValue : 0);
-    const fullyPaid = isCompleted && round2(totalPaid) >= round2(order.total || 0);
+    const fullyPaid = isCompleted && totalPaid >= (order.total || 0); // centavos exactos
 
     // Update order payment state
     db.prepare(`
@@ -198,7 +204,7 @@ export function processPayment(db, { order_id, method, amount, iva_amount, refer
 }
 
 export function round2(n) {
-  return Math.round(n * 100) / 100;
+  return Math.round(n);
 }
 
 // ============================================================

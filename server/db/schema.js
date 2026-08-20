@@ -36,7 +36,7 @@
 //   - order_items.promo_label TEXT NULL â€” 'Promo' cuando la lÃ­nea se facturÃ³ con
 //     promo_price (el ticket imprime "(Promo)" discreto para la caja).
 //   Las 3 son ADD COLUMN no destructivas (los registros existentes quedan con defaults).
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 
 const CREATE_TABLES = [
   // â”€â”€ Staff / Users (v5: 4 roles â€” admin, mesero, kds, caja) â”€â”€â”€â”€â”€
@@ -86,9 +86,9 @@ const CREATE_TABLES = [
     name            TEXT NOT NULL,
     subtitle        TEXT,
     description     TEXT NOT NULL DEFAULT '',
-    price           REAL,
+    price           INTEGER,
     price_variable  INTEGER NOT NULL DEFAULT 0,  -- v9: precio MANUAL ("Consultar precio")
-    promo_price     REAL,                        -- v9: precio promocional (NULL = sin promo)
+    promo_price     INTEGER,                    -- v9/v11: centavos (NULL = sin promo)
     currency        TEXT NOT NULL DEFAULT 'BOB',
     iva_percentage  REAL NOT NULL DEFAULT 13,
     image_url       TEXT,
@@ -126,7 +126,7 @@ const CREATE_TABLES = [
     id              TEXT PRIMARY KEY,
     group_id        TEXT NOT NULL,
     name            TEXT NOT NULL,
-    price_adjustment REAL NOT NULL DEFAULT 0,
+    price_adjustment INTEGER NOT NULL DEFAULT 0, -- v11: centavos
     is_default      INTEGER NOT NULL DEFAULT 0,
     sort_order      INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (group_id) REFERENCES modifier_groups(id) ON DELETE CASCADE
@@ -140,11 +140,11 @@ const CREATE_TABLES = [
     waiter_id       TEXT NOT NULL,
     waiter_name     TEXT NOT NULL,
     status          TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','called','confirmed','preparing','ready','served','paid','cancelled')),
-    subtotal        REAL NOT NULL DEFAULT 0,
-    iva_amount      REAL NOT NULL DEFAULT 0,
-    discount        REAL NOT NULL DEFAULT 0,
+    subtotal        INTEGER NOT NULL DEFAULT 0, -- v11: centavos
+    iva_amount      INTEGER NOT NULL DEFAULT 0, -- v11: centavos
+    discount        INTEGER NOT NULL DEFAULT 0, -- v11: centavos
     discount_reason TEXT NOT NULL DEFAULT '',
-    total           REAL NOT NULL DEFAULT 0,
+    total           INTEGER NOT NULL DEFAULT 0, -- v11: centavos
     payment_method  TEXT,
     payment_reference TEXT,
     is_paid         INTEGER NOT NULL DEFAULT 0,
@@ -169,10 +169,10 @@ const CREATE_TABLES = [
     menu_item_id    TEXT NOT NULL,
     menu_item_name  TEXT NOT NULL,
     quantity        INTEGER NOT NULL DEFAULT 1,
-    unit_price      REAL NOT NULL,
+    unit_price      INTEGER NOT NULL, -- v11: centavos
     modifiers_json  TEXT,  -- JSON array of {groupName, optionName, priceAdjustment}
     promo_label     TEXT,  -- v9: 'Promo' cuando la lÃ­nea se facturÃ³ con promo_price
-    subtotal        REAL NOT NULL,
+    subtotal        INTEGER NOT NULL, -- v11: centavos
     status          TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','preparing','ready','delivered','cancelled')),
     round           INTEGER NOT NULL DEFAULT 1,
     preparation_notes TEXT NOT NULL DEFAULT '',
@@ -188,10 +188,10 @@ const CREATE_TABLES = [
     id            TEXT PRIMARY KEY,
     order_id      TEXT NOT NULL,
     method        TEXT NOT NULL CHECK(method IN ('cash','qr')),
-    amount        REAL NOT NULL,
-    iva_amount    REAL NOT NULL DEFAULT 0,
-    received      REAL NOT NULL DEFAULT 0,  -- efectivo: lo que el cliente entrega
-    change        REAL NOT NULL DEFAULT 0,  -- efectivo: vuelto = received - amount
+    amount        INTEGER NOT NULL, -- v11: centavos
+    iva_amount    INTEGER NOT NULL DEFAULT 0, -- v11: centavos
+    received      INTEGER NOT NULL DEFAULT 0,  -- efectivo: centavos
+    change        INTEGER NOT NULL DEFAULT 0,  -- efectivo: centavos
     reference     TEXT NOT NULL DEFAULT '',
     status        TEXT NOT NULL DEFAULT 'completed' CHECK(status IN ('pending','completed','failed','refunded')),
     processed_by  TEXT NOT NULL,
@@ -213,9 +213,9 @@ const CREATE_TABLES = [
     closed_at       TEXT,
     opened_by       TEXT NOT NULL,
     closed_by       TEXT,
-    expected_cash   REAL NOT NULL DEFAULT 0,
-    actual_cash     REAL NOT NULL DEFAULT 0,
-    cash_difference REAL NOT NULL DEFAULT 0,
+    expected_cash   INTEGER NOT NULL DEFAULT 0, -- v11: centavos
+    actual_cash     INTEGER NOT NULL DEFAULT 0, -- v11: centavos
+    cash_difference INTEGER NOT NULL DEFAULT 0, -- v11: centavos
     is_reconciled   INTEGER NOT NULL DEFAULT 0,
     notes           TEXT NOT NULL DEFAULT '',
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
@@ -340,7 +340,7 @@ function applySchema(db) {
         console.log('[DB] Migration v9: menu_items.price_variable (precio manual)');
       }
       if (!hasColumn(db, 'menu_items', 'promo_price')) {
-        db.exec(`ALTER TABLE menu_items ADD COLUMN promo_price REAL`);
+        db.exec(`ALTER TABLE menu_items ADD COLUMN promo_price INTEGER`);
         console.log('[DB] Migration v9: menu_items.promo_price (precio promocional)');
       }
       if (!hasColumn(db, 'order_items', 'promo_label')) {
@@ -373,6 +373,16 @@ function applySchema(db) {
                         'expected_cash', 'actual_cash', 'cash_difference', 'is_reconciled', 'notes', 'created_at'],
         });
         console.log('[DB] Migration v5b: cash_closings sin columnas fantasma');
+      }
+      // v11 (2026-08-19): MIGRACIÓN A CENTAVOS — todo dinero pasa a ENTEROS
+      // en la unidad mínima (Bs 10.50 → 1050 centavos). Regla MANDATORIA del
+      // ecosistema FORCH.iA (money-minor-units). Disparador: DB pre-v11
+      // (currentVersion < 11). Las DBs fresh ya nacen con INTEGER (CREATE_TABLES
+      // actualizado) y tienen 0 filas → el UPDATE ×100 es no-op. ROUND() evita
+      // residuos float (10.5*100 = 1050 exacto). NULL se conserva (price manual).
+      if (currentVersion && currentVersion.version < 11) {
+        migrateMoneyToCentsV11(db);
+        console.log('[DB] Migration v11: dinero a centavos (INTEGER ×100)');
       }
       // Record schema version
       db.prepare(`INSERT OR REPLACE INTO schema_version (version) VALUES (?)`).run(SCHEMA_VERSION);
@@ -420,6 +430,34 @@ function recreateTable(db, { table, newSql, copyColumns }) {
 function hasColumn(db, table, column) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
   return cols.some(c => c.name === column);
+}
+
+/**
+ * v11: convierte TODAS las columnas monetarias de Bs a centavos (x100).
+ * Idempotente por diseno: solo corre con currentVersion < 11; en DBs fresh
+ * (0 filas) es no-op. ROUND() elimina residuos float de la multiplicacion.
+ * Corre DENTRO de la transaccion de applySchema (foreign_keys=OFF).
+ */
+function migrateMoneyToCentsV11(db) {
+  const MONEY_COLUMNS = [
+    ['menu_items', ['price', 'promo_price']],
+    ['modifier_options', ['price_adjustment']],
+    ['orders', ['subtotal', 'iva_amount', 'discount', 'total']],
+    ['order_items', ['unit_price', 'subtotal']],
+    ['payments', ['amount', 'iva_amount', 'received', 'change']],
+    ['cash_closings', ['expected_cash', 'actual_cash', 'cash_difference']],
+  ];
+  for (const [table, cols] of MONEY_COLUMNS) {
+    const exists = db.prepare(
+      `SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`
+    ).get(table);
+    if (!exists) continue;
+    for (const col of cols) {
+      if (hasColumn(db, table, col)) {
+        db.exec(`UPDATE ${table} SET ${col} = ROUND(${col} * 100)`);
+      }
+    }
+  }
 }
 
 /**

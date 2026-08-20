@@ -3,8 +3,8 @@
  *
  * Cubre:
  *   GET /api/promotions        → público, filtra por día laboral
- *   POST /api/orders con promo_type → precios de la promo (0 2x1, 12 barra,
- *                                      25 primera visita, 30/15 combo)
+ *   POST /api/orders con promo_type → precios de la promo (0 2x1, 1200 barra,
+ *                                      2500 primera visita, 3000/1500 combo)
  *   Contexto: 2x1 sin pareja → 400 PROMO_CONTEXT_VIOLATION
  *   Día no activo → 400 PROMO_NOT_ACTIVE
  *
@@ -168,7 +168,7 @@ describe('POST /api/orders con promo_type — precios SSOT (business_day fijo)',
     expect(r.json.code).toBe('PROMO_CONTEXT_VIOLATION');
   });
 
-  it('barra (miércoles fijo): Artesanal a 12 con promo_type=barra', async () => {
+  it('barra (miércoles fijo): Artesanal a 1200 con promo_type=barra', async () => {
     const { artesanal } = await getMenuItems();
     if (!artesanal) return;
 
@@ -184,8 +184,8 @@ describe('POST /api/orders con promo_type — precios SSOT (business_day fijo)',
       },
     });
     expect(r.status).toBe(201);
-    expect(r.json.order.items[0].unit_price).toBe(12);
-    expect(r.json.order.total).toBeCloseTo(12, 2);
+    expect(r.json.order.items[0].unit_price).toBe(1200);
+    expect(r.json.order.total).toBeCloseTo(1200, 2);
   });
 
   it('2x1 un día NO activo (miércoles) → 400 PROMO_NOT_ACTIVE', async () => {
@@ -226,7 +226,7 @@ describe('POST /api/orders con promo_type — precios SSOT (business_day fijo)',
     expect(r.json.code).toBe('INVALID_PROMO_TYPE');
   });
 
-  it('combo (jueves fijo): Signature 30 + Cerveza 15 = 45', async () => {
+  it('combo (jueves fijo): Signature 3000 + Cerveza 1500 = 4500', async () => {
     const { signature, artesanal } = await getMenuItems();
     if (!signature || !artesanal) return;
 
@@ -245,12 +245,12 @@ describe('POST /api/orders con promo_type — precios SSOT (business_day fijo)',
     expect(r.status).toBe(201);
     const sigLine = r.json.order.items.find(i => i.promo_type === 'combo' && i.menu_item_name === signature.name);
     const artLine = r.json.order.items.find(i => i.promo_type === 'combo' && i.menu_item_name === artesanal.name);
-    expect(sigLine.unit_price).toBe(30);
-    expect(artLine.unit_price).toBe(15);
-    expect(r.json.order.total).toBeCloseTo(45, 2);
+    expect(sigLine.unit_price).toBe(3000);
+    expect(artLine.unit_price).toBe(1500);
+    expect(r.json.order.total).toBeCloseTo(4500, 2);
   });
 
-  it('primera-visita (jueves fijo): Signature a 25, y rechaza una segunda', async () => {
+  it('primera-visita (jueves fijo): Signature a 2500, y rechaza una segunda', async () => {
     const { signature } = await getMenuItems();
     if (!signature) return;
 
@@ -266,7 +266,7 @@ describe('POST /api/orders con promo_type — precios SSOT (business_day fijo)',
       },
     });
     expect(ok.status).toBe(201);
-    expect(ok.json.order.items[0].unit_price).toBe(25);
-    expect(ok.json.order.total).toBeCloseTo(25, 2);
+    expect(ok.json.order.items[0].unit_price).toBe(2500);
+    expect(ok.json.order.total).toBeCloseTo(2500, 2);
   });
 });

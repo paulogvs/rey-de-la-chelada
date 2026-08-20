@@ -77,7 +77,7 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
       ? 0
       : (daily?.byMethod['cash'] ?? 0));
 
-  const difference = Math.round((actualCash - expectedCash) * 100) / 100;
+  const difference = actualCash - expectedCash; // v11: centavos exactos
 
   const handleOpen = useCallback(async () => {
     setBusy(true);

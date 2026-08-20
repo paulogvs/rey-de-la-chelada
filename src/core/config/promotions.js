@@ -10,11 +10,11 @@
  *
  *  Contrato aprobado 2026-08-19 (días = DÍAS LABORALES 15:00→06:00 +1):
  *    - 2x1 (Jueves de Chelada)   : solo jueves
- *    - Miércoles de Barra        : solo miércoles (artesanal 15 → 12)
- *    - Combo Michelada + Cerveza : mié/jue/dom (Signature 30 + Cerveza 15 = 45)
- *    - Primera Visita (Instagram): mié/jue/dom (Signature → 25, 1 vez/pedido)
- *    - Shot + Michelada          : mié/jue/dom (modifier +15 — informativo)
- *    - Doble Escarchado          : mié/jue/dom (modifier +5 — informativo)
+ *    - Miércoles de Barra        : solo miércoles (artesanal 1500 → 1200)
+ *    - Combo Michelada + Cerveza : mié/jue/dom (Signature 3000 + Cerveza 1500 = 4500)
+ *    - Primera Visita (Instagram): mié/jue/dom (Signature → 2500, 1 vez/pedido)
+ *    - Shot + Michelada          : mié/jue/dom (modifier +1500 — informativo)
+ *    - Doble Escarchado          : mié/jue/dom (modifier +500 — informativo)
  *
  *  La categoría objetivo se referencia por NOMBRE (el upsert de
  *  load-menu.js usa name+category como clave; los ids del seed no
@@ -55,7 +55,7 @@ export const PROMOTIONS = [
     days: ['miercoles'],
     promoType: 'PRICE_OVERRIDE',
     categoryName: ARTESANAL_CATEGORY,
-    price: 12,
+    price: 1200,
   },
   {
     id: 'combo',
@@ -64,8 +64,8 @@ export const PROMOTIONS = [
     description: '1 Michelada Signature + 1 Cerveza Artesanal. Miércoles, jueves y domingo.',
     days: ['miercoles', 'jueves', 'domingo'],
     promoType: 'COMBO',
-    price: 45,
-    comboPrices: { [SIGNATURE_CATEGORY]: 30, [ARTESANAL_CATEGORY]: 15 },
+    price: 4500,
+    comboPrices: { [SIGNATURE_CATEGORY]: 3000, [ARTESANAL_CATEGORY]: 1500 },
   },
   {
     id: 'primera-visita',
@@ -75,7 +75,7 @@ export const PROMOTIONS = [
     days: ['miercoles', 'jueves', 'domingo'],
     promoType: 'PRICE_OVERRIDE',
     categoryName: SIGNATURE_CATEGORY,
-    price: 25,
+    price: 2500,
     oncePerOrder: true,
   },
   {
@@ -84,7 +84,7 @@ export const PROMOTIONS = [
     description: 'Remátala con un shot a tu elección. Miércoles, jueves y domingo.',
     days: ['miercoles', 'jueves', 'domingo'],
     promoType: 'MODIFIER',
-    price: 15,
+    price: 1500,
   },
   {
     id: 'escarchado',
@@ -92,7 +92,7 @@ export const PROMOTIONS = [
     description: 'Súmale un segundo escarchado: Tajín, coco o chamoy. Miércoles, jueves y domingo.',
     days: ['miercoles', 'jueves', 'domingo'],
     promoType: 'MODIFIER',
-    price: 5,
+    price: 500,
   },
 ];
 

@@ -63,7 +63,7 @@ describe('ensureBootstrap', () => {
     ).get().promo_price).toBe(null);
 
     // Sprint 1 (D): adicionales como modifiers — grupo "Adicionales" en las
-    // micheladas (Shot +15, Doble Escarchado +5), siembra idempotente.
+    // micheladas (Shot +1500, Doble Escarchado +500), siembra idempotente.
     const islaId = db.prepare("SELECT id FROM menu_items WHERE name = 'Isla Dorada'").get().id;
     const addGroup = db.prepare(
       'SELECT id, type, required, max_select FROM modifier_groups WHERE menu_item_id = ? AND name = ?'
@@ -75,8 +75,8 @@ describe('ensureBootstrap', () => {
       'SELECT name, price_adjustment FROM modifier_options WHERE group_id = ? ORDER BY sort_order'
     ).all(addGroup.id);
     expect(addOpts).toEqual([
-      { name: 'Shot + Michelada', price_adjustment: 15 },
-      { name: 'Doble Escarchado', price_adjustment: 5 },
+      { name: 'Shot + Michelada', price_adjustment: 1500 },
+      { name: 'Doble Escarchado', price_adjustment: 500 },
     ]);
     // 17 items de barra con adicionales (8 Signature + 3 Especiales + 6 Cheladas)
     expect(db.prepare(
@@ -127,13 +127,13 @@ describe('ensureBootstrap', () => {
     const db = makeDb();
     ensureBootstrap(db);
 
-    // Admin changes a price
-    db.prepare("UPDATE menu_items SET price = 99 WHERE name = 'Isla Dorada'").run();
+    // Admin changes a price (centavos)
+    db.prepare("UPDATE menu_items SET price = 9900 WHERE name = 'Isla Dorada'").run();
 
     // Re-run bootstrap (simulates server restart)
     ensureBootstrap(db);
 
-    expect(db.prepare("SELECT price FROM menu_items WHERE name = 'Isla Dorada'").get().price).toBe(99);
+    expect(db.prepare("SELECT price FROM menu_items WHERE name = 'Isla Dorada'").get().price).toBe(9900);
     db.close();
   });
 
@@ -149,7 +149,7 @@ describe('ensureBootstrap', () => {
 
   // ═══ P0-1 (2026-08-11): ajustes de tamaño sobreviven a los restarts ═══
 
-  it('P0-1: pizza size adjustments (Familiar +20 / XL +40) sobreviven al restart', () => {
+  it('P0-1: pizza size adjustments (Familiar +2000 / XL +4000) sobreviven al restart', () => {
     const db = makeDb();
     ensureBootstrap(db);
 
@@ -163,8 +163,8 @@ describe('ensureBootstrap', () => {
       WHERE mg.name = 'Tamaño'
     `).all();
     const byName = Object.fromEntries(rows.map(r => [r.name, r.price_adjustment]));
-    expect(byName['Familiar']).toBe(20);
-    expect(byName['XL']).toBe(40);
+    expect(byName['Familiar']).toBe(2000);
+    expect(byName['XL']).toBe(4000);
     db.close();
   });
 
@@ -184,7 +184,7 @@ describe('ensureBootstrap', () => {
       JOIN modifier_groups mg ON mo.group_id = mg.id
       WHERE mg.name = 'Tamaño' AND mo.name = 'XL'
     `).get();
-    expect(xl.price_adjustment).toBe(40);
+    expect(xl.price_adjustment).toBe(4000);
     db.close();
   });
 
@@ -193,9 +193,9 @@ describe('ensureBootstrap', () => {
     ensureBootstrap(db);
 
     // Admin cambia el precio de un item (y de una opción de tamaño)
-    db.prepare("UPDATE menu_items SET price = 99 WHERE name = 'La Rey'").run();
+    db.prepare("UPDATE menu_items SET price = 9900 WHERE name = 'La Rey'").run();
     db.prepare(`
-      UPDATE modifier_options SET price_adjustment = 55
+      UPDATE modifier_options SET price_adjustment = 5500
       WHERE id IN (
         SELECT mo.id FROM modifier_options mo
         JOIN modifier_groups mg ON mo.group_id = mg.id
@@ -206,7 +206,7 @@ describe('ensureBootstrap', () => {
 
     ensureBootstrap(db);
 
-    expect(db.prepare("SELECT price FROM menu_items WHERE name = 'La Rey'").get().price).toBe(99);
+    expect(db.prepare("SELECT price FROM menu_items WHERE name = 'La Rey'").get().price).toBe(9900);
     const xl = db.prepare(`
       SELECT mo.price_adjustment
       FROM modifier_options mo
@@ -214,8 +214,8 @@ describe('ensureBootstrap', () => {
       JOIN menu_items mi ON mg.menu_item_id = mi.id
       WHERE mi.name = 'La Rey' AND mo.name = 'XL'
     `).get();
-    // El admin puso 55 → bootstrap NO lo pisa con el plan 40 (menu-seed null conserva)
-    expect(xl.price_adjustment).toBe(55);
+    // El admin puso 5500 → bootstrap NO lo pisa con el plan 4000 (menu-seed null conserva)
+    expect(xl.price_adjustment).toBe(5500);
     db.close();
   });
 });

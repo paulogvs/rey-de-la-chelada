@@ -152,7 +152,7 @@ export function InvoiceView() {
           customerName: printData?.name ?? '',
           orderId: printData?.orderId || '—',
           amount: printData?.amount ?? 0,
-          ivaAmount: Math.round((printData?.amount ?? 0) * 0.13 * 100) / 100,
+          ivaAmount: Math.round((printData?.amount ?? 0) * 0.13), // v11: centavos (semántica previa: IVA display)
           date: new Date().toISOString(),
         }}
         label="Factura"

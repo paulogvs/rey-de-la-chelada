@@ -19,12 +19,12 @@ function makeDaily() {
     totalOrders: 5,
     completedOrders: 4,
     cancelledOrders: 1,
-    grossRevenue: 400,
-    totalSales: 350,
-    totalIva: 40.27,
-    baseRevenue: 309.73,
-    averageTicket: 87.5,
-    byMethod: { cash: 250, qr: 100 },
+    grossRevenue: 40000,
+    totalSales: 35000,
+    totalIva: 4027,
+    baseRevenue: 30973,
+    averageTicket: 8750,
+    byMethod: { cash: 25000, qr: 10000 },
   };
 }
 

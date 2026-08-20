@@ -9,8 +9,8 @@
  * Contrato aprobado (2026-08-19):
  *   - 2x1: una Signature gratis por cada Signature pagada (sin promo)
  *   - Primera Visita: máx 1 línea por pedido
- *   - Combo: marca 1 Signature + 1 Cerveza juntas (30 + 15 = 45)
- *   - Barra: Artesanal a 12 (miércoles)
+ *   - Combo: marca 1 Signature + 1 Cerveza juntas (3000 + 1500 = 4500)
+ *   - Barra: Artesanal a 1200 (miércoles)
  *   - shot/escarchado son MODIFIER (informativo) — NO aplican como línea
  */
 
@@ -28,7 +28,7 @@ const sig = (over = {}) => ({
   name: 'Isla Dorada',
   category_id: 'cat-sig',
   category_name: 'Micheladas Signature',
-  price: 40,
+  price: 4000,
   ...over,
 });
 const art = (over = {}) => ({
@@ -36,7 +36,7 @@ const art = (over = {}) => ({
   name: 'Negra',
   category_id: 'cat-art',
   category_name: 'Cerveza Artesanal',
-  price: 15,
+  price: 1500,
   ...over,
 });
 
@@ -130,17 +130,17 @@ describe('clearPromoFromCart — quita promo', () => {
 });
 
 describe('resolveCartPromoUnitPrice — espejo del server', () => {
-  it('2x1 → 0; barra → 12; primera visita → 25; combo → 30/15', () => {
+  it('2x1 → 0; barra → 1200; primera visita → 2500; combo → 3000/1500', () => {
     expect(resolveCartPromoUnitPrice(item(sig(), 1, '2x1'), '2026-08-20')).toBe(0);
-    expect(resolveCartPromoUnitPrice(item(art(), 1, 'barra'), '2026-08-19')).toBe(12);
-    expect(resolveCartPromoUnitPrice(item(sig(), 1, 'primera-visita'), '2026-08-20')).toBe(25);
-    expect(resolveCartPromoUnitPrice(item(sig(), 1, 'combo'), '2026-08-20')).toBe(30);
-    expect(resolveCartPromoUnitPrice(item(art(), 1, 'combo'), '2026-08-20')).toBe(15);
+    expect(resolveCartPromoUnitPrice(item(art(), 1, 'barra'), '2026-08-19')).toBe(1200);
+    expect(resolveCartPromoUnitPrice(item(sig(), 1, 'primera-visita'), '2026-08-20')).toBe(2500);
+    expect(resolveCartPromoUnitPrice(item(sig(), 1, 'combo'), '2026-08-20')).toBe(3000);
+    expect(resolveCartPromoUnitPrice(item(art(), 1, 'combo'), '2026-08-20')).toBe(1500);
   });
 
   it('sin promo → precio base del item', () => {
-    expect(resolveCartPromoUnitPrice(item(sig()), '2026-08-20')).toBe(40);
-    expect(resolveCartPromoUnitPrice(item(art()), '2026-08-19')).toBe(15);
+    expect(resolveCartPromoUnitPrice(item(sig()), '2026-08-20')).toBe(4000);
+    expect(resolveCartPromoUnitPrice(item(art()), '2026-08-19')).toBe(1500);
   });
 
   it('promoType con día no activo → null (el server rechazaría)', () => {
@@ -152,17 +152,17 @@ describe('cartSavings — preview del ahorro', () => {
   it('2x1: ahorra el precio de la línea gratis', () => {
     const cart = [item(sig()), item(sig({ id: 'sig-2' }), 1, '2x1')];
     const s = cartSavings(cart, '2026-08-20');
-    expect(s.originalTotal).toBe(80);
-    expect(s.promoTotal).toBe(40);
-    expect(s.savings).toBe(40);
+    expect(s.originalTotal).toBe(8000);
+    expect(s.promoTotal).toBe(4000);
+    expect(s.savings).toBe(4000);
   });
 
-  it('combo: 80 → 45 (ahorro 35)', () => {
+  it('combo: 5500 → 4500 (ahorro 1000)', () => {
     const cart = [item(sig(), 1, 'combo'), item(art(), 1, 'combo')];
     const s = cartSavings(cart, '2026-08-20');
-    expect(s.originalTotal).toBe(55);
-    expect(s.promoTotal).toBe(45);
-    expect(s.savings).toBe(10);
+    expect(s.originalTotal).toBe(5500);
+    expect(s.promoTotal).toBe(4500);
+    expect(s.savings).toBe(1000);
   });
 
   it('sin promos → savings 0', () => {

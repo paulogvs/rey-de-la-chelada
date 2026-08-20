@@ -782,7 +782,7 @@ router.patch('/:id/status', requireAuth, requireRole('admin', 'mesero'), (req, r
         SELECT COALESCE(SUM(amount), 0) as total FROM payments
         WHERE order_id = ? AND status = 'completed'
       `).get(req.params.id);
-      if ((paidSum?.total || 0) + 0.001 < (orderTotal?.total || 0)) {
+      if ((paidSum?.total || 0) < (orderTotal?.total || 0)) { // v11: centavos exactos
         return res.status(409).json({
           success: false,
           error: 'No se puede marcar como pagado: falta registrar el pago completo',

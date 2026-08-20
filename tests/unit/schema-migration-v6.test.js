@@ -56,8 +56,8 @@ function seedMiniWorld(db) {
 }
 
 describe('MigraciÃ³n v6 â€” sin propina, solo cash|qr, received/change', () => {
-  it('SCHEMA_VERSION ahora es 10 (v10: promo_type en order_items)', () => {
-    expect(SCHEMA_VERSION).toBe(10);
+  it('SCHEMA_VERSION ahora es 11 (v11: dinero a centavos)', () => {
+    expect(SCHEMA_VERSION).toBe(11);
   });
 
   it('DB nueva: payments SIN columna tip, CON received/change y CHECK cash|qr', () => {
@@ -67,7 +67,7 @@ describe('MigraciÃ³n v6 â€” sin propina, solo cash|qr, received/change', 
     expect(hasColumn(db, 'payments', 'received')).toBe(true);
     expect(hasColumn(db, 'payments', 'change')).toBe(true);
     expect(hasColumn(db, 'payments', 'proof_photo')).toBe(true);
-    expect(currentVersion(db)).toBe(10);
+    expect(currentVersion(db)).toBe(11);
     // El CHECK solo acepta cash|qr
     const ddl = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='payments'").get().sql;
     expect(ddl).toMatch(/method\s+TEXT NOT NULL CHECK\(method IN \('cash','qr'\)\)/);
@@ -111,14 +111,14 @@ describe('MigraciÃ³n v6 â€” sin propina, solo cash|qr, received/change', 
     applySchema(db);
 
     expect(hasColumn(db, 'payments', 'tip')).toBe(false);
-    expect(currentVersion(db)).toBe(10);
+    expect(currentVersion(db)).toBe(11);
     // MÃ©todos consolidados â†’ qr; amount absorbe el tip (70+2=72)
     const qr = db.prepare('SELECT * FROM payments WHERE id = ?').get('legacy-qr');
     expect(qr.method).toBe('qr');
-    expect(qr.amount).toBe(72);
+    expect(qr.amount).toBe(7200);
     const card = db.prepare('SELECT * FROM payments WHERE id = ?').get('legacy-card');
     expect(card.method).toBe('qr');
-    expect(card.amount).toBe(30);
+    expect(card.amount).toBe(3000);
     // received/change default 0 en legacy
     expect(qr.received).toBe(0);
     expect(qr.change).toBe(0);
@@ -131,14 +131,14 @@ describe('MigraciÃ³n v6 â€” sin propina, solo cash|qr, received/change', 
     seedMiniWorld(db);
     db.prepare(`
       INSERT INTO payments (id, order_id, method, amount, received, change, status, processed_by)
-      VALUES ('p1', 'o1', 'cash', 34.5, 50, 15.5, 'completed', 'w1')
+      VALUES ('p1', 'o1', 'cash', 3450, 5000, 1550, 'completed', 'w1')
     `).run();
     applySchema(db);
     const p = db.prepare('SELECT * FROM payments WHERE id = ?').get('p1');
     expect(p.method).toBe('cash');
-    expect(p.received).toBe(50);
-    expect(p.change).toBe(15.5);
-    expect(currentVersion(db)).toBe(10);
+    expect(p.received).toBe(5000);
+    expect(p.change).toBe(1550);
+    expect(currentVersion(db)).toBe(11);
     db.close();
   });
 
@@ -174,7 +174,7 @@ describe('MigraciÃ³n v6 â€” sin propina, solo cash|qr, received/change', 
     applySchema(db);
 
     expect(hasColumn(db, 'order_items', 'round')).toBe(true);
-    expect(currentVersion(db)).toBe(10);
+    expect(currentVersion(db)).toBe(11);
     // El item existente queda en ronda 1 (no destructivo)
     const item = db.prepare('SELECT * FROM order_items WHERE id = ?').get('it1');
     expect(item.round).toBe(1);
@@ -217,12 +217,12 @@ describe('MigraciÃ³n v6 â€” sin propina, solo cash|qr, received/change', 
     applySchema(db);
 
     expect(hasColumn(db, 'payments', 'proof_photo')).toBe(true);
-    expect(currentVersion(db)).toBe(10);
+    expect(currentVersion(db)).toBe(11);
     // El pago existente queda con proof_photo '' (no destructivo)
     const p = db.prepare('SELECT * FROM payments WHERE id = ?').get('p-v7');
     expect(p.proof_photo).toBe('');
     expect(p.method).toBe('qr');
-    expect(p.amount).toBe(40);
+    expect(p.amount).toBe(4000);
     // INSERT nuevo con proof_photo funciona
     db.prepare(`
       INSERT INTO payments (id, order_id, method, amount, received, change, status, processed_by, proof_photo)

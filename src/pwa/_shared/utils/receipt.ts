@@ -12,13 +12,15 @@
 // Types
 // ============================================================
 
-import { computeTotals } from '@/core/config/iva';
+import { IVA_RATE } from '@/core/config/iva';
 import { formatMoney } from './format';
 
 export interface ReceiptItem {
   name: string;
   quantity: number;
+  /** Precio unitario en CENTAVOS (entero). */
   unitPrice: number;
+  /** Total de línea en CENTAVOS (entero). */
   lineTotal: number;
   /** Human-readable modifier summary, e.g. "Familiar +20" */
   modifiers?: string;
@@ -33,8 +35,11 @@ export interface ReceiptData {
   /** ISO date */
   createdAt: string;
   items: ReceiptItem[];
+  /** Subtotal en CENTAVOS (entero). */
   subtotal: number;
+  /** IVA en CENTAVOS (entero). */
   ivaAmount: number;
+  /** Total en CENTAVOS (entero). */
   total: number;
   paymentMethod?: string;
   /** Short code shown on thermal receipts, e.g. first 8 chars of order id */
@@ -71,9 +76,12 @@ export interface InvoiceReceiptData {
 // Formatters (pure)
 // ============================================================
 
-/** Format an amount as BOB currency string ("Bs 12,50" — coma decimal). */
-export function formatBs(amount: number): string {
-  return formatMoney(amount);
+/**
+ * Format an amount in CENTAVOS as BOB currency string ("Bs 12,50" — coma decimal).
+ * @param cents monto en centavos (ej. 1250 → "Bs 12,50")
+ */
+export function formatBs(cents: number): string {
+  return formatMoney(cents);
 }
 
 /** Format an ISO date as dd/mm/yyyy HH:mm (deterministic, testable). */
@@ -150,14 +158,15 @@ export function buildReceiptData(
  * Compute receipt totals from line items (defensive — used when the
  * order object lacks precomputed totals).
  *
- * MODELO SSOT EXTRACTIVO (precio INCLUYE IVA): los lineTotal ya incluyen
- * IVA → subtotal(base) = total/1.13, iva = total - subtotal, total = total.
+ * MODELO SSOT EXTRACTIVO EN CENTAVOS (precio INCLUYE IVA): los lineTotal
+ * llegan en CENTAVOS y ya incluyen IVA → subtotal(base) = total/(1+IVA_RATE)
+ * redondeado al centavo, iva = total - base, total = total.
  */
 export function computeReceiptTotals(items: ReceiptItem[]) {
   const total = items.reduce((sum, i) => sum + i.lineTotal, 0);
-  const { subtotal, iva, total: gross } = computeTotals(total);
-  const ivaAmount = iva;
-  return { subtotal, ivaAmount, total: gross };
+  const subtotal = Math.round(total / (1 + IVA_RATE));
+  const ivaAmount = total - subtotal;
+  return { subtotal, ivaAmount, total };
 }
 
 // ============================================================

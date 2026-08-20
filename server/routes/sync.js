@@ -347,7 +347,7 @@ router.post('/push', requireAuth, (req, res) => {
               WHERE order_id = ? AND status = 'completed'
             `).get(order.id);
             const ord = db.prepare('SELECT total FROM orders WHERE id = ?').get(order.id);
-            if ((paidCheck?.total || 0) + 0.001 < (ord?.total || 0)) {
+            if ((paidCheck?.total || 0) < (ord?.total || 0)) { // v11: centavos exactos
               throw new Error(`No se puede marcar pagado sin pago completo: ${order.id}`);
             }
           }

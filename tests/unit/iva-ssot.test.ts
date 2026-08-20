@@ -5,9 +5,9 @@
  * usando el helper compartido `src/core/config/iva.js`. El modelo autorizado
  * es EXTRACTIVO: los precios INCLUYEN IVA (includedInPrices: true en
  * app.config.ts), por lo que:
- *   - total   = suma de precios (lo que paga el cliente, ya incluye IVA)
- *   - subtotal = total / 1.13 (base sin IVA)
- *   - iva     = total - subtotal
+ *   - total   = suma de precios (lo que paga el cliente, ya incluye IVA, en CENTAVOS)
+ *   - subtotal = total / 1.13 (base sin IVA, en CENTAVOS)
+ *   - iva     = total - subtotal (en CENTAVOS)
  *
  * TDD: pruebas escritas antes de centralizar las capas en el helper.
  */
@@ -16,10 +16,10 @@ import { describe, it, expect } from 'vitest';
 import { computeTotals, extractIvaAmount, priceWithoutIva, IVA_RATE } from '../../src/core/config/iva';
 import { appConfig } from '../../src/core/config/app.config';
 
-// Carrito de ejemplo: 2x Chelada (20) + 1x Pique (85) → total bruto 125
+// Carrito de ejemplo: 2x Chelada (2000) + 1x Pique (8500) → total bruto 12500
 const CART = [
-  { price: 20, qty: 2 },
-  { price: 85, qty: 1 },
+  { price: 2000, qty: 2 },
+  { price: 8500, qty: 1 },
 ];
 
 function cartGross(cart) {
@@ -28,18 +28,18 @@ function cartGross(cart) {
 
 describe('computeTotals (SSOT helper)', () => {
   it('extrae base e IVA de un total que ya incluye IVA', () => {
-    const totals = computeTotals(125);
-    expect(totals.total).toBe(125);        // lo que paga el cliente
-    expect(totals.subtotal).toBe(110.62);  // 125 / 1.13
-    expect(totals.iva).toBe(14.38);        // 125 - 110.62
+    const totals = computeTotals(12500);
+    expect(totals.total).toBe(12500);      // lo que paga el cliente (centavos)
+    expect(totals.subtotal).toBe(11062);   // 12500 / 1.13 (base, centavos)
+    expect(totals.iva).toBe(1438);         // 12500 - 11062 (centavos)
   });
 
   it('extractIvaAmount coincide con computeTotals.iva', () => {
-    expect(extractIvaAmount(125)).toBe(computeTotals(125).iva);
+    expect(extractIvaAmount(12500)).toBe(computeTotals(12500).iva);
   });
 
   it('priceWithoutIva devuelve la base', () => {
-    expect(priceWithoutIva(125)).toBeCloseTo(110.62, 2);
+    expect(priceWithoutIva(12500)).toBeCloseTo(11062, 2);
   });
 
   it('IVA_RATE es 13% (no hardcodeado por los módulos)', () => {
@@ -49,7 +49,7 @@ describe('computeTotals (SSOT helper)', () => {
 
 describe('Consistencia entre capas (mismo carrito → mismo total)', () => {
   it('el total del carrito es idéntico al de appConfig.calculateIVA', () => {
-    const gross = cartGross(CART); // 125
+    const gross = cartGross(CART); // 12500
     const helper = computeTotals(gross);
     const viaAppConfig = appConfig.calculateIVA(gross);
     expect(helper.total).toBe(viaAppConfig.total);

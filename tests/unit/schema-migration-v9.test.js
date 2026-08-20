@@ -36,8 +36,8 @@ function seedMiniWorld(db) {
 }
 
 describe('Migración v9 — precio manual (price_variable), promo_price y promo_label', () => {
-  it('SCHEMA_VERSION ahora es 10 (v10: promo_type en order_items)', () => {
-    expect(SCHEMA_VERSION).toBe(10);
+it('SCHEMA_VERSION ahora es 11 (v11: dinero a centavos)', () => {
+    expect(SCHEMA_VERSION).toBe(11);
   });
 
   it('DB nueva: menu_items con price_variable + promo_price y order_items con promo_label', () => {
@@ -47,12 +47,12 @@ describe('Migración v9 — precio manual (price_variable), promo_price y promo_
     expect(hasColumn(db, 'menu_items', 'promo_price')).toBe(true);
     expect(hasColumn(db, 'order_items', 'promo_label')).toBe(true);
     expect(hasColumn(db, 'order_items', 'promo_type')).toBe(true); // v10
-    expect(currentVersion(db)).toBe(10);
+    expect(currentVersion(db)).toBe(11);
 
     // Defaults correctos
     const itemsDdl = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='menu_items'").get().sql;
     expect(itemsDdl).toMatch(/price_variable\s+INTEGER NOT NULL DEFAULT 0/);
-    expect(itemsDdl).toMatch(/promo_price\s+REAL/);
+    expect(itemsDdl).toMatch(/promo_price\s+INTEGER/); // v11: centavos
     const itemsDdl2 = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='order_items'").get().sql;
     expect(itemsDdl2).toMatch(/promo_label\s+TEXT/);
     expect(itemsDdl2).toMatch(/promo_type\s+TEXT/); // v10
@@ -108,16 +108,16 @@ describe('Migración v9 — precio manual (price_variable), promo_price y promo_
     expect(hasColumn(db, 'menu_items', 'price_variable')).toBe(true);
     expect(hasColumn(db, 'menu_items', 'promo_price')).toBe(true);
     expect(hasColumn(db, 'order_items', 'promo_label')).toBe(true);
-    expect(currentVersion(db)).toBe(10);
+    expect(currentVersion(db)).toBe(11);
 
     // No destructivo: item existente queda con defaults v9
     const item = db.prepare('SELECT * FROM menu_items WHERE id = ?').get('m1');
     expect(item.price_variable).toBe(0);
     expect(item.promo_price).toBe(null);
-    expect(item.price).toBe(15);
+    expect(item.price).toBe(1500);
     const oi = db.prepare('SELECT * FROM order_items WHERE id = ?').get('it1');
     expect(oi.promo_label).toBe(null);
-    expect(oi.unit_price).toBe(15);
+    expect(oi.unit_price).toBe(1500);
 
     // INSERT con las columnas nuevas funciona
     db.prepare(`
@@ -143,13 +143,13 @@ describe('Migración v9 — precio manual (price_variable), promo_price y promo_
     db.prepare("INSERT INTO menu_categories (id, name, sort_order) VALUES ('c1', 'Micheladas Signature', 0)").run();
     db.prepare(`
       INSERT INTO menu_items (id, category_id, name, price, price_variable, promo_price, area)
-      VALUES ('m1', 'c1', 'Isla Dorada', 15, 0, 12, 'bar')
+      VALUES ('m1', 'c1', 'Isla Dorada', 1500, 0, 1200, 'bar')
     `).run();
     applySchema(db);
     const item = db.prepare('SELECT * FROM menu_items WHERE id = ?').get('m1');
-    expect(item.promo_price).toBe(12);
+    expect(item.promo_price).toBe(1200);
     expect(item.price_variable).toBe(0);
-    expect(currentVersion(db)).toBe(10);
+    expect(currentVersion(db)).toBe(11);
     db.close();
   });
 
@@ -160,7 +160,7 @@ describe('Migración v9 — precio manual (price_variable), promo_price y promo_
     db.exec(`ALTER TABLE order_items DROP COLUMN promo_label`);
     // sube el version a 9 → no debe migrar (version >= SCHEMA_VERSION)
     applySchema(db);
-    expect(currentVersion(db)).toBe(10);
+    expect(currentVersion(db)).toBe(11);
     expect(hasColumn(db, 'order_items', 'promo_label')).toBe(false);
     db.close();
   });

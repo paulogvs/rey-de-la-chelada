@@ -23,7 +23,7 @@ if (items.length === 0) { closeDb(); process.exit(1); }
 
 const ids = items.map(i => i.id);
 const originalPrices = items.map(i => i.price);
-const newPrices = [45, 65, 85];
+const newPrices = [4500, 6500, 8500]; // v11: centavos
 
 const validation = validateBulkPricesRequest({
   updates: ids.map((id, i) => ({ id, price: newPrices[i] })),

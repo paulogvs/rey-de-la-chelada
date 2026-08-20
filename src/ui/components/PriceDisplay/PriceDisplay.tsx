@@ -12,7 +12,7 @@ import { formatMoney } from '@/pwa/_shared/utils/format';
 import './PriceDisplay.css';
 
 export interface PriceDisplayProps {
-  /** Total price with IVA included (null = show "—" placeholder) */
+  /** Total price with IVA included, en CENTAVOS (entero) — null = show "—" placeholder */
   priceWithIVA: number | null;
   /** Optional: IVA percentage (defaults to app config) */
   ivaPercentage?: number;
@@ -53,8 +53,9 @@ export function PriceDisplay({
     );
   }
 
-  const base = Math.round((priceWithIVA / (1 + rate)) * 100) / 100;
-  const ivaAmount = Math.round((priceWithIVA - base) * 100) / 100;
+  // Total y desglose en CENTAVOS (contrato SSOT): base = total/(1+rate), iva = total - base.
+  const base = Math.round(priceWithIVA / (1 + rate));
+  const ivaAmount = priceWithIVA - base;
 
   return (
     <div className={classes}>

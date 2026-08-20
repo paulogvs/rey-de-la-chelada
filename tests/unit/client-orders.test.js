@@ -18,14 +18,14 @@ function createMockDb() {
     { id: 't2', number: 2, status: 'free', capacity: 4 },
   ];
   const menuItems = [
-    { id: 'm1', name: 'Chelada Clásica', price: 20, area: 'bar', category_id: 'c1', is_active: 1 },
-    { id: 'm2', name: 'Pique Macho', price: 85, area: 'cocina', category_id: 'c2', is_active: 1 },
+    { id: 'm1', name: 'Chelada Clásica', price: 2000, area: 'bar', category_id: 'c1', is_active: 1 },
+    { id: 'm2', name: 'Pique Macho', price: 8500, area: 'cocina', category_id: 'c2', is_active: 1 },
     { id: 'm3', name: 'Pizza La Rey', price: null, area: 'cocina', category_id: 'c3', is_active: 1 },
   ];
   const modifierOptions = [
     { id: 'o1', group_id: 'g1', name: 'Mediana', price_adjustment: 0, is_default: 1 },
-    { id: 'o2', group_id: 'g1', name: 'Familiar', price_adjustment: 15, is_default: 0 },
-    { id: 'o3', group_id: 'g1', name: 'Familiar XL', price_adjustment: 30, is_default: 0 },
+    { id: 'o2', group_id: 'g1', name: 'Familiar', price_adjustment: 1500, is_default: 0 },
+    { id: 'o3', group_id: 'g1', name: 'Familiar XL', price_adjustment: 3000, is_default: 0 },
   ];
   const modifierGroups = [{ id: 'g1', menu_item_id: 'm3' }];
   const orders = [];
@@ -174,11 +174,11 @@ describe('createPublicOrder service', () => {
     const order = mockDb._state.orders[0];
     expect(order.status).toBe('called');
     expect(order.table_number).toBe(1);
-    // Modelo SSOT EXTRACTIVO (precio INCLUYE IVA): total = 40 + 85 = 125
-    // (lo que paga el cliente), subtotal = 125/1.13 = 110.62, iva = 14.38.
-    expect(order.subtotal).toBe(110.62);
-    expect(order.iva_amount).toBe(14.38);
-    expect(order.total).toBe(125);
+    // Modelo SSOT EXTRACTIVO (precio INCLUYE IVA, centavos): total = 4000 + 8500 = 12500
+    // (lo que paga el cliente), subtotal = 12500/1.13 = 11062, iva = 1438.
+    expect(order.subtotal).toBe(11062);
+    expect(order.iva_amount).toBe(1438);
+    expect(order.total).toBe(12500);
     expect(mockDb._state.orderItems).toHaveLength(2);
   });
 
@@ -249,14 +249,14 @@ describe('createPublicOrder service', () => {
       items: [{
         menu_item_id: 'm3', // pizza, price null
         quantity: 1,
-        modifiers: [{ option_id: 'o2' }], // Familiar +15
+        modifiers: [{ option_id: 'o2' }], // Familiar +1500
       }],
     });
     expect(result.success).toBe(true);
     const order = mockDb._state.orders[0];
-    // subtotal (base) 15 / 1.13 = 13.27, iva 1.73, total 15
-    expect(order.subtotal).toBe(13.27);
-    expect(order.total).toBe(15);
+    // subtotal (base) 1500 / 1.13 = 1327, iva 173, total 1500
+    expect(order.subtotal).toBe(1327);
+    expect(order.total).toBe(1500);
   });
 
   it('sums multiple modifier adjustments and multiplies by quantity', async () => {
@@ -267,13 +267,13 @@ describe('createPublicOrder service', () => {
       items: [{
         menu_item_id: 'm3',
         quantity: 2,
-        modifiers: [{ option_id: 'o2' }, { option_id: 'o3' }], // +15 +30 = +45
+        modifiers: [{ option_id: 'o2' }, { option_id: 'o3' }], // +1500 +3000 = +4500
       }],
     });
     const order = mockDb._state.orders[0];
-    // unit 45 * 2 = 90 (gross, incluye IVA) → total 90, subtotal 79.65, iva 10.35
-    expect(order.subtotal).toBe(79.65);
-    expect(order.total).toBe(90);
+    // unit 4500 * 2 = 9000 (gross, incluye IVA) → total 9000, subtotal 7965, iva 1035
+    expect(order.subtotal).toBe(7965);
+    expect(order.total).toBe(9000);
   });
 
   it('rejects invalid modifier options with a clear code', async () => {
@@ -392,8 +392,8 @@ describe('getPublicOrderStatus service', () => {
     const status = getPublicOrderStatus(mockDb, orderId);
     expect(status.success).toBe(true);
     expect(status.status).toBe('called');
-    // total incluye IVA = 20 (precio del item, ya incluye IVA)
-    expect(status.total).toBe(20);
+    // total incluye IVA = 2000 (precio del item, ya incluye IVA, centavos)
+    expect(status.total).toBe(2000);
   });
 
   it('returns not-found for unknown order id', async () => {
@@ -409,7 +409,7 @@ describe('getPublicOrderStatus service', () => {
     const { getPublicOrderStatus } = await import('../../server/services/client-orders.js');
     // DB guarda UTC: '2026-08-11 20:54:32' → local La Paz = 16:54:32 (UTC-4)
     const order = {
-      id: 'ord-local', status: 'confirmed', table_number: 1, total: 20,
+      id: 'ord-local', status: 'confirmed', table_number: 1, total: 2000,
       updated_at: '2026-08-11 20:54:32', created_at: '2026-08-11 20:54:32',
     };
     mockDb._state.orders.push(order);
@@ -422,7 +422,7 @@ describe('getPublicOrderStatus service', () => {
   it('P2-4: updatedAt null → no rompe (null seguro)', async () => {
     const { getPublicOrderStatus } = await import('../../server/services/client-orders.js');
     const order = {
-      id: 'ord-null', status: 'draft', table_number: 2, total: 10,
+      id: 'ord-null', status: 'draft', table_number: 2, total: 1000,
       updated_at: null, created_at: '2026-08-11 20:54:32',
     };
     mockDb._state.orders.push(order);

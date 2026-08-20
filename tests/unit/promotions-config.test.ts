@@ -85,18 +85,18 @@ describe('promotions config — promoById y promoUnitPrice', () => {
     expect(promoById('nope')).toBeUndefined();
   });
 
-  it('PRICE_OVERRIDE: barra → 12, primera visita → 25', () => {
-    expect(promoUnitPrice(promoById('barra'), 'Cerveza Artesanal')).toBe(12);
-    expect(promoUnitPrice(promoById('primera-visita'), 'Micheladas Signature')).toBe(25);
+  it('PRICE_OVERRIDE: barra → 1200, primera visita → 2500', () => {
+    expect(promoUnitPrice(promoById('barra'), 'Cerveza Artesanal')).toBe(1200);
+    expect(promoUnitPrice(promoById('primera-visita'), 'Micheladas Signature')).toBe(2500);
   });
 
   it('BOGO (2x1): unidad gratis (0)', () => {
     expect(promoUnitPrice(promoById('2x1'), 'Micheladas Signature')).toBe(0);
   });
 
-  it('COMBO: reparto fijo Signature 30 + Cerveza 15 = 45', () => {
-    expect(promoUnitPrice(promoById('combo'), 'Micheladas Signature')).toBe(30);
-    expect(promoUnitPrice(promoById('combo'), 'Cerveza Artesanal')).toBe(15);
+  it('COMBO: reparto fijo Signature 3000 + Cerveza 1500 = 4500', () => {
+    expect(promoUnitPrice(promoById('combo'), 'Micheladas Signature')).toBe(3000);
+    expect(promoUnitPrice(promoById('combo'), 'Cerveza Artesanal')).toBe(1500);
   });
 
   it('MODIFIER (shot/escarchado) no tienen precio de línea', () => {

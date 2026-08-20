@@ -13,14 +13,14 @@
  *    node server/scripts/demo-prices.js --dry-run  → muestra qué cambiaría
  *    node server/scripts/demo-prices.js --reset    → deja todo en NULL/0
  *
- *  Rango por categoría (BOB, Cochabamba):
- *    Ensaladas              Bs 28 – 40
- *    Tablas y Canastas      Bs 42 – 85
- *    Burgers & Sandwiches   Bs 26 – 40
- *    Quesadillas            Bs 32 – 38
- *    Pizzas (Mediana)       Bs 50 (Familiar +20, XL +40 → 50–90)
- *    Empanadas              Bs 12 – 17
- *    Salsas y Extras        Bs 6 – 10
+ *  Rango por categoría (BOB, Cochabamba — centavos):
+ *    Ensaladas              Bs 2800 – 4000
+ *    Tablas y Canastas      Bs 4200 – 8500
+ *    Burgers & Sandwiches   Bs 2600 – 4000
+ *    Quesadillas            Bs 3200 – 3800
+ *    Pizzas (Mediana)       Bs 5000 (Familiar +2000, XL +4000 → 5000–9000)
+ *    Empanadas              Bs 1200 – 1700
+ *    Salsas y Extras        Bs 600 – 1000
  *
  *  ⚠️ Sprint 1 (2026-08-17): el menú BAR ya trae precios REALES en el seed.
  *  El demo SOLO rellena items sin precio (price IS NULL), NUNCA a items de
@@ -40,22 +40,22 @@ import {
 // ── Pricing plan: category → prices in sort_order ──────────
 // Sprint 1: SOLO categorías COCINA (el menú BAR ya tiene precios reales).
 const PRICING_PLAN = {
-  'Ensaladas': [28, 32, 38, 34, 30],
-  'Tablas y Canastas': [45, 52, 58, 68, 42, 85],
-  'Burgers & Sandwiches': [28, 32, 30, 38, 26, 34, 30, 35, 32, 40, 36],
-  'Quesadillas': [32, 35, 38],
-  'Pizzas': [50, 50, 50, 50], // base = Mediana; sizes adjust via modifier options
-  'Empanadas': [14, 15, 16, 14, 17, 15, 12],
-  'Salsas y Extras': [6, 7, 8, 10],
+  'Ensaladas': [2800, 3200, 3800, 3400, 3000],
+  'Tablas y Canastas': [4500, 5200, 5800, 6800, 4200, 8500],
+  'Burgers & Sandwiches': [2800, 3200, 3000, 3800, 2600, 3400, 3000, 3500, 3200, 4000, 3600],
+  'Quesadillas': [3200, 3500, 3800],
+  'Pizzas': [5000, 5000, 5000, 5000], // base = Mediana; sizes adjust via modifier options
+  'Empanadas': [1400, 1500, 1600, 1400, 1700, 1500, 1200],
+  'Salsas y Extras': [600, 700, 800, 1000],
 };
 
 /** Categoría display de promociones — nunca facturable, jamás recibe demo price. */
 const DISPLAY_ONLY_CATEGORIES = new Set(['Promociones']);
 
-/** Tamaños de pizza: ajuste de precio sobre el precio base (Mediana). */
-const PIZZA_SIZE_ADJUST = { Mediana: 0, Familiar: 20, XL: 40 };
+/** Tamaños de pizza: ajuste de precio (centavos) sobre el precio base (Mediana). */
+const PIZZA_SIZE_ADJUST = { Mediana: 0, Familiar: 2000, XL: 4000 };
 
-const FALLBACK_PRICE = 25;
+const FALLBACK_PRICE = 2500;
 
 /**
  * Aplica SOLO los ajustes de tamaño de pizza (modifier_options.price_adjustment)
@@ -67,7 +67,7 @@ const FALLBACK_PRICE = 25;
  *
  * ⚠️ FIX P0-1 (2026-08-11): bootstrap re-carga el menú en cada arranque y
  * load-menu.js (upsert) escribía price_adjustment = 0 cuando el seed trae
- * null → los +20/+40 de Familiar/XL se perdían silenciosamente. Este helper
+ * null → los +2000/+4000 de Familiar/XL se perdían silenciosamente. Este helper
  * se ejecuta SIEMPRE en el bootstrap (a diferencia de applyDemoPrices, que
  * solo corre cuando hay items sin precio) para garantizar que los ajustes
  * sobrevivan a cada restart SIN pisar precios de items editados por admin.
@@ -188,12 +188,12 @@ export function applyDemoPrices(db, { log = console.log, dryRun = false, reset =
       const price = plan ? (plan[idx] ?? FALLBACK_PRICE) : FALLBACK_PRICE;
       if (item.price !== price) {
         itemUpdates.push({ id: item.id, price });
-        summary.push(`  ${category} · ${item.name}: ${item.price ?? 'NULL'} → Bs ${price}`);
+        summary.push(`  ${category} · ${item.name}: ${item.price ?? 'NULL'} → Bs ${(price / 100).toFixed(2)}`);
       }
     });
   }
 
-  // Ajustes de tamaño (pizza): Mediana 0, Familiar +20, XL +40 — delegado
+  // Ajustes de tamaño (pizza): Mediana 0, Familiar +2000, XL +4000 — delegado
   // al helper dedicado applyPizzaSizeAdjustments (P0-1: reaplicable siempre).
   const modResultFromHelper = applyPizzaSizeAdjustments(db, { log, dryRun: DRY_RUN });
   if (modResultFromHelper.message === 'applied' || modResultFromHelper.message === 'dry-run') {

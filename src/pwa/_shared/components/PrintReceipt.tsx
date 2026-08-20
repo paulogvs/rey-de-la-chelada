@@ -235,7 +235,7 @@ function InvoiceReceiptBody({ receipt }: { receipt: InvoiceReceiptData }) {
       <div className="print-receipt__totals">
         <div className="print-receipt__total-row">
           <span>Subtotal</span>
-          <span>{formatBs(Math.round((receipt.amount - receipt.ivaAmount) * 100) / 100)}</span>
+          <span>{formatBs(receipt.amount - receipt.ivaAmount)}</span>
         </div>
         <div className="print-receipt__total-row">
           <span>IVA (13%)</span>

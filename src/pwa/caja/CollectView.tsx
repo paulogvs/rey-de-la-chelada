@@ -60,7 +60,7 @@ const PAYMENT_OPTIONS: SegmentedOption[] = PAYMENT_METHODS.map(m => ({
 
 /** Saldo pendiente de un pedido (total − pagos completed). SSOT server. */
 export function orderRemaining(order: Order): number {
-  return Math.max(0, Math.round((order.total - order.paidAmount) * 100) / 100);
+  return Math.max(0, order.total - order.paidAmount); // v11: centavos exactos
 }
 
 export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
@@ -207,7 +207,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
           const remaining = orderRemaining(order);
           const isExpanded = expandedId === order.id;
           const change = method === 'cash' && received > remaining
-            ? Math.round((received - remaining) * 100) / 100
+            ? received - remaining // v11: centavos exactos
             : 0;
           return (
             <Card key={order.id} padded={false} className="caja-collect__order">

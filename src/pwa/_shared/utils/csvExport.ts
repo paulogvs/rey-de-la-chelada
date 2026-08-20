@@ -5,12 +5,22 @@
  *   (\uFEFF) so Excel opens it correctly with Spanish characters.
  * - downloadCsv: browser download helper (Blob + object URL).
  *
+ * CONTRATO DE CENTAVOS: los montos de entrada (`DailySalesCsvSource`) llegan
+ * en CENTAVOS (enteros). El CSV es formato MÁQUINA (Excel lo parsea
+ * numéricamente) → aquí SIEMPRE se emite Bs decimal con PUNTO decimal,
+ * nunca el display humano ("Bs 12,50") de formatMoney.
+ *
  * No external dependencies.
  */
 
 // ============================================================
 // Escaping (pure)
 // ============================================================
+
+/** Convierte CENTAVOS a Bs (formato máquina: punto decimal, 2 dígitos). */
+function centsToBs(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
 
 /** Escape a single CSV field (RFC 4180: quote if it contains , " or newline). */
 export function csvEscape(value: string | number | null | undefined): string {
@@ -36,11 +46,17 @@ export interface DailySalesCsvSource {
   totalOrders: number;
   completedOrders: number;
   cancelledOrders: number;
+  /** Venta bruta en CENTAVOS (entero). */
   grossRevenue: number;
+  /** Venta neta en CENTAVOS (entero). */
   totalSales: number;
+  /** IVA en CENTAVOS (entero). */
   totalIva: number;
+  /** Base imponible en CENTAVOS (entero). */
   baseRevenue: number;
+  /** Ticket promedio en CENTAVOS (entero). */
   averageTicket: number;
+  /** Recaudación por método en CENTAVOS (entero). */
   byMethod: Record<string, number>;
 }
 
@@ -91,17 +107,17 @@ export function buildDailySalesCsv(
     daily.totalOrders,
     daily.completedOrders,
     daily.cancelledOrders,
-    daily.grossRevenue.toFixed(2),
-    daily.totalSales.toFixed(2),
-    daily.totalIva.toFixed(2),
-    daily.baseRevenue.toFixed(2),
-    daily.averageTicket.toFixed(2),
-    ...methods.map(m => (daily.byMethod[m] ?? 0).toFixed(2)),
+    centsToBs(daily.grossRevenue),
+    centsToBs(daily.totalSales),
+    centsToBs(daily.totalIva),
+    centsToBs(daily.baseRevenue),
+    centsToBs(daily.averageTicket),
+    ...methods.map(m => centsToBs(daily.byMethod[m] ?? 0)),
   ];
 
   const methodRows = methods
     .filter(m => (daily.byMethod[m] ?? 0) > 0)
-    .map(m => [METHOD_LABELS[m] || m, daily.byMethod[m].toFixed(2)]);
+    .map(m => [METHOD_LABELS[m] || m, centsToBs(daily.byMethod[m] ?? 0)]);
 
   const lines = [csvLine(header), csvLine(summaryRow), ...methodRows.map(r => csvLine(r))];
 
