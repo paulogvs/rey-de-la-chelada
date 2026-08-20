@@ -112,7 +112,6 @@ export function DashboardView({ token, onToast }: DashboardViewProps) {
         <>
           <PromotionsToday />
           <div className="admin-dashboard__grid">
-            <PromotionsToday />
             <StatCard
               className={stats.nullPriceCount > 0 ? 'admin-stat admin-stat--alert' : 'admin-stat admin-stat--items'}
               label="Items del menú"

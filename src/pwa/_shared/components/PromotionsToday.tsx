@@ -14,6 +14,7 @@ import React, { useMemo } from 'react';
 import { Card } from '@/ui/components/Card';
 import { businessDayDateStr } from '@/core/config/local-date';
 import { activePromotionsForDay, businessDayName } from '@/core/config/promotions.js';
+import { formatMoney } from '@/pwa/_shared/utils/format';
 import './PromotionsToday.css';
 
 export function PromotionsToday({ compact = false }: { compact?: boolean }) {
@@ -45,7 +46,7 @@ export function PromotionsToday({ compact = false }: { compact?: boolean }) {
               <span className="promotions-today__tag">2x1</span>
             )}
             {!compact && p.price != null && p.promoType !== 'COMBO' && (
-              <span className="promotions-today__tag">Bs {p.price}</span>
+              <span className="promotions-today__tag">{formatMoney(p.price)}</span>
             )}
           </li>
         ))}

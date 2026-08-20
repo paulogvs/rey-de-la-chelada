@@ -12,7 +12,7 @@ import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
 import { Loader } from '@/ui/components/Loader';
-import { FormField } from '@/ui/components/FormField';
+import { MoneyInput } from '@/ui/components/MoneyInput/MoneyInput';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import {
   fetchModifierOptions,
@@ -28,7 +28,8 @@ interface ModifierOptionsViewProps {
 }
 
 interface FieldState {
-  value: string;
+  /** Ajuste en CENTAVOS (entero) — contrato v11. 0 = campo vacío/limpio. */
+  value: number;
   saved: 'ok' | 'err' | null;
 }
 
@@ -62,18 +63,20 @@ export function ModifierOptionsView({ token, onToast }: ModifierOptionsViewProps
     return Array.from(map.values());
   }, [options]);
 
-  const handleChange = useCallback((id: string, value: string) => {
-    setFields(prev => ({ ...prev, [id]: { value, saved: null } }));
+  const handleChange = useCallback((id: string, cents: number) => {
+    setFields(prev => ({ ...prev, [id]: { value: cents, saved: null } }));
   }, []);
 
   const handleSaveOne = useCallback(async (opt: ModifierOptionRow) => {
     const field = fields[opt.id];
-    const priceAdjustment = Number(field?.value);
-    if (field == null || Number.isNaN(priceAdjustment) || priceAdjustment < 0) {
+    // MoneyInput ya entrega centavos (parseMoneyInput) — el server SIEMPRE
+    // recibe price_adjustment en centavos enteros (contrato v11).
+    const priceAdjustment = field?.value;
+    if (field == null || priceAdjustment == null || Number.isNaN(priceAdjustment) || priceAdjustment < 0) {
       onToast('error', 'Precio inválido');
       return;
     }
-    setFields(prev => ({ ...prev, [opt.id]: { value: String(priceAdjustment), saved: null } }));
+    setFields(prev => ({ ...prev, [opt.id]: { value: priceAdjustment, saved: null } }));
     const result = await updateModifierOptionPrice(token, opt.id, priceAdjustment);
     if (result.ok) {
       setOptions(prev => prev.map(o => (o.id === opt.id ? { ...o, price_adjustment: priceAdjustment } : o)));
@@ -88,8 +91,8 @@ export function ModifierOptionsView({ token, onToast }: ModifierOptionsViewProps
 
   const handleSaveAll = useCallback(async () => {
     const updates = options
-      .filter(o => fields[o.id]?.value !== '')
-      .map(o => ({ id: o.id, priceAdjustment: Number(fields[o.id].value) }))
+      .filter(o => fields[o.id]?.value !== 0)
+      .map(o => ({ id: o.id, priceAdjustment: fields[o.id].value }))
       .filter(u => !Number.isNaN(u.priceAdjustment) && u.priceAdjustment >= 0);
 
     if (updates.length === 0) {
@@ -106,7 +109,7 @@ export function ModifierOptionsView({ token, onToast }: ModifierOptionsViewProps
       setFields(prev => {
         const next: Record<string, FieldState> = {};
         for (const u of updates) {
-          next[u.id] = { value: String(u.priceAdjustment), saved: okIds.has(u.id) ? 'err' : 'ok' };
+          next[u.id] = { value: u.priceAdjustment, saved: okIds.has(u.id) ? 'err' : 'ok' };
         }
         return { ...prev, ...next };
       });
@@ -132,7 +135,7 @@ export function ModifierOptionsView({ token, onToast }: ModifierOptionsViewProps
   }, [options, fields, token, onToast]);
 
   const filledCount = useMemo(
-    () => Object.values(fields).filter(f => f.value !== '').length,
+    () => Object.values(fields).filter(f => f.value !== 0).length,
     [fields]
   );
 
@@ -161,18 +164,15 @@ export function ModifierOptionsView({ token, onToast }: ModifierOptionsViewProps
             <div className="admin-bulk-grid">
               {group.options.map(opt => {
                 const field = fields[opt.id];
-                const value = field?.value ?? String(opt.price_adjustment ?? 0);
                 return (
                   <div key={opt.id} className="admin-bulk-item">
                     <span className="admin-bulk-item__name">{opt.name}</span>
                     <div className="admin-price-input">
                       <span className="admin-price-input__prefix">+Bs</span>
-                      <FormField
-                        type="text"
-                        inputMode="decimal"
+                      <MoneyInput
                         variant="sm" className="form-input--mono"
-                        value={value}
-                        onChange={e => handleChange(opt.id, e.target.value.replace(',', '.'))}
+                        value={field?.value ?? opt.price_adjustment ?? 0}
+                        onChange={cents => handleChange(opt.id, cents)}
                         onKeyDown={e => { if (e.key === 'Enter') handleSaveOne(opt); }}
                         aria-label={`Precio de ${opt.name} de ${opt.menu_item_name}`}
                       />

@@ -133,7 +133,7 @@ export async function fetchDailySales(
     totalSales,
     totalIva,
     baseRevenue,
-    averageTicket: (s.completed_orders ?? 0) > 0 ? totalSales / (s.completed_orders ?? 0) : 0,
+    averageTicket: (s.completed_orders ?? 0) > 0 ? Math.round(totalSales / (s.completed_orders ?? 0)) : 0,
     byMethod,
     hourly: result.data.hourly ?? [],
   };

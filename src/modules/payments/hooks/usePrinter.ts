@@ -122,27 +122,27 @@ export function generateTicket(
         ticket += ESCPOS.FONT_B;
         ticket += `   + ${mod.optionName}`;
         if (mod.priceAdjustment > 0) {
-          ticket += ` (Bs. ${mod.priceAdjustment.toFixed(2)})`;
+          ticket += ` (Bs. ${(mod.priceAdjustment / 100).toFixed(2)})`;
         }
         ticket += '\n';
         ticket += ESCPOS.FONT_A;
       });
     }
-    ticket += right('', `Bs. ${item.subtotal.toFixed(2)}`) + '\n';
+    ticket += right('', `Bs. ${(item.subtotal / 100).toFixed(2)}`) + '\n';
   });
 
   ticket += line();
 
   // Totals
-  ticket += right('Subtotal:', `Bs. ${order.subtotal.toFixed(2)}`) + '\n';
-  ticket += right(`IVA ${taxConfig.iva.percentage}%:`, `Bs. ${order.ivaAmount.toFixed(2)}`) + '\n';
+  ticket += right('Subtotal:', `Bs. ${(order.subtotal / 100).toFixed(2)}`) + '\n';
+  ticket += right(`IVA ${taxConfig.iva.percentage}%:`, `Bs. ${(order.ivaAmount / 100).toFixed(2)}`) + '\n';
 
   if (order.discount > 0) {
-    ticket += right('Descuento:', `-Bs. ${order.discount.toFixed(2)}`) + '\n';
+    ticket += right('Descuento:', `-Bs. ${(order.discount / 100).toFixed(2)}`) + '\n';
   }
 
   ticket += ESCPOS.DOUBLE_ON;
-  ticket += right('TOTAL:', `Bs. ${order.total.toFixed(2)}`) + '\n';
+  ticket += right('TOTAL:', `Bs. ${(order.total / 100).toFixed(2)}`) + '\n';
   ticket += ESCPOS.DOUBLE_OFF;
 
   ticket += line();

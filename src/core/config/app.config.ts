@@ -78,7 +78,7 @@ export interface SFEConfig {
   dosingKey: string;
   /** Modalidad: 'computarizada' | 'prevalorada' | 'ambas' */
   modality: 'computarizada' | 'prevalorada' | 'ambas';
-  /** Límite para factura con NIT (Bs. 1,000) */
+  /** Límite para factura con NIT (Bs 1.000 → 100000 CENTAVOS, contrato v11) */
   nitThreshold: number;
   /** Código de sucursal (0 = casa matriz) */
   branchCode: number;
@@ -235,7 +235,7 @@ export const DEFAULT_CONFIG: RestaurantConfig = {
     validityDate: '',
     dosingKey: '',
     modality: 'computarizada',
-    nitThreshold: 1000,
+    nitThreshold: 100000, // Bs 1.000 en centavos (contrato v11 — dinero SIEMPRE entero en centavos)
     branchCode: 0,
     pointOfSaleCode: 0,
   },

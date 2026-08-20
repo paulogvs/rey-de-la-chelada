@@ -285,7 +285,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
       <Card className="payment-panel__invoice">
         <h4>Facturación</h4>
         <p className="payment-panel__invoice-text">
-          {order.total >= 1000
+          {order.total >= appConfig.all.invoicing.nitThreshold
             ? 'Monto mayor a Bs 1000 — requiere NIT para factura'
             : 'Factura sin NIT (consumidor final)'}
         </p>

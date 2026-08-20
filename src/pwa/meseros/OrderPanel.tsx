@@ -849,7 +849,7 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
                       <span className="order-panel__item-badge order-panel__item-badge--promo">Promo</span>
                     )}
                     {ci.manualPrice != null && (
-                      <span className="order-panel__item-badge order-panel__item-badge--manual">Bs {ci.manualPrice}</span>
+                      <span className="order-panel__item-badge order-panel__item-badge--manual">{formatMoney(ci.manualPrice)}</span>
                     )}
                   </span>
                   <span className="order-panel__cart-item-total">

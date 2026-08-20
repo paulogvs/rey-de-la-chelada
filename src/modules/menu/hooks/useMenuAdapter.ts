@@ -11,6 +11,7 @@
 import { useState, useCallback } from 'react';
 import { menuEngine } from '@/core/engine';
 import { appConfig } from '@/core/config';
+import { toCents } from '@/core/config/iva.js';
 import type { MenuCategory, MenuItem, ModifierGroup, ModifierOption, ModifierType } from '@/core/types';
 
 export interface ImportResult {
@@ -146,7 +147,7 @@ export function useMenuAdapter() {
                     return {
                       id: `mod-opt-${index}-${gi}-${oi}`,
                       name: optName.trim(),
-                      priceAdjustment: parseFloat(priceStr) || 0,
+                      priceAdjustment: toCents(parseFloat(priceStr) || 0), // Bs decimal → centavos (contrato v11)
                       isDefault: oi === 0,
                       sortOrder: oi,
                     };
@@ -175,7 +176,7 @@ export function useMenuAdapter() {
             categoryId: category?.id || '',
             name: row.name,
             description: row.description || '',
-            price: Math.round(row.price * 100) / 100,
+            price: toCents(row.price), // row en Bs decimal (punto máquina) → CENTAVOS (contrato v11)
             currency: appConfig.all.currency.code,
             ivaPercentage: ivaPct,
             imageUrl: null,

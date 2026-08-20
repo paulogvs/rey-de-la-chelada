@@ -146,7 +146,7 @@ export function processPayment(db, { order_id, method, amount, iva_amount, refer
     // un refund se puede registrar aunque el pedido ya esté paid.
     // v11: enteros exactos — la tolerancia float (+0.001) ya no es necesaria.
     if (canonicalStatus === 'completed' && amountValue > remaining) {
-      throw new Error(`El monto excede el saldo pendiente. Restante: Bs ${(remaining / 100).toFixed(2)}`);
+      throw new Error(`El monto excede el saldo pendiente. Restante: Bs ${(remaining / 100).toFixed(2).replace('.', ',')}`);
     }
 
     const paymentId = randomUUID();

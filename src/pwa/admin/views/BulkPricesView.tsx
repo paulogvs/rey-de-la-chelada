@@ -13,7 +13,7 @@ import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
 import { Loader } from '@/ui/components/Loader';
-import { FormField } from '@/ui/components/FormField';
+import { MoneyInput } from '@/ui/components/MoneyInput/MoneyInput';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import {
   fetchAdminMenuItems,
@@ -28,7 +28,8 @@ interface BulkPricesViewProps {
 }
 
 interface FieldState {
-  value: string;
+  /** Precio en CENTAVOS (entero) — contrato v11. 0 = campo vacío/limpio. */
+  value: number;
   saved: 'ok' | 'err' | null;
 }
 
@@ -66,17 +67,17 @@ export function BulkPricesView({ token, onToast }: BulkPricesViewProps) {
       .filter(g => g.items.length > 0);
   }, [items, categories]);
 
-  const handleChange = useCallback((id: string, value: string) => {
-    setFields(prev => ({ ...prev, [id]: { value, saved: null } }));
+  const handleChange = useCallback((id: string, cents: number) => {
+    setFields(prev => ({ ...prev, [id]: { value: cents, saved: null } }));
   }, []);
 
-  // Collect only items with a valid numeric value (>= 0)
+  // Collect only items with a valid numeric value (> 0, en centavos)
   const collectUpdates = useCallback((): Array<{ id: string; price: number }> => {
     const updates: Array<{ id: string; price: number }> = [];
     for (const item of items) {
       const field = fields[item.id];
-      if (!field || field.value === '') continue;
-      const price = Number(field.value);
+      if (!field || field.value === 0) continue;
+      const price = field.value; // MoneyInput ya entrega centavos (contrato v11)
       if (Number.isNaN(price) || price < 0) continue;
       updates.push({ id: item.id, price });
     }
@@ -100,7 +101,7 @@ export function BulkPricesView({ token, onToast }: BulkPricesViewProps) {
       setFields(prev => {
         const next: Record<string, FieldState> = {};
         for (const u of updates) {
-          next[u.id] = { value: String(u.price), saved: okIds.has(u.id) ? 'err' : 'ok' };
+          next[u.id] = { value: u.price, saved: okIds.has(u.id) ? 'err' : 'ok' };
         }
         return { ...prev, ...next };
       });
@@ -128,7 +129,7 @@ export function BulkPricesView({ token, onToast }: BulkPricesViewProps) {
   }, [collectUpdates, token, onToast]);
 
   const filledCount = useMemo(
-    () => Object.values(fields).filter(f => f.value !== '').length,
+    () => Object.values(fields).filter(f => f.value !== 0).length,
     [fields]
   );
 
@@ -160,7 +161,6 @@ export function BulkPricesView({ token, onToast }: BulkPricesViewProps) {
             <div className="admin-bulk-grid">
               {group.items.map(item => {
                 const field = fields[item.id];
-                const value = field?.value ?? (item.price != null ? String(item.price) : '');
                 return (
                   <div key={item.id} className="admin-bulk-item">
                     <span className="admin-bulk-item__name" title={item.name}>
@@ -169,13 +169,11 @@ export function BulkPricesView({ token, onToast }: BulkPricesViewProps) {
                     </span>
                     <div className="admin-price-input">
                       <span className="admin-price-input__prefix">Bs</span>
-                      <FormField
-                        type="text"
-                        inputMode="decimal"
+                      <MoneyInput
                         variant="sm" className="form-input--mono"
-                        value={value}
+                        value={field?.value ?? item.price ?? 0}
                         placeholder="—"
-                        onChange={e => handleChange(item.id, e.target.value.replace(',', '.'))}
+                        onChange={cents => handleChange(item.id, cents)}
                         aria-label={`Precio de ${item.name}`}
                       />
                       {field?.saved === 'ok' && <span className="admin-bulk-item__ok"><AppIcon name="check" size="sm" /></span>}

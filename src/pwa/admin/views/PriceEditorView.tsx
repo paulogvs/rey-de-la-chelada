@@ -14,6 +14,7 @@ import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
 import { Loader } from '@/ui/components/Loader';
 import { FormField } from '@/ui/components/FormField';
+import { MoneyInput } from '@/ui/components/MoneyInput/MoneyInput';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import {
   fetchAdminMenuItems,
@@ -29,7 +30,8 @@ interface PriceEditorViewProps {
 }
 
 interface ItemDraft {
-  value: string;
+  /** Precio en CENTAVOS (entero) — contrato v11. */
+  value: number;
   saving: boolean;
   saved: 'ok' | 'err' | null;
 }
@@ -71,27 +73,29 @@ export function PriceEditorView({ token, onToast }: PriceEditorViewProps) {
 
   const nullCount = useMemo(() => items.filter(i => i.price == null).length, [items]);
 
-  const handleDraftChange = useCallback((id: string, value: string) => {
-    setDrafts(prev => ({ ...prev, [id]: { value, saving: false, saved: null } }));
+  const handleDraftChange = useCallback((id: string, cents: number) => {
+    setDrafts(prev => ({ ...prev, [id]: { value: cents, saving: false, saved: null } }));
   }, []);
 
   const handleSave = useCallback(async (item: AdminMenuItem) => {
     const draft = drafts[item.id];
-    const price = Number(draft?.value);
-    if (draft == null || Number.isNaN(price) || price < 0) {
-      setDrafts(prev => ({ ...prev, [item.id]: { value: '', saving: false, saved: 'err' } }));
+    // MoneyInput ya entrega centavos (parseMoneyInput) — el server SIEMPRE
+    // recibe el precio en centavos enteros (contrato v11).
+    const price = draft?.value;
+    if (draft == null || price == null || Number.isNaN(price) || price < 0) {
+      setDrafts(prev => ({ ...prev, [item.id]: { value: 0, saving: false, saved: 'err' } }));
       onToast('error', 'Precio inválido');
       return;
     }
 
-    setDrafts(prev => ({ ...prev, [item.id]: { value: String(price), saving: true, saved: null } }));
+    setDrafts(prev => ({ ...prev, [item.id]: { value: price, saving: true, saved: null } }));
     const result = await updateMenuItemPrice(token, item.id, price);
     if (result.ok) {
       setItems(prev => prev.map(i => (i.id === item.id ? { ...i, price } : i)));
-      setDrafts(prev => ({ ...prev, [item.id]: { value: String(price), saving: false, saved: 'ok' } }));
+      setDrafts(prev => ({ ...prev, [item.id]: { value: price, saving: false, saved: 'ok' } }));
       onToast('success', `${item.name}: ${formatMoney(price)}`);
     } else {
-      setDrafts(prev => ({ ...prev, [item.id]: { value: String(price), saving: false, saved: 'err' } }));
+      setDrafts(prev => ({ ...prev, [item.id]: { value: price, saving: false, saved: 'err' } }));
       onToast('error', `Error al guardar ${item.name}`);
     }
     // Clear saved feedback after a moment
@@ -154,7 +158,6 @@ export function PriceEditorView({ token, onToast }: PriceEditorViewProps) {
           <div className="admin-price-list">
             {filtered.map(item => {
               const draft = drafts[item.id];
-              const value = draft?.value ?? (item.price != null ? String(item.price) : '');
               return (
                 <div key={item.id} className="admin-price-row">
                   <div className="admin-price-row__info">
@@ -165,13 +168,11 @@ export function PriceEditorView({ token, onToast }: PriceEditorViewProps) {
                   <div className="admin-price-row__edit">
                     <div className="admin-price-input">
                       <span className="admin-price-input__prefix">Bs</span>
-                      <FormField
-                        type="text"
-                        inputMode="decimal"
+                      <MoneyInput
                         variant="sm" className="form-input--mono"
-                        value={value}
+                        value={draft?.value ?? item.price ?? 0}
                         placeholder="—"
-                        onChange={e => handleDraftChange(item.id, e.target.value.replace(',', '.'))}
+                        onChange={cents => handleDraftChange(item.id, cents)}
                         onKeyDown={e => { if (e.key === 'Enter') handleSave(item); }}
                         aria-label={`Precio de ${item.name}`}
                       />
