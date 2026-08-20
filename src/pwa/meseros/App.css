@@ -290,14 +290,25 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  scroll-behavior: smooth;
   background: var(--glass-bg-strong);
   backdrop-filter: var(--glass-blur-strong);
   -webkit-backdrop-filter: var(--glass-blur-strong);
   border-bottom: 1px solid var(--glass-border);
   flex-shrink: 0;
+  position: relative; /* ancla la máscara ::after (FASE B) */
 }
 
 .order-panel__categories::-webkit-scrollbar { display: none; }
+
+/* FASE B — máscara de degradado lateral (fade) sobre los tabs */
+.order-panel__categories::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, var(--bg) 0%, transparent 6%, transparent 94%, var(--bg) 100%);
+}
 
 .order-panel__cat-btn {
   display: inline-flex;
@@ -388,7 +399,7 @@
 
 .order-panel__content {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 35%);
   gap: var(--space-4);
   flex: 1;
   min-height: 0;
@@ -2117,5 +2128,89 @@
 
   .order-panel__content {
     padding-top: var(--space-2);
+  }
+}
+
+/* ============================================================
+   FASE C — Tipografía operativa sans (decisión del usuario 2026-08-20)
+   PWA Meseros pasa de serif (Playfair, --font-display) a sans
+   (--font-body) en TODA la UI operativa. Se preservan tamaños y
+   colores; solo cambia la familia + peso + tracking.
+   Zero hardcoded — solo tokens.
+   ============================================================ */
+
+[data-pwa="meseros"] h1,
+[data-pwa="meseros"] h2,
+[data-pwa="meseros"] h3,
+[data-pwa="meseros"] h4,
+[data-pwa="meseros"] .meseros-header__title,
+[data-pwa="meseros"] .order-panel__cart-title,
+[data-pwa="meseros"] .order-panel__active-header h3,
+[data-pwa="meseros"] .order-panel__round-group-title,
+[data-pwa="meseros"] .order-panel__round-title,
+[data-pwa="meseros"] .order-panel__mod-card-title,
+[data-pwa="meseros"] .payment-panel__summary-header h3,
+[data-pwa="meseros"] .payment-panel__tip h4,
+[data-pwa="meseros"] .payment-panel__splits-header h4,
+[data-pwa="meseros"] .payment-panel__invoice h4,
+[data-pwa="meseros"] .waiter-calls__header h2,
+[data-pwa="meseros"] .waiter-calls__call-table {
+  font-family: var(--font-body);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+/* ============================================================
+   FASE E — Mobile bottom-sheet (≤1023px) — carrito colapsable fijo
+   al pie. Reusa el estado cartExpanded existente en OrderPanel.tsx
+   (toggle ya aplica la clase `--expanded` al contenedor; sin JSX).
+   Solo layout visual — contratos de datos intactos.
+   ============================================================ */
+
+@media (max-width: 1023px) {
+  .order-panel__content {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .order-panel__items {
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .order-panel__cart {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    z-index: var(--z-floating);
+    max-height: 64px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    background: var(--glass-bg-strong);
+    backdrop-filter: var(--glass-blur-strong);
+    -webkit-backdrop-filter: var(--glass-blur-strong);
+    transition: max-height var(--duration-normal) var(--ease-out);
+  }
+
+  .order-panel__cart--expanded {
+    max-height: 92dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .order-panel__cart:not(.order-panel__cart--expanded) .order-panel__cart-body {
+    display: none;
+  }
+
+  .order-panel__cart .order-panel__actions {
+    border-radius: 0;
+    margin-left: 0;
+    margin-right: 0;
+    margin-bottom: calc(-1 * var(--space-4));
   }
 }

@@ -202,6 +202,15 @@ class ThemeManager {
       this._setProp(root, `--touch-${key}`, val);
     });
 
+    // 12.5 Scrollbars (from tokens.json SSOT — doradas globales, FASE A)
+    const scrollbar = this._tokens.scrollbar;
+    if (scrollbar) {
+      this._setProp(root, '--scrollbar-size', scrollbar.size);
+      this._setProp(root, '--scrollbar-thumb', scrollbar.thumb);
+      this._setProp(root, '--scrollbar-thumb-hover', scrollbar['thumb-hover']);
+      this._setProp(root, '--scrollbar-track', scrollbar.track);
+    }
+
     // 13. Theme attribute for CSS selectors
     root.setAttribute('data-theme', theme);
 

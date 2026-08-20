@@ -170,6 +170,7 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  scroll-behavior: smooth;
   background: var(--glass-bg-strong);
   backdrop-filter: var(--glass-blur-strong);
   -webkit-backdrop-filter: var(--glass-blur-strong);
@@ -178,6 +179,15 @@
 }
 
 .clientes-categories::-webkit-scrollbar { display: none; }
+
+/* FASE B — máscara de degradado lateral (fade) sobre los pills */
+.clientes-categories::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, var(--bg) 0%, transparent 6%, transparent 94%, var(--bg) 100%);
+}
 
 .clientes-categories__btn {
   display: inline-flex;
@@ -249,7 +259,7 @@
 }
 
 .clientes-category-title {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: var(--text-2xl);
   font-weight: 700;
   color: var(--text-strong);

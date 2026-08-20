@@ -39,17 +39,9 @@ html {
   }
 }
 
-/* ---- Scrollbar (Dark Theme) ---- */
-[data-theme="dark"]::-webkit-scrollbar {
-  width: 8px;
-}
-[data-theme="dark"]::-webkit-scrollbar-track {
-  background: var(--bg);
-}
-[data-theme="dark"]::-webkit-scrollbar-thumb {
-  background: var(--surface-elevated);
-  border-radius: var(--radius-full);
-}
+/* ---- Scrollbar (FASE A: global dorada theme-agnostic) ----
+   Las reglas de scrollbar viven en scrollbars.css (importado DESPUÉS
+   de este archivo). Tokens: --scrollbar-* definidos en tokens.json (SSOT). */
 
 /* ---- Selection ---- */
 ::selection {

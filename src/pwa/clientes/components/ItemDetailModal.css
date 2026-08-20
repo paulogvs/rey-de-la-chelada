@@ -97,7 +97,7 @@
 }
 
 .clientes-detail__name {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: var(--text-3xl);
   font-weight: 700;
   color: var(--text-strong);

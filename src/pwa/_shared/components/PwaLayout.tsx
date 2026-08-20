@@ -9,6 +9,7 @@
 
 import React, { type ReactNode } from 'react';
 import '@/ui/tokens/tokens.css';
+import '@/ui/tokens/scrollbars.css';
 import '@/ui/tokens/responsive.css';
 
 interface PwaLayoutProps {

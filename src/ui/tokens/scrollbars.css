@@ -1,0 +1,41 @@
+/* ============================================================
+   SCROLLBARS — doradas globales (theme-agnostic) — FASE A
+   
+   Los tokens se definen en tokens.json (SSOT) y theme.js los
+   emite en :root. Este archivo se importa DESPUÉS de tokens.css
+   para que las reglas no se pierdan si tokens.css se regenera.
+   
+   ZERO hardcoded — solo CSS vars / color-mix.
+   Los contenedores táctiles (tabs de categorías) conservan su
+   `scrollbar-width: none` + `::-webkit-scrollbar { display:none }`.
+   ============================================================ */
+
+:root {
+  --scrollbar-size: 6px;
+  --scrollbar-thumb: color-mix(in srgb, var(--dorado-rey) 32%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--dorado-rey) 50%, transparent);
+  --scrollbar-track: transparent;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
