@@ -10,6 +10,11 @@ import {
   fetchClosingCurrent,
   openClosing,
   closeClosing,
+  processMixedPayment,
+  fetchPayments,
+  fetchPaymentProof,
+  fetchFinancialSummary,
+  uploadPaymentProof,
   type PaymentPayload,
   type PaymentResult,
 } from '../../src/pwa/_shared/api/paymentsApi';
@@ -51,6 +56,61 @@ describe('processPayment', () => {
     expect(result.ok).toBe(false);
     expect(result.code).toBe('PAYMENT_CONFLICT');
     expect(result.payment).toBeNull();
+  });
+});
+
+describe('financial mixed payment API', () => {
+  it('POSTs mixed allocations in cents and normalizes the server result', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      success: true,
+      operation_id: 'op-1',
+      payments: [{ id: 'p-cash', method: 'cash', amount: 4000 }],
+      by_method: { cash: 4000, qr: 6000 },
+      remaining: 0,
+      is_fully_paid: true,
+    }, 201));
+    const result = await processMixedPayment('tok-1', {
+      order_id: 'o1',
+      idempotency_key: 'op-client-1',
+      allocations: [
+        { method: 'cash', amount: 4000, received: 5000 },
+        { method: 'qr', amount: 6000, reference: 'bank-1' },
+      ],
+    }, fetchMock as unknown as typeof fetch);
+
+    expect(result.ok).toBe(true);
+    expect(result.isFullyPaid).toBe(true);
+    expect(result.byMethod).toEqual({ cash: 4000, qr: 6000 });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/payments/mixed');
+    expect(JSON.parse(init.body as string)).toEqual(expect.objectContaining({
+      order_id: 'o1', idempotency_key: 'op-client-1',
+    }));
+  });
+
+  it('lists payments and fetches proof metadata through authenticated clients', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ success: true, payments: [{ id: 'p1', amount: 100 }] }))
+      .mockResolvedValueOnce(jsonResponse({ success: true, proof: { payment_id: 'p1', status: 'pending' } }));
+    const payments = await fetchPayments('tok-1', { orderId: 'o1' }, fetchMock as unknown as typeof fetch);
+    const proof = await fetchPaymentProof('tok-1', 'p1', fetchMock as unknown as typeof fetch);
+    expect(payments.data?.payments).toHaveLength(1);
+    expect(proof.data?.proof.status).toBe('pending');
+    expect((fetchMock.mock.calls[0] as [string])[0]).toContain('order_id=o1');
+  });
+
+  it('normalizes server financial summary and keeps proof upload independently observable', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ success: true, today: {
+        date: '2026-08-21', total: 10000, cash: 4000, received_total: 5000, change_total: 1000,
+        payments: [{ method: 'cash', count: 1, total: 4000 }, { method: 'qr', count: 1, total: 6000 }],
+      } }))
+      .mockResolvedValueOnce(jsonResponse({ success: false, error: 'proof unavailable', code: 'PROOF_UPLOAD_ERROR' }, 500));
+    const summary = await fetchFinancialSummary('tok-1', fetchMock as unknown as typeof fetch);
+    const proofUpload = await uploadPaymentProof('tok-1', 'p-qr', 'data:image/jpeg;base64,abc', fetchMock as unknown as typeof fetch);
+    expect(summary.data?.summary).toMatchObject({ total: 10000, cash: 4000, changeTotal: 1000 });
+    expect(proofUpload.ok).toBe(false);
+    expect(proofUpload.code).toBe('PROOF_UPLOAD_ERROR');
   });
 });
 

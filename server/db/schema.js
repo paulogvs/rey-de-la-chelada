@@ -36,7 +36,7 @@
 //   - order_items.promo_label TEXT NULL â€” 'Promo' cuando la lÃ­nea se facturÃ³ con
 //     promo_price (el ticket imprime "(Promo)" discreto para la caja).
 //   Las 3 son ADD COLUMN no destructivas (los registros existentes quedan con defaults).
-const SCHEMA_VERSION = 11;
+const SCHEMA_VERSION = 12;
 
 const CREATE_TABLES = [
   // â”€â”€ Staff / Users (v5: 4 roles â€” admin, mesero, kds, caja) â”€â”€â”€â”€â”€
@@ -197,7 +197,8 @@ const CREATE_TABLES = [
     processed_by  TEXT NOT NULL,
     processed_at  TEXT NOT NULL DEFAULT (datetime('now')),
     notes         TEXT NOT NULL DEFAULT '',
-    proof_photo   TEXT NOT NULL DEFAULT '',  -- v8: ruta del comprobante QR (ej. /payment-proofs/xxx.jpg)
+     proof_photo   TEXT NOT NULL DEFAULT '',  -- v8: ruta del comprobante QR (ej. /payment-proofs/xxx.jpg)
+     payment_operation_id TEXT,
     synced_at     TEXT,
     FOREIGN KEY (order_id) REFERENCES orders(id),
     FOREIGN KEY (processed_by) REFERENCES staff(id)
@@ -269,6 +270,39 @@ const CREATE_TABLES = [
     version   INTEGER PRIMARY KEY,
     applied_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
+
+  `CREATE TABLE IF NOT EXISTS payment_operations (
+    id              TEXT PRIMARY KEY,
+    order_id        TEXT NOT NULL,
+    total_amount    INTEGER NOT NULL,
+    status          TEXT NOT NULL CHECK(status IN ('pending','completed','failed','cancelled')),
+    idempotency_key TEXT NOT NULL UNIQUE,
+    created_by      TEXT NOT NULL,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (order_id) REFERENCES orders(id),
+    FOREIGN KEY (created_by) REFERENCES staff(id)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS payment_proofs (
+    id          TEXT PRIMARY KEY,
+    payment_id  TEXT NOT NULL,
+    storage_key TEXT NOT NULL UNIQUE,
+    mime        TEXT NOT NULL,
+    size        INTEGER NOT NULL,
+    hash        TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
+    reviewer    TEXT,
+    supersedes  TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (payment_id) REFERENCES payments(id),
+    FOREIGN KEY (reviewer) REFERENCES staff(id),
+    FOREIGN KEY (supersedes) REFERENCES payment_proofs(id)
+  )`,
+
+  `CREATE INDEX IF NOT EXISTS idx_payment_operations_order ON payment_operations(order_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_payment_proofs_payment ON payment_proofs(payment_id)`,
 ];
 
 /**
@@ -384,7 +418,13 @@ function applySchema(db) {
         migrateMoneyToCentsV11(db);
         console.log('[DB] Migration v11: dinero a centavos (INTEGER ×100)');
       }
-      // Record schema version
+       if (!hasColumn(db, 'payments', 'payment_operation_id')) {
+         db.exec('ALTER TABLE payments ADD COLUMN payment_operation_id TEXT');
+       }
+       // v12: financial operation and private proof metadata tables are created
+       // with IF NOT EXISTS so partially upgraded databases remain repairable.
+       db.exec(CREATE_TABLES.filter(sql => sql.includes('payment_operations') || sql.includes('payment_proofs') || sql.includes('idx_payment_')).join(';'));
+       // Record schema version
       db.prepare(`INSERT OR REPLACE INTO schema_version (version) VALUES (?)`).run(SCHEMA_VERSION);
     });
 

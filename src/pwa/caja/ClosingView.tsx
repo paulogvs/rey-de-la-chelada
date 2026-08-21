@@ -70,12 +70,9 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
     load();
   }, [load, refreshTick]);
 
-  // Derived: expected cash = opening balance + today's cash sales (if any closing)
-  const expectedCash =
-    (closing?.expected_cash ?? 0) +
-    (closing && closing.expected_cash !== undefined && closing.expected_cash > 0
-      ? 0
-      : (daily?.byMethod['cash'] ?? 0));
+  // The financial service already includes opening balance and cash sales.
+  // Never add the daily report again: mixed payments are already split server-side.
+  const expectedCash = closing?.expected_cash ?? 0;
 
   const difference = actualCash - expectedCash; // v11: centavos exactos
 

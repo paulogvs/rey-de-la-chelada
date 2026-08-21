@@ -19,16 +19,15 @@ import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { PriceDisplay } from '@/ui/components/PriceDisplay';
 import { Loader } from '@/ui/components/Loader';
-import { SegmentedControl, type SegmentedOption } from '@/ui/components/SegmentedControl';
 import { useToast } from '@/ui/components/Toast';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
-import { MoneyInput } from '@/ui/components/MoneyInput/MoneyInput';
 import { apiFetch } from '../_shared/api/apiFetch';
-import { processPayment, uploadPaymentProof } from '../_shared/api/paymentsApi';
+import { processMixedPayment, processPayment, uploadPaymentProof } from '../_shared/api/paymentsApi';
+import { MixedPaymentEditor } from '../_shared/components/MixedPaymentEditor';
+import { buildMixedPaymentPayload, previewAllocations } from '../_shared/utils/paymentAllocations';
 import type { Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
-import { METHOD_LABELS, methodIcon } from '../_shared/utils/paymentMethods';
 import { formatMoney } from '../_shared/utils/format';
 import { appConfig } from '@/core/config/app.config';
 
@@ -40,17 +39,16 @@ interface PaymentPanelProps {
   onBack: () => void;
 }
 
-const METHOD_OPTIONS: SegmentedOption[] = [
-  { value: 'cash', label: (<><AppIcon name={methodIcon('cash')} size="sm" /> {METHOD_LABELS.cash}</>) },
-  { value: 'qr', label: (<><AppIcon name={methodIcon('qr')} size="sm" /> {METHOD_LABELS.qr}</>) },
-];
-
 export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack }: PaymentPanelProps) {
   const { addToast } = useToast();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loadingOrder, setLoadingOrder] = useState(true);
   const [method, setMethod] = useState<PaymentMethod>('cash');
+  const [paymentMode, setPaymentMode] = useState<'simple' | 'mixed'>('simple');
+  const [cashAmount, setCashAmount] = useState(0);
+  const [qrAmount, setQrAmount] = useState(0);
+  const [reference, setReference] = useState('');
   const [received, setReceived] = useState<number>(0);
   const [processing, setProcessing] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
@@ -87,9 +85,12 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
   }, [orderId, token, addToast]);
 
   const amountToCollect = order?.total ?? 0;
-  const change = method === 'cash' && received > amountToCollect
-    ? received - amountToCollect // v11: centavos exactos
-    : 0;
+  const preview = previewAllocations(amountToCollect, paymentMode === 'mixed'
+    ? [
+      ...(cashAmount > 0 ? [{ method: 'cash' as const, amount: cashAmount, received: received || undefined }] : []),
+      ...(qrAmount > 0 ? [{ method: 'qr' as const, amount: qrAmount, reference }] : []),
+    ]
+    : [{ method, amount: amountToCollect, ...(method === 'cash' ? { received: received || amountToCollect } : {}) }]);
 
   // Tomar foto del comprobante QR (FASE 5): lee el archivo y lo guarda en
   // estado (data URL). Se sube al server DESPUÉS de cobrar (necesita el
@@ -109,24 +110,25 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
     if (!order) return;
     setProcessing(true);
     try {
-      const result = await processPayment(token, {
-        order_id: order.id,
-        amount: amountToCollect,
-        method,
-        received: method === 'cash' && received > 0 ? received : undefined,
-      });
-      if (!result.ok) {
+      const idempotencyKey = crypto.randomUUID();
+      const result = paymentMode === 'mixed'
+        ? await processMixedPayment(token, buildMixedPaymentPayload(order.id, [
+          ...(cashAmount > 0 ? [{ method: 'cash' as const, amount: cashAmount, received: received || undefined }] : []),
+          ...(qrAmount > 0 ? [{ method: 'qr' as const, amount: qrAmount, reference }] : []),
+        ], idempotencyKey))
+        : await processPayment(token, { order_id: order.id, amount: amountToCollect, method, reference, received: method === 'cash' ? (received || amountToCollect) : undefined, idempotency_key: idempotencyKey });
+      if (!result.ok || (paymentMode === 'mixed' && (!preview.valid || preview.total !== amountToCollect))) {
         addToast({ type: 'error', message: result.error || 'Error al registrar el pago', duration: 5000 });
         return;
       }
 
-      // Si es QR y se tomó foto del comprobante → subirla enlazada al pago
-      if (method === 'qr' && proofPhoto && result.payment?.id) {
+      const qrPayments = 'payments' in result ? result.payments : (result.payment?.method === 'qr' && result.payment ? [result.payment] : []);
+      if (proofPhoto && qrPayments.length > 0) {
         setUploadingProof(true);
-        const upload = await uploadPaymentProof(token, result.payment.id, proofPhoto);
+        const uploads = await Promise.all(qrPayments.map(payment => uploadPaymentProof(token, payment.id, proofPhoto)));
         setUploadingProof(false);
-        if (!upload.ok) {
-          addToast({ type: 'warning', message: upload.error || 'Pago OK pero no se guardó la foto', duration: 5000 });
+        if (uploads.some(upload => !upload.ok)) {
+          addToast({ type: 'warning', message: 'Pago OK pero no se guardó uno o más comprobantes', duration: 5000 });
         }
       }
 
@@ -142,7 +144,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
     } finally {
       setProcessing(false);
     }
-  }, [order, amountToCollect, method, received, proofPhoto, token, table.number, addToast, onPaymentComplete]);
+  }, [order, amountToCollect, method, paymentMode, cashAmount, qrAmount, reference, received, proofPhoto, preview, token, table.number, addToast, onPaymentComplete]);
 
   if (loadingOrder) {
     return <div className="payment-panel"><Loader block label="Cargando pedido…" /></div>;
@@ -183,103 +185,32 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
         />
       </Card>
 
-      {/* Payment (FASE 5: 1 solo método, monto FIJO no editable) */}
-      <Card className="payment-panel__splits">
-        <div className="payment-panel__splits-header">
-          <h4>Forma de pago</h4>
-        </div>
-
-        <SegmentedControl
-          className="payment-panel__method"
-          options={METHOD_OPTIONS}
-          value={method}
-          onChange={v => setMethod(v as PaymentMethod)}
-        />
-
-        {/* Monto a cobrar — FIJO, NO editable */}
-        <div className="payment-panel__amount-fixed">
-          <span className="payment-panel__amount-label">Monto a cobrar</span>
-          <span className="payment-panel__amount-value">{formatMoney(amountToCollect)}</span>
-        </div>
-
-        {method === 'cash' && (
-          <>
-            <div className="payment-panel__cash-fields">
-              <label htmlFor="payment-received" className="payment-panel__cash-label">
-                Efectivo recibido (Bs) — dinero que entra al restobar
-              </label>
-              <MoneyInput
-                id="payment-received"
-                className="payment-panel__received"
-                value={received}
-                placeholder="Bs"
-                onChange={setReceived}
-              />
-            </div>
-
-            {change > 0 && (
-              <p className="payment-panel__change">
-                Cambio a devolver: <strong className="payment-panel__change-amount">{formatMoney(change)}</strong>
-              </p>
-            )}
-          </>
-        )}
-
-        {method === 'qr' && (
-          <div className="payment-panel__qr-block">
-            {qrEnabled ? (
-              <div className="payment-panel__split-qr">
-                {/* QR ESTÁTICO del restobar — no se genera dinámicamente */}
-                <img
-                  src={qrImageUrl}
-                  alt="QR de pago del restobar"
-                  className="payment-panel__qr-image"
-                />
-                <p className="payment-panel__qr-hint">
-                  El cliente escanea y transfiere <strong>{formatMoney(amountToCollect)}</strong>
-                </p>
-                <p className="payment-panel__qr-cashnote">
-                  <AppIcon name="smartphone" size="sm" /> El QR NO es dinero físico — se registra como depósito digital en el flujo de caja.
-                </p>
-
-                <Button
-                  variant="secondary"
-                  fullWidth
-                  onClick={() => document.getElementById('payment-proof-input')?.click()}
-                  loading={uploadingProof}
-                  disabled={uploadingProof || processing}
-                >
-                  <AppIcon name="camera" size="sm" /> {proofPhoto ? 'Cambiar foto del comprobante' : 'Tomar foto del comprobante'}
-                </Button>
-                <input
-                  id="payment-proof-input"
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  style={{ display: 'none' }}
-                  onChange={e => {
-                    const file = e.target.files?.[0];
-                    if (file) handleTakePhoto(file);
-                    e.target.value = '';
-                  }}
-                />
-                {proofPhoto && (
-                  <img src={proofPhoto} alt="Comprobante" className="payment-panel__proof-preview" />
-                )}
-              </div>
-            ) : (
-              <div className="payment-panel__qr-disabled">
-                <AppIcon name="alert" size="sm" /> El QR de pago no está configurado. El administrador debe subir la imagen del QR.
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="payment-panel__remaining">
-          <span>Total a pagar:</span>
-          <span className="payment-panel__remaining-amount">{formatMoney(amountToCollect)}</span>
-        </div>
-      </Card>
+      <MixedPaymentEditor
+        total={amountToCollect}
+        mode={paymentMode}
+        method={method}
+        cashAmount={cashAmount}
+        qrAmount={qrAmount}
+        received={received}
+        reference={reference}
+        onModeChange={setPaymentMode}
+        onMethodChange={setMethod}
+        onCashAmountChange={setCashAmount}
+        onQrAmountChange={setQrAmount}
+        onReceivedChange={setReceived}
+        onReferenceChange={setReference}
+        qrEnabled={qrEnabled}
+      />
+      {(method === 'qr' || paymentMode === 'mixed') && qrEnabled && (
+        <Card className="payment-panel__qr-block">
+          <img src={qrImageUrl} alt="QR de pago del restobar" className="payment-panel__qr-image" />
+          <Button variant="secondary" fullWidth onClick={() => document.getElementById('payment-proof-input')?.click()} loading={uploadingProof} disabled={uploadingProof || processing}>
+            <AppIcon name="camera" size="sm" /> {proofPhoto ? 'Cambiar foto del comprobante' : 'Tomar foto del comprobante'}
+          </Button>
+          <input id="payment-proof-input" type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => { const file = e.target.files?.[0]; if (file) handleTakePhoto(file); e.target.value = ''; }} />
+          {proofPhoto && <img src={proofPhoto} alt="Comprobante" className="payment-panel__proof-preview" />}
+        </Card>
+      )}
 
       {/* Invoice info */}
       <Card className="payment-panel__invoice">
@@ -305,8 +236,8 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
           loading={processing}
           disabled={
             processing ||
-            (method === 'cash' && received > 0 && received < amountToCollect) ||
-            (method === 'qr' && !qrEnabled)
+            !preview.valid || (paymentMode === 'mixed' && preview.total !== amountToCollect) ||
+            ((method === 'qr' || paymentMode === 'mixed') && !qrEnabled)
           }
           fullWidth
         >

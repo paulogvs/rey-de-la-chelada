@@ -25,6 +25,7 @@ import { getDb } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { computeTotals, round2 } from '../../src/core/config/iva.js';
 import { resolveModifierAdjustment, resolveItemUnitPrice } from '../services/order-pricing.js';
+import { recordPayment } from '../services/financial/payment-service.js';
 
 const router = Router();
 
@@ -400,42 +401,18 @@ router.post('/push', requireAuth, (req, res) => {
             continue;
           }
 
-          // F3-2: received/change viajan con el payment (efectivo al centavo).
-          const receivedValue = Math.max(0, Number(order.received) || order.amount || 0);
-          const changeValue = Math.max(0, Number(order.change) || Math.max(0, receivedValue - (order.amount || 0)));
-          db.prepare(`
-            INSERT INTO payments (id, order_id, method, amount, iva_amount, received, change, reference,
-                                  status, processed_by, notes, synced_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?)
-          `).run(
+          recordPayment(db, {
             paymentId,
             orderId,
             method,
-            order.amount || 0,
-            order.iva_amount || 0,
-            receivedValue,
-            changeValue,
-            order.reference || '',
-            order.processed_by || req.user.sub,
-            order.notes || '',
-            new Date().toISOString()
-          );
-
-          // Actualizar estado de pago del pedido
-          // C2: solo completed cuenta; FASE 3: sin propina → SUM(amount).
-          const ord = db.prepare('SELECT total FROM orders WHERE id = ?').get(orderId);
-          const totalPaid = db.prepare(`
-            SELECT COALESCE(SUM(amount), 0) as paid FROM payments
-            WHERE order_id = ? AND status = 'completed'
-          `).get(orderId).paid;
-          if (ord && totalPaid >= ord.total) {
-            db.prepare(`
-              UPDATE orders SET is_paid = 1, paid_at = datetime('now'),
-                                payment_method = ?, payment_reference = ?,
-                                status = 'paid', synced_at = ?
-              WHERE id = ?
-            `).run(method, order.reference || '', new Date().toISOString(), orderId);
-          }
+            amount: order.amount,
+            ivaAmount: order.iva_amount,
+            received: order.received,
+            reference: order.reference,
+            notes: order.notes,
+            processedBy: order.processed_by || req.user.sub,
+            idempotencyKey: `sync:${paymentId}`,
+          });
 
           results.push({ client_id: order.client_id || paymentId, server_id: paymentId, status: 'created' });
         }

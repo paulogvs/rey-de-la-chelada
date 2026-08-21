@@ -13,7 +13,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { fetchPendingOrders, type Order } from '../_shared/api/ordersApi';
-import { processPayment, uploadPaymentProof } from '../_shared/api/paymentsApi';
+import { processMixedPayment, processPayment, uploadPaymentProof } from '../_shared/api/paymentsApi';
 import { Card } from '@/ui/components/Card';
 import { Button } from '@/ui/components/Button';
 import { Badge } from '@/ui/components/Badge';
@@ -27,6 +27,7 @@ import { MoneyInput } from '@/ui/components/MoneyInput/MoneyInput';
 import { METHOD_LABELS, methodIcon, PAYMENT_METHODS } from '../_shared/utils/paymentMethods';
 import { formatMoney } from '../_shared/utils/format';
 import { appConfig } from '@/core/config/app.config';
+import { buildMixedPaymentPayload } from '../_shared/utils/paymentAllocations';
 import './CollectView.css';
 
 interface CollectViewProps {
@@ -71,11 +72,16 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [method, setMethod] = useState<(typeof PAYMENT_METHODS)[number]>('cash');
+  const [paymentMode, setPaymentMode] = useState<'simple' | 'mixed'>('simple');
+  const [cashAmount, setCashAmount] = useState(0);
+  const [qrAmount, setQrAmount] = useState(0);
+  const [reference, setReference] = useState('');
   const [received, setReceived] = useState(0);
   const [paying, setPaying] = useState(false);
   // FASE 5: foto del comprobante QR (data URL) — se sube tras cobrar
   const [proofPhoto, setProofPhoto] = useState<string | null>(null);
   const [uploadingProof, setUploadingProof] = useState(false);
+  const [breakdowns, setBreakdowns] = useState<Record<string, { cash: number; qr: number }>>({});
 
   const qrEnabled = appConfig.all.payments.qrEnabled;
   const qrImageUrl = appConfig.all.payments.qrImageUrl;
@@ -118,28 +124,33 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
           addToast({ type: 'warning', message: 'El pedido ya está cubierto', duration: 3000 });
           return;
         }
-        const result = await processPayment(token, {
-          order_id: order.id,
-          amount: remaining,
-          method,
-          received: method === 'cash' && received > 0 ? received : undefined,
-        });
+        const idempotencyKey = crypto.randomUUID();
+        const allocationInputs = [
+          ...(cashAmount > 0 ? [{ method: 'cash' as const, amount: cashAmount, received: received || undefined }] : []),
+          ...(qrAmount > 0 ? [{ method: 'qr' as const, amount: qrAmount, reference }] : []),
+        ];
+        const result = paymentMode === 'mixed'
+          ? await processMixedPayment(token, buildMixedPaymentPayload(order.id, allocationInputs, idempotencyKey))
+          : await processPayment(token, { order_id: order.id, amount: remaining, method, idempotency_key: idempotencyKey, reference, received: method === 'cash' ? (received || remaining) : undefined });
         if (!result.ok) {
           addToast({ type: 'error', message: result.error || 'Error al procesar el pago', duration: 5000 });
           return;
         }
+        if ('byMethod' in result) setBreakdowns(current => ({ ...current, [order.id]: result.byMethod }));
 
         // FASE 5: si es QR y hay foto → subir enlazada al pago
-        if (method === 'qr' && proofPhoto && result.payment?.id) {
+        const qrPayments = 'payments' in result ? result.payments : (result.payment?.method === 'qr' && result.payment ? [result.payment] : []);
+        if (proofPhoto && qrPayments.length > 0) {
           setUploadingProof(true);
-          const upload = await uploadPaymentProof(token, result.payment.id, proofPhoto);
+          const uploads = await Promise.all(qrPayments.map(payment => uploadPaymentProof(token, payment.id, proofPhoto)));
           setUploadingProof(false);
-          if (!upload.ok) {
-            addToast({ type: 'warning', message: upload.error || 'Pago OK pero no se guardó la foto', duration: 5000 });
+          if (uploads.some(upload => !upload.ok)) {
+            addToast({ type: 'warning', message: 'Pago OK pero no se guardó uno o más comprobantes', duration: 5000 });
           }
         }
 
-        if (result.fullyPaid) {
+        const fullyPaid = 'isFullyPaid' in result ? result.isFullyPaid : result.fullyPaid;
+        if (fullyPaid) {
           addToast({
             type: 'success',
             message: `Mesa ${order.tableNumber} cobrada`,
@@ -163,7 +174,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
         setPaying(false);
       }
     },
-    [token, method, received, proofPhoto, addToast, onPaid, load]
+    [token, method, paymentMode, cashAmount, qrAmount, reference, received, proofPhoto, addToast, onPaid, load]
   );
 
   if (loading && orders.length === 0) {
@@ -248,9 +259,14 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                     showBreakdown
                     className="caja-collect__order-total"
                   />
-                  {order.paidAmount > 0 && (
+                   {order.paidAmount > 0 && (
                     <p className="caja-collect__paid-hint">
                       Ya cobrado: {formatMoney(order.paidAmount)} · Saldo: {formatMoney(remaining)}
+                    </p>
+                   )}
+                  {breakdowns[order.id] && (
+                    <p className="caja-collect__paid-hint">
+                      Último cobro server: efectivo {formatMoney(breakdowns[order.id].cash)} · QR {formatMoney(breakdowns[order.id].qr)}
                     </p>
                   )}
 
@@ -266,7 +282,24 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                       />
                     </div>
 
-                    {method === 'cash' && (
+                    <div className="caja-collect__pay-field">
+                      <label>Modalidad</label>
+                      <SegmentedControl options={[{ value: 'simple', label: 'Un método' }, { value: 'mixed', label: 'Mixto' }]} value={paymentMode} onChange={value => setPaymentMode(value as 'simple' | 'mixed')} />
+                    </div>
+
+                    {paymentMode === 'mixed' ? (
+                      <div className="caja-collect__pay-field">
+                        <label htmlFor={`mixed-cash-${order.id}`}>Efectivo aplicado</label>
+                        <MoneyInput id={`mixed-cash-${order.id}`} value={cashAmount} onChange={setCashAmount} placeholder="Bs" />
+                        <label htmlFor={`mixed-received-${order.id}`}>Efectivo recibido</label>
+                        <MoneyInput id={`mixed-received-${order.id}`} value={received} onChange={setReceived} placeholder="Bs" />
+                        <label htmlFor={`mixed-qr-${order.id}`}>QR aplicado</label>
+                        <MoneyInput id={`mixed-qr-${order.id}`} value={qrAmount} onChange={setQrAmount} placeholder="Bs" />
+                        <label htmlFor={`mixed-ref-${order.id}`}>Referencia QR</label>
+                        <input id={`mixed-ref-${order.id}`} value={reference} onChange={event => setReference(event.target.value)} />
+                        <p>Asignado: {formatMoney(cashAmount + qrAmount)} · Saldo: {formatMoney(Math.max(0, remaining - cashAmount - qrAmount))}</p>
+                      </div>
+                    ) : method === 'cash' && (
                       <div className="caja-collect__pay-field">
                         <label htmlFor={`received-${order.id}`}>Efectivo recibido</label>
                         <MoneyInput
@@ -284,7 +317,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                       </div>
                     )}
 
-                    {method === 'qr' && (
+                    {(method === 'qr' || paymentMode === 'mixed') && (
                       <div className="caja-collect__pay-field">
                         {qrEnabled ? (
                           <>
@@ -294,9 +327,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                                 alt="QR de pago del restobar"
                                 className="caja-collect__qr-image"
                               />
-                              <p className="caja-collect__qr-hint">
-                                El cliente transfiere <strong>{formatMoney(remaining)}</strong> escaneando el QR
-                              </p>
+                              <p className="caja-collect__qr-hint">El cliente transfiere por QR el importe asignado.</p>
                               <Button
                                 variant="secondary"
                                 size="sm"
@@ -336,7 +367,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                       variant="primary"
                       fullWidth
                       loading={paying}
-                      disabled={paying}
+                       disabled={paying || (paymentMode === 'mixed' && (cashAmount + qrAmount <= 0 || cashAmount + qrAmount > remaining)) || ((method === 'qr' || paymentMode === 'mixed') && !qrEnabled)}
                       onClick={() => handlePay(order)}
                     >
                       Cobrar {formatMoney(remaining)}

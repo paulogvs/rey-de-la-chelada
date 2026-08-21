@@ -32,12 +32,14 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { businessDayDateStr, businessDayExpr } from '../utils/date-utils.js';
 import { toCents } from '../../src/core/config/iva.js'; // v11: centavos
 import { logger } from '../utils/logger.js'; // S1/T2: errores de pago/corte al log diario
 import { broadcastOrderToCaja } from '../services/order-broadcaster.js'; // S2-D: caja real-time
+import { recordPayment, recordMixedPayment } from '../services/financial/payment-service.js';
 
 const router = Router();
 
@@ -87,9 +89,9 @@ const PAYMENT_STATUS_MAP = {
  * @param {object} db — better-sqlite3
  * @param {{ order_id, method, amount, iva_amount, reference, notes, status, processed_by, received }} args
  */
-export function processPayment(db, { order_id, method, amount, iva_amount, reference, notes, status, processed_by, received }) {
-  const canonicalMethod = PAYMENT_METHOD_MAP[method];
-  const canonicalStatus = PAYMENT_STATUS_MAP[status || 'completed'];
+export function processPayment(db, args) {
+  const canonicalMethod = PAYMENT_METHOD_MAP[args.method];
+  const canonicalStatus = PAYMENT_STATUS_MAP[args.status || 'completed'];
 
   // B2 (2026-08-13): defensa en profundidad — la ruta ya valida amount,
   // pero este es el punto de entrada ÚNICO para registrar pagos. Antes
@@ -99,108 +101,21 @@ export function processPayment(db, { order_id, method, amount, iva_amount, refer
   // v11 (2026-08-19): CENTAVOS — el API espera enteros en centavos. Por
   // tolerancia con clientes legacy que aún manden Bs con decimales ("10.5"),
   // si el número no es entero se convierte con toCents (10.5 → 1050).
-  const rawAmount = Number(amount);
+  const rawAmount = Number(args.amount);
   if (!Number.isFinite(rawAmount) || rawAmount < 0) {
-    throw new Error(`El monto es inválido: ${String(amount)} (debe ser un número ≥ 0)`);
+    throw new Error(`El monto es inválido: ${String(args.amount)} (debe ser un número ≥ 0)`);
   }
   const amountValue = Number.isInteger(rawAmount) ? rawAmount : toCents(rawAmount);
 
-  if (!canonicalMethod) {
-    throw new Error(`Método de pago inválido: ${method}`);
+  if (!canonicalMethod || !canonicalStatus) {
+    throw new Error(`Método de pago inválido: ${args.method}`);
   }
 
   // F3-2: efectivo al centavo. received = lo que entrega el cliente.
   // Si no se envía (retrocompat) → received = amount, change = 0.
-  let receivedValue = amountValue;
-  let changeValue = 0;
-  if (received !== undefined && received !== null) {
-    const rawReceived = Number(received);
-    receivedValue = Number.isInteger(rawReceived) ? rawReceived : toCents(rawReceived);
-    if (canonicalMethod !== 'cash') {
-      throw new Error('El campo received solo aplica a pagos en efectivo');
-    }
-    if (receivedValue < amountValue) {
-      throw new Error('Cambio inválido: el monto recibido es menor al cobrado');
-    }
-    changeValue = receivedValue - amountValue; // centavos enteros
-  }
-
-  const execute = db.transaction(() => {
-    const order = db.prepare('SELECT id, total, iva_amount, status FROM orders WHERE id = ?').get(order_id);
-    if (!order) {
-      throw new Error(`Pedido no encontrado: ${order_id}`);
-    }
-    if (order.status === 'cancelled') {
-      throw new Error('No se puede pagar un pedido cancelado');
-    }
-
-    // C2: solo completed cuenta como cobrado. FASE 3: sin propina → SUM(amount).
-    const paid = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total_paid FROM payments
-      WHERE order_id = ? AND status = 'completed'
-    `).get(order_id);
-    const remaining = round2((order.total || 0) - paid.total_paid); // centavos enteros
-
-    // C2: la constraint de saldo SOLO aplica a pagos que cuentan como
-    // cobrados (completed). failed/refunded se registran sin tocar el saldo:
-    // un refund se puede registrar aunque el pedido ya esté paid.
-    // v11: enteros exactos — la tolerancia float (+0.001) ya no es necesaria.
-    if (canonicalStatus === 'completed' && amountValue > remaining) {
-      throw new Error(`El monto excede el saldo pendiente. Restante: Bs ${(remaining / 100).toFixed(2).replace('.', ',')}`);
-    }
-
-    const paymentId = randomUUID();
-    // SSOT IVA: si el cliente no envía iva_amount, derivar del pedido
-    // (orders.iva_amount) — evita pagos con IVA 0 inconsistentes.
-    const ivaAmount = iva_amount ?? order.iva_amount ?? 0;
-    db.prepare(`
-      INSERT INTO payments (id, order_id, method, amount, iva_amount, received, change, reference,
-                            status, processed_by, notes, synced_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      paymentId, order_id, canonicalMethod, amountValue, ivaAmount, receivedValue, changeValue, reference || '',
-      canonicalStatus, processed_by, notes || '', new Date().toISOString()
-    );
-
-    // El nuevo pago solo aporta al saldo si es completed
-    const isCompleted = canonicalStatus === 'completed';
-    const totalPaid = paid.total_paid + (isCompleted ? amountValue : 0);
-    const fullyPaid = isCompleted && totalPaid >= (order.total || 0); // centavos exactos
-
-    // Update order payment state
-    db.prepare(`
-      UPDATE orders SET is_paid = ?,
-                        payment_method = CASE WHEN ? THEN ? ELSE payment_method END,
-                        payment_reference = CASE WHEN ? THEN ? ELSE payment_reference END,
-                        paid_at = CASE WHEN ? THEN datetime('now') ELSE paid_at END,
-                        status = CASE WHEN ? THEN 'paid' ELSE status END,
-                        updated_at = datetime('now')
-      WHERE id = ?
-    `).run(
-      fullyPaid ? 1 : 0,
-      isCompleted ? 1 : 0, canonicalMethod,
-      isCompleted ? 1 : 0, reference || '',
-      fullyPaid ? 1 : 0, fullyPaid ? 1 : 0,
-      order_id
-    );
-
-    // If fully paid, free the table (if no other active orders)
-    if (fullyPaid) {
-      const table = db.prepare('SELECT table_id FROM orders WHERE id = ?').get(order_id);
-      if (table && table.table_id) {
-        const activeOrders = db.prepare(
-          "SELECT id FROM orders WHERE table_id = ? AND status NOT IN ('paid','cancelled') AND id != ?"
-        ).get(table.table_id, order_id);
-        if (!activeOrders) {
-          db.prepare("UPDATE tables SET status = 'free', current_order_id = NULL WHERE id = ?").run(table.table_id);
-        }
-      }
-    }
-
-    return { paymentId, fullyPaid, remaining: round2(remaining - (isCompleted ? amountValue : 0)) };
-  });
-
-  return execute();
+  return recordPayment(db, { orderId: args.order_id, method: canonicalMethod, amount: amountValue,
+    ivaAmount: args.iva_amount, reference: args.reference, notes: args.notes, status: canonicalStatus,
+    processedBy: args.processed_by, received: args.received, idempotencyKey: args.idempotency_key });
 }
 
 export function round2(n) {
@@ -299,7 +214,7 @@ router.get('/:id', requireAuth, (req, res) => {
 
 router.post('/', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res) => {
   try {
-    const { order_id, amount, method, iva_amount, reference, notes, status, received } = req.body;
+    const { order_id, amount, method, iva_amount, reference, notes, status, received, idempotency_key } = req.body;
 
     if (!order_id || amount === undefined || !method) {
       return res.status(400).json({
@@ -352,6 +267,7 @@ router.post('/', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res)
     const db = getDb();
     const result = processPayment(db, {
       order_id, amount, method, iva_amount, reference, notes, status, received,
+      idempotency_key,
       processed_by: req.user.sub,
     });
 
@@ -378,7 +294,10 @@ router.post('/', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res)
       remaining: result.remaining,
     });
   } catch (err) {
-    if (err.message.startsWith('Cambio inválido')) {
+    if (err.code === 'IDEMPOTENCY_CONFLICT' || err.code === 'IDEMPOTENCY_REQUIRED') {
+      return res.status(409).json({ success: false, error: err.message, code: err.code });
+    }
+    if (err.message.includes('received') || err.message.startsWith('Cambio inválido')) {
       return res.status(400).json({ success: false, error: err.message, code: 'INVALID_RECEIVED' });
     }
     const known = err.message.startsWith('El monto') || err.message.startsWith('Método') ||
@@ -388,6 +307,21 @@ router.post('/', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res)
     }
     logger.error('[Payments] Create error:', err.message);
     res.status(500).json({ success: false, error: 'Error al procesar pago', code: 'PAYMENT_CREATE_ERROR' });
+  }
+});
+
+// POST /api/payments/mixed — una operación atómica con cash + QR.
+router.post('/mixed', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res) => {
+  try {
+    const { order_id, allocations, idempotency_key } = req.body || {};
+    if (!order_id || !Array.isArray(allocations) || !idempotency_key) {
+      return res.status(400).json({ success: false, error: 'order_id, allocations e idempotency_key son requeridos', code: 'PAYMENT_DATA_REQUIRED' });
+    }
+    const result = recordMixedPayment(getDb(), { orderId: order_id, allocations, idempotencyKey: idempotency_key, processedBy: req.user.sub });
+    res.status(201).json({ success: true, ...result });
+  } catch (err) {
+    const status = ['IDEMPOTENCY_CONFLICT', 'ORDER_CLOSED', 'ORDER_NOT_FOUND', 'PAYMENT_CONFLICT'].includes(err.code) ? 409 : 400;
+    res.status(status).json({ success: false, error: err.message, code: err.code || 'PAYMENT_INVALID' });
   }
 });
 
@@ -438,7 +372,15 @@ router.post('/:id/proof', proofJsonParser, requireAuth, requireRole('admin', 'me
 
     const ext = mimeMatch[1].toLowerCase() === 'png' ? 'png' : mimeMatch[1].toLowerCase() === 'webp' ? 'webp' : 'jpg';
     const base64Data = mimeMatch[2];
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64Data) || base64Data.length % 4 === 1) {
+      return res.status(400).json({ success: false, error: 'Base64 inválido', code: 'INVALID_PROOF_IMAGE' });
+    }
     const buffer = Buffer.from(base64Data, 'base64');
+
+    const magic = (ext === 'png' && buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) ||
+      (ext === 'jpg' && buffer.subarray(0, 3).equals(Buffer.from([255, 216, 255]))) ||
+      (ext === 'webp' && buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP');
+    if (!magic) return res.status(400).json({ success: false, error: 'El contenido no coincide con el MIME', code: 'INVALID_PROOF_IMAGE' });
 
     // Límite defensivo: ~8 MB (fotos de teléfono comprimidas)
     if (buffer.length > 8 * 1024 * 1024) {
@@ -461,12 +403,28 @@ router.post('/:id/proof', proofJsonParser, requireAuth, requireRole('admin', 'me
       payment.notes || 'Comprobante QR adjunto',
       payment.id
     );
+    db.prepare(`INSERT OR REPLACE INTO payment_proofs (id, payment_id, storage_key, mime, size, hash, status)
+      VALUES (?, ?, ?, ?, ?, ?, 'pending')`).run(randomUUID(), payment.id, filename, `image/${ext === 'jpg' ? 'jpeg' : ext}`, buffer.length, createHash('sha256').update(buffer).digest('hex'));
 
     res.json({ success: true, proof_photo: proofUrl, message: 'Comprobante guardado' });
   } catch (err) {
     logger.error('[Payments] Proof upload error:', err.message);
     res.status(500).json({ success: false, error: 'Error al guardar el comprobante', code: 'PROOF_UPLOAD_ERROR' });
   }
+});
+
+router.get('/:id/proof', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res) => {
+  const proof = getDb().prepare('SELECT id, payment_id, storage_key, mime, size, hash, status, reviewer, supersedes, created_at, updated_at FROM payment_proofs WHERE payment_id = ? ORDER BY created_at DESC LIMIT 1').get(req.params.id);
+  if (!proof) return res.status(404).json({ success: false, error: 'Comprobante no encontrado', code: 'PROOF_NOT_FOUND' });
+  res.json({ success: true, proof });
+});
+
+router.get('/:id/proof/content', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res) => {
+  const proof = getDb().prepare('SELECT storage_key, mime FROM payment_proofs WHERE payment_id = ? ORDER BY created_at DESC LIMIT 1').get(req.params.id);
+  if (!proof || !/^[0-9a-f-]+\.(png|jpg|webp)$/.test(proof.storage_key)) return res.status(404).json({ success: false, error: 'Comprobante no encontrado', code: 'PROOF_NOT_FOUND' });
+  const file = path.join(PROOF_DIR, proof.storage_key);
+  if (!fs.existsSync(file)) return res.status(404).json({ success: false, error: 'Archivo no encontrado', code: 'PROOF_FILE_NOT_FOUND' });
+  res.type(proof.mime).sendFile(file);
 });
 
 // ============================================================
