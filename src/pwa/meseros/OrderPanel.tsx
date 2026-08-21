@@ -28,6 +28,8 @@ import { filterMenuItems } from '../_shared/utils/filterMenuItems';
 import { getCategoriesForArea, type AreaTab } from '../_shared/utils/menuAreas';
 import { fetchMenuCategories, fetchMenuItems, fetchMenuItemDetail, type MenuItem } from '../_shared/api/menuApi';
 import { createOrder, fetchOrderById, deliverOrder, addOrderItem, removeOrderItem, type Order } from '../_shared/api/ordersApi';
+import { BottomCartBar } from './components/BottomCartBar';
+import { CartModal } from './components/CartModal';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
 import { computeTotals } from '@/core/config/iva';
@@ -73,7 +75,7 @@ interface OrderPanelProps {
   onRequestPayment: (orderId: string) => void;
 }
 
-interface CartItem {
+export interface CartItem {
   menuItem: MenuItem;
   quantity: number;
   selectedModifiers: ModifierOption[];
@@ -139,6 +141,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
   const [itemManualPrice, setItemManualPrice] = useState(0);
   const [itemApplyPromo, setItemApplyPromo] = useState(false);
   const [cartExpanded, setCartExpanded] = useState(false);
+  const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [loadingMenu, setLoadingMenu] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
@@ -288,6 +291,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
       });
       setCart([]);
       setEditMode(false);
+      setIsCartModalOpen(false);
       setActiveOrderTick(t => t + 1);
     } catch (err) {
       console.error('[OrderPanel] add items error:', err);
@@ -438,6 +442,10 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
     setCart(prev => prev.map((ci, i) => (i === index ? { ...ci, quantity } : ci)));
   }, []);
 
+  const handleCartNotesChange = useCallback((index: number, notes: string) => {
+    setCart(prev => prev.map((ci, i) => (i === index ? { ...ci, notes } : ci)));
+  }, []);
+
   // FASE 4A: crear pedido en UNA llamada — POST /api/orders crea directo
   // 'confirmed' y el server lo envía al KDS al instante (adiós submit/confirm).
   const placeOrder = useCallback(async () => {
@@ -472,6 +480,7 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
         return;
       }
 
+      setIsCartModalOpen(false);
       onOrderPlaced(created.order.id);
       if (typeof navigator.vibrate === 'function') navigator.vibrate(10);
     } catch (err) {
@@ -949,6 +958,30 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
           </div>
         </div>
       </div>
+
+      {/* Mobile — Bottom Bar + Modal carrito editable (≤768px) */}
+      <BottomCartBar
+        quantity={cartSummary.totalQuantity}
+        total={cartTotal}
+        onOpen={() => setIsCartModalOpen(true)}
+      />
+      <CartModal
+        open={isCartModalOpen}
+        onClose={() => setIsCartModalOpen(false)}
+        cart={cart}
+        onUpdateQuantity={updateQuantity}
+        onRemove={removeFromCart}
+        onNotesChange={handleCartNotesChange}
+        cartTotal={cartTotal}
+        savings={savings}
+        onConfirm={editMode ? handleAddItemsToActiveOrder : placeOrder}
+        submitting={submitting}
+        businessDay={businessDay}
+        businessDayNameLabel={businessDayNameLabel}
+        activePromos={activePromos}
+        onApplyPromo={handleApplyPromo}
+        onClearPromo={handleClearPromo}
+      />
 
       {/* Item detail modal */}
       <Modal

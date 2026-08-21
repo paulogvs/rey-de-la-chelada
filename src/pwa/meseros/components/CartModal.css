@@ -1,0 +1,66 @@
+/* CartModal — móvil bottom sheet, scroll independiente */
+
+.cart-modal .modal-sheet {
+  max-height: 92dvh;
+}
+
+.cart-modal__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.cart-modal__scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  max-height: 58dvh;
+  padding-right: var(--space-1);
+}
+
+.cart-modal__item {
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
+.cart-modal__notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.cart-modal__notes-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.cart-modal__textarea {
+  min-height: 64px;
+}
+
+.cart-modal__footer {
+  display: flex;
+  gap: var(--space-3);
+  position: sticky;
+  bottom: 0;
+  background: var(--glass-bg-strong);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  padding-top: var(--space-2);
+}
+
+@media (min-width: 769px) {
+  .cart-modal {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .cart-modal__scroll {
+    max-height: 52dvh;
+  }
+}

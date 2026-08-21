@@ -2175,46 +2175,33 @@
   .order-panel__content {
     grid-template-columns: 1fr;
     overflow-y: auto;
-    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
   }
 
   .order-panel__items {
-    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
   }
 
+  /* Legacy bottom-sheet del carrito — oculto en nuevo diseño (reemplazado por BottomCartBar + CartModal).
+     Se mantiene oculto para preservar desktop 769+ intacto; móvil usa el nuevo bar/modal. */
   .order-panel__cart {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    max-width: 100%;
-    z-index: var(--z-floating);
-    max-height: 64px;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-    background: var(--glass-bg-strong);
-    backdrop-filter: var(--glass-blur-strong);
-    -webkit-backdrop-filter: var(--glass-blur-strong);
-    transition: max-height var(--duration-normal) var(--ease-out);
+    display: none !important;
   }
+}
 
-  .order-panel__cart--expanded {
-    max-height: 92dvh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
+/* ============================================================
+   NUEVO — Bottom Bar + Cart Modal (móvil ≤768px)
+   Zero hardcoded — solo tokens var(--...)
+   Bottom bar ~64px + safe-area, glass strong, z-floating
+   Cart modal usa Modal.css existente + scroll contain
+   ============================================================ */
 
-  .order-panel__cart:not(.order-panel__cart--expanded) .order-panel__cart-body {
-    display: none;
-  }
-
-  .order-panel__cart .order-panel__actions {
-    border-radius: 0;
-    margin-left: 0;
-    margin-right: 0;
-    margin-bottom: calc(-1 * var(--space-4));
+/* BottomCartBar y CartModal traen su propio CSS (components/*.css).
+   Reglas aquí son el espejo en App.css para auditoría de tokens
+   y para asegurar que desktop/tablet no muestren el bar/modal. */
+@media (min-width: 769px) {
+  .bottom-cart-bar,
+  .cart-modal {
+    display: none !important;
   }
 }
