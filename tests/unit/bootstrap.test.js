@@ -50,11 +50,12 @@ describe('ensureBootstrap', () => {
 
     // Sprint 1: precios REALES del seed cargados (los items BAR ya no son null).
     // Solo quedan NULL: 2 items "Consultar precio" (price_variable=1) + 1 promo
-    // display (Jueves de Chelada 2x1, price_variable=0, no facturable).
+    // display (Jueves de Chelada 2x1, price_variable=0, no facturable) + 5 pizzas
+    // (precio por variante Mediana/Familiar, base NULL por diseño).
     expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND price_variable = 1').get().n).toBe(2);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND price_variable = 0').get().n).toBe(1);
-    // El demo rellenó TODA la cocina (39 items con price null → precio)
-    expect(db.prepare("SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND area = 'cocina'").get().n).toBe(0);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND price_variable = 0').get().n).toBe(6);
+    // El demo rellenó TODA la cocina EXCEPTO pizzas (5 con price null por variante)
+    expect(db.prepare("SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND area = 'cocina'").get().n).toBe(5);
     // Sprint Promos (2026-08-19): Opción A aprobada — el seed ya NO trae
     // promo_price en Signature (Isla Dorada 40) ni artesanales (Negra 15).
     // El descuento vive en las promos por día laboral (botones manuales).

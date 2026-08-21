@@ -39,14 +39,14 @@ import {
 
 // ── Pricing plan: category → prices in sort_order ──────────
 // Sprint 1: SOLO categorías COCINA (el menú BAR ya tiene precios reales).
+// 2026-08-21: menú cocina real — Churrascos/Extras renombrados, Pizzas con precio por variante (no base).
 const PRICING_PLAN = {
-  'Ensaladas': [2800, 3200, 3800, 3400, 3000],
-  'Tablas y Canastas': [4500, 5200, 5800, 6800, 4200, 8500],
-  'Burgers & Sandwiches': [2800, 3200, 3000, 3800, 2600, 3400, 3000, 3500, 3200, 4000, 3600],
-  'Quesadillas': [3200, 3500, 3800],
-  'Pizzas': [5000, 5000, 5000, 5000], // base = Mediana; sizes adjust via modifier options
-  'Empanadas': [1400, 1500, 1600, 1400, 1700, 1500, 1200],
-  'Salsas y Extras': [600, 700, 800, 1000],
+  'Tablas y Canastas': [4500, 5200, 5800, 6800],
+  'Churrascos': [3500, 3000, 3500, 3500, 4000, 3800, 3800, 4000, 4500, 5000, 5000],
+  'Quesadillas': [3200, 3200, 3800],
+  // Pizzas: precio va por variante (Mediana/Familiar) en modifier_options, no en item.price
+  'Empanadas': [1800, 1200, 1200, 1200, 1200, 1200, 1200],
+  'Extras': [800, 1000],
 };
 
 /** Categoría display de promociones — nunca facturable, jamás recibe demo price. */
@@ -181,6 +181,8 @@ export function applyDemoPrices(db, { log = console.log, dryRun = false, reset =
       // Sprint 1: el demo SOLO rellena items sin precio. Nunca pisa precios
       // reales del seed, ni items "Consultar precio" (price_variable = 1),
       // ni categorías display no facturables (Promociones).
+      // 2026-08-21: Pizzas no tienen precio base (van por variante Mediana/Familiar)
+      if (category === 'Pizzas') return;
       if (item.price !== null) return;
       if (item.price_variable === 1) return;
       if (DISPLAY_ONLY_CATEGORIES.has(category)) return;
