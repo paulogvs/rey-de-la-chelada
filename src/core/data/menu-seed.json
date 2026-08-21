@@ -747,298 +747,130 @@
         "descripcion_area": "Platos calientes, fríos, picoteos, tablas y sándwiches",
         "categorias": [
           {
-            "nombre_categoria": "Ensaladas",
+            "nombre_categoria": "Tablas y Canastas",
             "items": [
               {
                 "id": "COC-001",
-                "nombre": "César Tradicional",
-                "ingredientes": [
-                  "Lechuga crespa",
-                  "Abundante pollo salteado"
-                ],
-                "precio": null,
+                "nombre": "Canasta Rey",
+                "descripcion": "Cama de papas fritas, pollo o carne, queso derretido, tocino crocante, cebollín picado.",
+                "precio": 5500,
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
                 "id": "COC-002",
-                "nombre": "King César",
-                "ingredientes": [
-                  "Lechuga",
-                  "Crutones",
-                  "Pollo salteado",
-                  "Aliño César"
-                ],
-                "precio": null,
+                "nombre": "Pichanga para 2",
+                "descripcion": "Papas fritas, carne, pollo, salchichas, queso fundido, huevo frito, cebolla frita, chorizo.",
+                "precio": 6500,
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
                 "id": "COC-003",
-                "nombre": "El Rey",
-                "ingredientes": [
-                  "Mix verde",
-                  "Lechuga crespa",
-                  "Rácula",
-                  "Berros",
-                  "Manzana verde",
-                  "Corona de palta",
-                  "Pollo",
-                  "Nueces"
-                ],
-                "precio": null,
+                "nombre": "Tabla Fría",
+                "descripcion": "Aceitunas, pechuga ahumada, salame, queso, pepinillos.",
+                "precio": 3500,
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
                 "id": "COC-004",
-                "nombre": "Romántica",
-                "ingredientes": [
-                  "Corazones de tomate",
-                  "Queso de cabra",
-                  "Albahaca",
-                  "Aceitunas verdes",
-                  "Nueces",
-                  "Almendras"
-                ],
-                "precio": null,
-                "area": "cocina",
-                "tiene_ice": false
-              },
-              {
-                "id": "COC-005",
-                "nombre": "Ensalada Surtida",
-                "ingredientes": [
-                  "Verduras de estación a elección del chef"
-                ],
-                "precio": null,
+                "nombre": "Tabla Rey",
+                "descripcion": "Trozos de lomo vetado, pechuga de pollo, camarones al pil pil, 4 empanadas de queso, chips de camote.",
+                "precio": 13000,
                 "area": "cocina",
                 "tiene_ice": false
               }
             ]
           },
           {
-            "nombre_categoria": "Tablas y Canastas",
+            "nombre_categoria": "Churrascos",
             "items": [
               {
+                "id": "COC-005",
+                "nombre": "Completo",
+                "descripcion": "Pan, carne, tomate, palta, chucrut, mayonesa.",
+                "precio": 3500,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
                 "id": "COC-006",
-                "nombre": "Canasta Rey",
-                "ingredientes": [
-                  "Cama de papas fritas",
-                  "Pollo o carne",
-                  "Queso derretido",
-                  "Tocino crocante",
-                  "Cebollín picado"
-                ],
-                "precio": null,
+                "nombre": "Especial",
+                "descripcion": "Pan, carne, tomate, mayonesa.",
+                "precio": 3000,
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
                 "id": "COC-007",
-                "nombre": "Canasta Mixta",
-                "ingredientes": [
-                  "Cama de papas fritas",
-                  "Pollo",
-                  "Carne",
-                  "Queso derretido",
-                  "Tocino crocante",
-                  "Cebollín picado"
-                ],
-                "precio": null,
+                "nombre": "Italiano",
+                "descripcion": "Pan, carne, tomate, palta, mayonesa.",
+                "precio": 3500,
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
                 "id": "COC-008",
-                "nombre": "Pichanaca para 2",
-                "ingredientes": [
-                  "Papas fritas",
-                  "Carne",
-                  "Pollo",
-                  "Salchichas",
-                  "Queso fundido",
-                  "Huevo frito",
-                  "Cebolla frita"
-                ],
-                "precio": null,
+                "nombre": "Barros Luco",
+                "descripcion": "Pan, carne y abundante queso fundido.",
+                "precio": 3500,
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
                 "id": "COC-009",
-                "nombre": "Pichanga para 4",
-                "ingredientes": [
-                  "Papas fritas",
-                  "Carne",
-                  "Pollo",
-                  "Salchichas",
-                  "Queso fundido",
-                  "Huevo frito",
-                  "Cebolla frita",
-                  "Palta"
-                ],
-                "precio": null,
+                "nombre": "Americano",
+                "descripcion": "Pan, carne, huevo frito, queso fundido y jamón.",
+                "precio": 4000,
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
                 "id": "COC-010",
-                "nombre": "Tabla Fría",
-                "ingredientes": [
-                  "Aceitunas",
-                  "Pechuga ahumada",
-                  "Salame",
-                  "Queso",
-                  "Pepinillos"
-                ],
-                "precio": null,
+                "nombre": "Brasileño",
+                "descripcion": "Pan, carne, queso fundido, palta, mayonesa.",
+                "precio": 3800,
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
                 "id": "COC-011",
-                "nombre": "Tabla Rey",
-                "ingredientes": [
-                  "Suculentos trozos de lomo vetado",
-                  "Trozos de pechuga de pollo",
-                  "Camarones al pil pil",
-                  "4 empanadas de queso",
-                  "Chips de camote"
-                ],
-                "precio": null,
+                "nombre": "Chacarero",
+                "descripcion": "Pan, carne, tomate, porotos verdes, ají verde, mayonesa.",
+                "precio": 3800,
                 "area": "cocina",
                 "tiene_ice": false
-              }
-            ]
-          },
-          {
-            "nombre_categoria": "Burgers & Sandwiches",
-            "items": [
+              },
               {
                 "id": "COC-012",
-                "nombre": "Barro Luco",
-                "ingredientes": [
-                  "Carne",
-                  "Abundante queso fundido"
-                ],
-                "precio": null,
+                "nombre": "Broaster Chicken",
+                "descripcion": "Pan, pechuga de pollo crocante, tomate, lechuga.",
+                "precio": 4000,
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
                 "id": "COC-013",
-                "nombre": "Broaster Chicken",
-                "ingredientes": [
-                  "Pechuga de pollo crocante",
-                  "Tomate",
-                  "Lechuga"
-                ],
-                "precio": null,
+                "nombre": "La Crispy",
+                "descripcion": "Pan, pollo frito crocante con tocino, queso cheddar fundido y mayonesa.",
+                "precio": 4500,
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
                 "id": "COC-014",
-                "nombre": "Americano",
-                "ingredientes": [
-                  "Carne",
-                  "Huevo frito",
-                  "Queso fundido",
-                  "Jamón"
-                ],
-                "precio": null,
+                "nombre": "Carnívoro Burger",
+                "descripcion": "Pan, doble carne, tocino crocante, queso cheddar, cebolla caramelizada.",
+                "precio": 5000,
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
                 "id": "COC-015",
-                "nombre": "Carnívoro Burguer",
-                "ingredientes": [
-                  "Doble carne",
-                  "Tocino crocante",
-                  "Queso cheddar",
-                  "Cebolla caramelizada"
-                ],
-                "precio": null,
-                "area": "cocina",
-                "tiene_ice": false
-              },
-              {
-                "id": "COC-016",
-                "nombre": "Especial",
-                "ingredientes": [
-                  "Carne",
-                  "Tomate",
-                  "Mayonesa"
-                ],
-                "precio": null,
-                "area": "cocina",
-                "tiene_ice": false
-              },
-              {
-                "id": "COC-017",
-                "nombre": "Italiano",
-                "ingredientes": [
-                  "Carne",
-                  "Tomate",
-                  "Palta",
-                  "Mayonesa"
-                ],
-                "precio": null,
-                "area": "cocina",
-                "tiene_ice": false
-              },
-              {
-                "id": "COC-018",
-                "nombre": "Completo",
-                "ingredientes": [
-                  "Carne",
-                  "Tomate",
-                  "Palta",
-                  "Chucrut",
-                  "Mayonesa"
-                ],
-                "precio": null,
-                "area": "cocina",
-                "tiene_ice": false
-              },
-              {
-                "id": "COC-019",
-                "nombre": "Chacarero",
-                "ingredientes": [
-                  "Carne",
-                  "Tomate",
-                  "Porotos verdes",
-                  "Ají verde",
-                  "Mayonesa"
-                ],
-                "precio": null,
-                "area": "cocina",
-                "tiene_ice": false
-              },
-              {
-                "id": "COC-020",
-                "nombre": "Brasileño",
-                "ingredientes": [
-                  "Carne",
-                  "Queso fundido",
-                  "Palta",
-                  "Mayonesa"
-                ],
-                "precio": null,
-                "area": "cocina",
-                "tiene_ice": false
-              },
-              {
-                "id": "COC-021",
-                "nombre": "La Crispy",
-                "ingredientes": [
-                  "Pollo frito crocante con tocino",
-                  "Queso cheddar fundido",
-                  "Mayonesa"
-                ],
-                "precio": null,
+                "nombre": "La Real Burger",
+                "descripcion": "Pan, base de carne y queso, elige hasta 3: tocino, cebolla caramelizada, lechuga, tomate, palta, queso cheddar.",
+                "precio": 5000,
                 "area": "cocina",
                 "tiene_ice": false
               }
@@ -1048,23 +880,26 @@
             "nombre_categoria": "Quesadillas",
             "items": [
               {
-                "id": "COC-022",
-                "nombre": "Quesadilla Carne",
-                "precio": null,
+                "id": "COC-016",
+                "nombre": "Carne",
+                "descripcion": "3 quesadillas de carne.",
+                "precio": 3200,
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
-                "id": "COC-023",
-                "nombre": "Quesadilla Pollo",
-                "precio": null,
+                "id": "COC-017",
+                "nombre": "Pollo",
+                "descripcion": "3 quesadillas de pollo.",
+                "precio": 3200,
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
-                "id": "COC-024",
-                "nombre": "Quesadilla Mixta",
-                "precio": null,
+                "id": "COC-018",
+                "nombre": "Mixta",
+                "descripcion": "3 quesadillas mixtas (carne y pollo).",
+                "precio": 3800,
                 "area": "cocina",
                 "tiene_ice": false
               }
@@ -1074,82 +909,60 @@
             "nombre_categoria": "Pizzas",
             "variantes_tamanos": [
               "Mediana",
-              "Familiar",
-              "XL"
+              "Familiar"
             ],
             "items": [
               {
-                "id": "COC-025",
+                "id": "COC-019",
+                "nombre": "La Elegida del Rey",
+                "descripcion": "Elige tus ingredientes: queso, carne, champiñones, piña, jamón, chorizo, aceitunas, salame, pepperoni, salsa pomodoro.",
+                "precios": {
+                  "mediana": 6000,
+                  "familiar": 8500
+                },
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-020",
                 "nombre": "La Rey",
-                "ingredientes": [
-                  "Salsa pomodoro",
-                  "Carne",
-                  "Queso fundido",
-                  "Champiñones",
-                  "Pimentón",
-                  "Orégano"
-                ],
+                "descripcion": "Salsa pomodoro, carne, queso fundido, champiñones, pimentón, orégano.",
                 "precios": {
-                  "mediana": null,
-                  "familiar": null,
-                  "xl": null
+                  "mediana": 5000,
+                  "familiar": 9000
                 },
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
-                "id": "COC-026",
+                "id": "COC-021",
                 "nombre": "Vegetariana",
-                "ingredientes": [
-                  "Salsa pomodoro",
-                  "Queso fundido",
-                  "Verduras variadas",
-                  "Orégano"
-                ],
+                "descripcion": "Salsa pomodoro, queso fundido, verduras variadas, orégano.",
                 "precios": {
-                  "mediana": null,
-                  "familiar": null,
-                  "xl": null
+                  "mediana": 4500,
+                  "familiar": 8000
                 },
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
-                "id": "COC-027",
+                "id": "COC-022",
                 "nombre": "La Tóxica",
-                "ingredientes": [
-                  "Salsa pomodoro",
-                  "Queso fundido",
-                  "Pepperoni",
-                  "Salame",
-                  "Jamón",
-                  "Chorizo",
-                  "Tocino",
-                  "Aceitunas negras",
-                  "Orégano"
-                ],
+                "descripcion": "Salsa pomodoro, queso fundido, pepperoni, salame, jamón, chorizo, tocino, aceitunas negras, orégano.",
                 "precios": {
-                  "mediana": null,
-                  "familiar": null,
-                  "xl": null
+                  "mediana": 5500,
+                  "familiar": 9500
                 },
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
-                "id": "COC-028",
+                "id": "COC-023",
                 "nombre": "Hawaiana",
-                "ingredientes": [
-                  "Salsa pomodoro",
-                  "Queso",
-                  "Jamón cocido",
-                  "Piña tropical",
-                  "Orégano"
-                ],
+                "descripcion": "Salsa pomodoro, queso, jamón, piña tropical, orégano.",
                 "precios": {
-                  "mediana": null,
-                  "familiar": null,
-                  "xl": null
+                  "mediana": 4800,
+                  "familiar": 8500
                 },
                 "area": "cocina",
                 "tiene_ice": false
@@ -1160,84 +973,70 @@
             "nombre_categoria": "Empanadas",
             "items": [
               {
-                "id": "COC-029",
+                "id": "COC-024",
                 "nombre": "Camarón Queso",
-                "precio": null,
+                "precio": 1800,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-025",
+                "nombre": "Choclo, Crema y Queso",
+                "precio": 1200,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-026",
+                "nombre": "Carne Queso",
+                "precio": 1200,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-027",
+                "nombre": "Pollo Queso",
+                "precio": 1200,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-028",
+                "nombre": "Casi Chaparrita",
+                "precio": 1200,
+                "area": "cocina",
+                "tiene_ice": false
+              },
+              {
+                "id": "COC-029",
+                "nombre": "Champiñón Queso",
+                "precio": 1200,
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
                 "id": "COC-030",
-                "nombre": "Choclo Crema, Queso",
-                "precio": null,
-                "area": "cocina",
-                "tiene_ice": false
-              },
-              {
-                "id": "COC-031",
-                "nombre": "Carne Queso",
-                "precio": null,
-                "area": "cocina",
-                "tiene_ice": false
-              },
-              {
-                "id": "COC-032",
-                "nombre": "Pollo Queso",
-                "precio": null,
-                "area": "cocina",
-                "tiene_ice": false
-              },
-              {
-                "id": "COC-033",
-                "nombre": "Casi Chaparrita",
-                "precio": null,
-                "area": "cocina",
-                "tiene_ice": false
-              },
-              {
-                "id": "COC-034",
-                "nombre": "Champiñón Queso",
-                "precio": null,
-                "area": "cocina",
-                "tiene_ice": false
-              },
-              {
-                "id": "COC-035",
                 "nombre": "Queso",
-                "precio": null,
+                "precio": 1200,
                 "area": "cocina",
                 "tiene_ice": false
               }
             ]
           },
           {
-            "nombre_categoria": "Salsas y Extras",
+            "nombre_categoria": "Extras",
             "items": [
               {
-                "id": "COC-036",
-                "nombre": "Salsa BBQ",
-                "precio": null,
-                "area": "cocina",
-                "tiene_ice": false
-              },
-              {
-                "id": "COC-037",
-                "nombre": "Salsa Verde",
-                "precio": null,
-                "area": "cocina",
-                "tiene_ice": false
-              },
-              {
-                "id": "COC-038",
+                "id": "COC-031",
                 "nombre": "Extra Queso",
-                "precio": null,
+                "precio": 800,
                 "area": "cocina",
                 "tiene_ice": false
               },
               {
-                "id": "COC-039",
+                "id": "COC-032",
                 "nombre": "Doble Tocino",
-                "precio": null,
+                "precio": 1000,
                 "area": "cocina",
                 "tiene_ice": false
               }

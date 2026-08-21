@@ -44,7 +44,7 @@ Decisiones SSOT documentadas en código (NO romper en FASE 3):
 | **Nº de mesas (SSOT)** | `src/core/config/app.config.ts` → `capacity.totalTables` (=10). Server lee `DEFAULT_TABLES` env con fallback al SSOT (ver `server/db/bootstrap.js` + `seed.js`). |
 | **DEFAULT_TABLES (.env)** | `DEFAULT_TABLES` en `.env` debe coincidir con `capacity.totalTables` del SSOT (10). GET /api/tables expone `capacity.totalTables` real (= nº de filas en `tables`); si `.env` difiere del SSOT, el seed lo sobreescribe y el cliente puede ver mesas de más/menos. |
 | **DB** | SQLite (better-sqlite3). NO postgres. `.env` → `DB_PATH` (default `data/rey-de-la-chelada.db`). |
-| **Menú (SSOT)** | `src/core/data/menu-seed.json` = **112 items / 21 categorías** (BAR 73: Micheladas Signature 8 + Especiales 3, Cheladas 6, Coctelería Clásica 16, Autor Exclusivo 3, Botellas 8, Jarras 4, Shots 3, Artesanal 4, Cerveza 2, Jugos 6, Gaseosas 3, Agua 1, Promociones 6 | COCINA 39: Ensaladas 5, Tablas y Canastas 6, Burgers & Sandwiches 10, Quesadillas 3, Pizzas 4, Empanadas 7, Salsas y Extras 4). 2 manuales `price_variable` (Negra Ahumada, Flor de Caña), 12 con `promo_price` (8 signature → 25, 4 artesanales → 12), 6 promos display `precio:null` (server las rechaza). `seed.js` NO siembra menú genérico (limpiado F1 2026-08-10); `bootstrap.js` carga el menú real vía `load-menu.js`. Precios SIEMPRE del server: `resolveItemUnitPrice` (promo > base > manual > ajuste > 400 PRICE_REQUIRED_MANUAL). |
+| **Menú (SSOT)** | `src/core/data/menu-seed.json` = **105 items / 20 categorías** (BAR 73: Micheladas Signature 8 + Especiales 3, Cheladas 6, Coctelería Clásica 16, Autor Exclusivo 3, Botellas 8, Jarras 4, Shots 3, Artesanal 4, Cerveza 2, Jugos 6, Gaseosas 3, Agua 1, Promociones 6 | COCINA 32: Tablas y Canastas 4, Churrascos 11, Quesadillas 3, Pizzas 5, Empanadas 7, Extras 2). 2 manuales `price_variable` (Negra Ahumada, Flor de Caña), 6 promos display `precio:null` (server las rechaza). `seed.js` NO siembra menú genérico (limpiado F1 2026-08-10); `bootstrap.js` carga el menú real vía `load-menu.js`. Precios SIEMPRE del server: `resolveItemUnitPrice` (promo > base > manual > ajuste > 400 PRICE_REQUIRED_MANUAL). Pizzas: `variantes_tamanos: [Mediana,Familiar]` con `precios:{mediana,familiar}` en centavos (ej. La Rey 5000/9000). |
 
 Scripts nuevos FASE 2: `scripts/cleanup-placeholder-data.mjs` (borra items placeholder del menú genérico sin uso; dry-run por defecto, `--yes` para borrar), `scripts/date-utils.mjs`.
 
@@ -83,7 +83,7 @@ rey-de-la-chelada/
 ├── src/
 │   ├── core/
 │   │   ├── config/         ← SSOT Config (app.config, pwa-registry, capabilities, security)
-│   │   ├── data/           ← SSOT menú real (menu-seed.json → 112 items, 21 categorías)
+│   │   ├── data/           ← SSOT menú real (menu-seed.json → 105 items, 20 categorías)
 │   │   ├── engine/         ← SSOT — motor de datos único (Table, Menu, Order)
 │   │   └── types/          ← Tipos compartidos (Table, Order, MenuItem, KDS, etc.)
 │   ├── modules/
