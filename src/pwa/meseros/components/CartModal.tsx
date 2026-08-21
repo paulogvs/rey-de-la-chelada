@@ -109,10 +109,12 @@ export function CartModal({
             </div>
           )}
 
-          {cart.length === 0 ? (
-            <p className="order-panel__cart-empty">Selecciona items del menú para agregar al pedido</p>
-          ) : (
-            cart.map((ci, index) => {
+          <section className="cart-modal__items" aria-label="Items del pedido">
+            <h3 className="cart-modal__items-title">Items del pedido</h3>
+            {cart.length === 0 ? (
+              <p className="order-panel__cart-empty">Selecciona items del menú para agregar al pedido</p>
+            ) : (
+              cart.map((ci, index) => {
               const modAdj = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
               const unit = ci.promoType
                 ? (resolveCartPromoUnitPrice(ci as PromoCartItem, businessDay) ?? 0)
@@ -178,8 +180,9 @@ export function CartModal({
                   </div>
                 </Card>
               );
-            })
-          )}
+              })
+            )}
+          </section>
 
           {cart.length > 0 && (
             <div className="order-panel__cart-total">
