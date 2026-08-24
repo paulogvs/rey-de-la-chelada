@@ -678,6 +678,8 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
           )}
         </div>
       )}
+      <div className="order-panel__split">
+        <div className="order-panel__menu-col">
       {/* Sprint 1 (C): buscador de meseros */}
       <div className="order-panel__search">
         <AppIcon name="search" size="sm" />
@@ -735,9 +737,8 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
         ))}
       </nav>
 
-      <div className="order-panel__content">
-        {/* Menu items */}
-        <div className="order-panel__items">
+          {/* Menu items */}
+          <div className="order-panel__items">
           {loadingMenu && <Loader label="Cargando menú…" />}
           {!loadingMenu && filteredItems.length === 0 && (
             <EmptyState compact icon={<AppIcon name="search" size="lg" />} message={searchQuery.trim() ? `Sin resultados para "${searchQuery}"` : 'Sin items en esta categoría'} />
@@ -775,6 +776,7 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
               )}
             </button>
           ))}
+          </div>
         </div>
 
         {/* Cart */}

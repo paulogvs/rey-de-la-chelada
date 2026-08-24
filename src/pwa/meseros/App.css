@@ -395,16 +395,24 @@
   box-shadow: var(--focus-ring);
 }
 
-/* ---- Contenido (2 columnas landscape) ---- */
+/* ---- Layout principal: 2/3 menú + 1/3 pedido (PC/tablet) ---- */
 
-.order-panel__content {
+.order-panel__split {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 35%);
+  grid-template-columns: 2fr 1fr;
   gap: var(--space-4);
   flex: 1;
   min-height: 0;
   overflow: hidden;
   padding: var(--space-4);
+}
+
+.order-panel__menu-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ---- Items del menú (tarjetas táctiles grandes) ---- */
@@ -1961,7 +1969,7 @@
    ============================================================ */
 
 @media (max-width: 768px) {
-  .order-panel__content {
+  .order-panel__split {
     grid-template-columns: 1fr;
     overflow-y: auto;
     gap: var(--space-2);
@@ -2096,10 +2104,10 @@
   }
 }
 
-/* Tablet: use the extra width for a denser product grid and a narrower cart. */
+/* Tablet: denser product grid, narrower cart. */
 @media (min-width: 769px) and (max-width: 1023px) {
-  .order-panel__content {
-    grid-template-columns: minmax(0, 1fr) 320px;
+  .order-panel__split {
+    grid-template-columns: 1fr 320px;
     gap: var(--space-3);
     padding: var(--space-3);
   }
@@ -2133,7 +2141,7 @@
     padding-bottom: var(--space-1);
   }
 
-  .order-panel__content {
+  .order-panel__split {
     padding-top: var(--space-2);
   }
 }
@@ -2179,7 +2187,7 @@
    ============================================================ */
 
 @media (max-width: 768px) {
-  .order-panel__content {
+  .order-panel__split {
     grid-template-columns: 1fr;
     overflow-y: auto;
     padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
