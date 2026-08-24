@@ -14,7 +14,7 @@
  *
  * ⚠️ FIX P0-1 (2026-08-11): ANTES, con seed `precios: {mediana: null, ...}`,
  * escribía price_adjustment = 0 en cada arranque → los ajustes de tamaño
- * de pizza (Mediana 0 / Familiar +20 / XL +40, aplicados por demo-prices)
+ * de pizza (solo Mediana/Familiar; precios absolutos del seed)
  * se perdían silenciosamente (pérdida de ingresos). Ahora, si el seed trae
  * null para un tamaño, CONSERVA el price_adjustment existente en la DB.
  */
@@ -31,7 +31,7 @@ import { randomUUID } from 'node:crypto';
  *
  * @param {object} db — better-sqlite3 database instance
  * @param {string} menuItemId — the menu_items.id
- * @param {object} sizeVariants — e.g. { mediana: 40, familiar: 60, xl: 80 }
+ * @param {object} sizeVariants — e.g. { mediana: 6000, familiar: 9000 }
  *   (null price = keep existing adjustment, not force 0)
  * @returns {string|null} groupId if created/updated, null if skipped
  */
@@ -64,8 +64,7 @@ export function createModifierGroupsForItem(db, menuItemId, sizeVariants) {
   }
 
   const sizeLabel = {
-    mediana: 'Mediana', familiar: 'Familiar', xl: 'XL',
-    pequena: 'Pequeña', grande: 'Grande',
+    mediana: 'Mediana', familiar: 'Familiar',
   };
 
   // ── UPSERT options por (group_id, name) — P0-1/P0-2 ───────────
@@ -82,6 +81,10 @@ export function createModifierGroupsForItem(db, menuItemId, sizeVariants) {
   `);
 
   let sortOrder = 0;
+  const officialLabels = sizes.map(sizeKey => sizeLabel[sizeKey] || sizeKey.charAt(0).toUpperCase() + sizeKey.slice(1));
+  const placeholders = officialLabels.map(() => '?').join(', ');
+  db.prepare(`DELETE FROM modifier_options WHERE group_id = ? AND name NOT IN (${placeholders})`)
+    .run(groupId, ...officialLabels);
   for (const sizeKey of sizes) {
     const label = sizeLabel[sizeKey] || sizeKey.charAt(0).toUpperCase() + sizeKey.slice(1);
     const seedPrice = sizeVariants[sizeKey];

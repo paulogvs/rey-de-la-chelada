@@ -263,7 +263,7 @@ Cambiar precios **de muchos productos a la vez** por categoría: eliges la categ
 
 ### 6.4 Tamaños (🍕)
 
-Precios de las **opciones/tamaños** de los productos que los tienen (ej. Mediana, Familiar, XL de las pizzas), uno por uno o en masa.
+Precios de las **opciones/tamaños** de los productos que los tienen (Mediana y Familiar de las pizzas), uno por uno o en masa.
 
 ### 6.5 Personal (👥)
 

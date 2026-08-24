@@ -27,7 +27,7 @@ const sig = (over = {}) => ({
   id: 'sig-1',
   name: 'Isla Dorada',
   category_id: 'cat-sig',
-  category_name: 'Micheladas Signature',
+  category_name: 'Micheladas Especiales',
   price: 4000,
   ...over,
 });

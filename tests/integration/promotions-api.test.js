@@ -89,7 +89,7 @@ async function ensureTable(number) {
 async function getMenuItems() {
   const menu = await api('/api/menu/items');
   const items = menu.json?.items || [];
-  const signature = items.find(i => i.category_name === 'Micheladas Signature' && i.price != null);
+  const signature = items.find(i => i.category_name === 'Micheladas Especiales' && i.price != null);
   const artesanal = items.find(i => i.category_name === 'Cerveza Artesanal' && i.price != null);
   return { signature, artesanal };
 }

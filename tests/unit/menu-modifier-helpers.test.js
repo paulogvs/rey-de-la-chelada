@@ -129,7 +129,7 @@ describe('createModifierGroupsForItem', () => {
 
   it('creates a "Tamaño" group for a pizza with size_variants', () => {
     const groupId = createModifierGroupsForItem(db, 'item-1', {
-      mediana: 40, familiar: 60, xl: 80,
+      mediana: 40, familiar: 60,
     });
     expect(groupId).toBeTruthy();
     const group = db.groups.get(groupId);
@@ -142,19 +142,18 @@ describe('createModifierGroupsForItem', () => {
 
   it('creates one modifier_option per size with correct price_adjustment', () => {
     const groupId = createModifierGroupsForItem(db, 'item-2', {
-      mediana: 40, familiar: 60, xl: 80,
+      mediana: 40, familiar: 60,
     });
     const opts = Array.from(db.options.values());
-    expect(opts.length).toBe(3);
+    expect(opts.length).toBe(2);
     const byName = Object.fromEntries(opts.map(o => [o.name, o]));
     expect(byName['Mediana'].price_adjustment).toBe(40);
     expect(byName['Familiar'].price_adjustment).toBe(60);
-    expect(byName['XL'].price_adjustment).toBe(80);
   });
 
   it('first option (Mediana) is marked as default', () => {
     const groupId = createModifierGroupsForItem(db, 'item-3', {
-      mediana: 40, familiar: 60, xl: 80,
+      mediana: 40, familiar: 60,
     });
     const opts = Array.from(db.options.values());
     const defaults = opts.filter(o => o.is_default);
@@ -182,12 +181,11 @@ describe('createModifierGroupsForItem', () => {
 
   it('preserves size order (sort_order matches input key order)', () => {
     const groupId = createModifierGroupsForItem(db, 'item-6', {
-      xl: 80, mediana: 40, familiar: 60,
+      mediana: 40, familiar: 60,
     });
     const opts = Array.from(db.options.values()).sort((a, b) => a.sort_order - b.sort_order);
-    expect(opts[0].name).toBe('XL');
-    expect(opts[1].name).toBe('Mediana');
-    expect(opts[2].name).toBe('Familiar');
+    expect(opts[0].name).toBe('Mediana');
+    expect(opts[1].name).toBe('Familiar');
   });
 
   it('is idempotent — re-running does not create duplicate group', () => {
@@ -195,26 +193,24 @@ describe('createModifierGroupsForItem', () => {
     expect(db.groups.size).toBe(1);
 
     // Re-seed with updated prices — should UPDATE the existing group, not insert
-    const secondId = createModifierGroupsForItem(db, 'item-7', { mediana: 45, familiar: 65, xl: 90 });
+    const secondId = createModifierGroupsForItem(db, 'item-7', { mediana: 45, familiar: 65 });
     expect(db.groups.size).toBe(1);
     expect(secondId).toBe(firstId);
 
     // Options should be replaced, not duplicated
     const opts = Array.from(db.options.values());
-    expect(opts.length).toBe(3);
+    expect(opts.length).toBe(2);
     const byName = Object.fromEntries(opts.map(o => [o.name, o]));
     expect(byName['Mediana'].price_adjustment).toBe(45);
-    expect(byName['XL'].price_adjustment).toBe(90);
   });
 
   it('accepts null prices in size_variants (treats as 0)', () => {
     const groupId = createModifierGroupsForItem(db, 'item-8', {
-      mediana: null, familiar: 60, xl: null,
+      mediana: null, familiar: 60,
     });
     const opts = Array.from(db.options.values());
     const byName = Object.fromEntries(opts.map(o => [o.name, o]));
     expect(byName['Mediana'].price_adjustment).toBe(0);
-    expect(byName['XL'].price_adjustment).toBe(0);
   });
 
   it('uses a friendly label for known size keys (mediana → Mediana)', () => {
@@ -234,14 +230,14 @@ describe('createModifierGroupsForItem', () => {
   it('P0-2: re-run conserva los option_ids (UPSERT por nombre, sin regenerar UUIDs)', () => {
     // 1ª carga con precios
     const firstOpts = [];
-    createModifierGroupsForItem(db, 'item-11', { mediana: 50, familiar: 70, xl: 90 });
+    createModifierGroupsForItem(db, 'item-11', { mediana: 50, familiar: 70 });
     Array.from(db.options.values()).forEach(o => firstOpts.push({ name: o.name, id: o.id }));
 
     // 2ª carga (simula restart del server — loadMenuFromSeed corre otra vez)
-    createModifierGroupsForItem(db, 'item-11', { mediana: 50, familiar: 70, xl: 90 });
+    createModifierGroupsForItem(db, 'item-11', { mediana: 50, familiar: 70 });
 
     const secondOpts = Array.from(db.options.values());
-    expect(secondOpts.length).toBe(3); // sin duplicados
+    expect(secondOpts.length).toBe(2); // sin duplicados
     for (const fo of firstOpts) {
       const match = secondOpts.find(o => o.name === fo.name);
       expect(match.id).toBe(fo.id); // MISMO id — no regenerado
@@ -250,24 +246,22 @@ describe('createModifierGroupsForItem', () => {
 
   it('P0-1: seed con precios null NO pisa price_adjustment existente (demo-prices)', () => {
     // Simula: applyDemoPrices ya puso +20/+40 en la DB
-    createModifierGroupsForItem(db, 'item-12', { mediana: 0, familiar: 20, xl: 40 });
+    createModifierGroupsForItem(db, 'item-12', { mediana: 0, familiar: 20 });
 
     // Restart: load-menu re-corre con seed null (precios: { mediana: null, familiar: null, xl: null })
-    createModifierGroupsForItem(db, 'item-12', { mediana: null, familiar: null, xl: null });
+    createModifierGroupsForItem(db, 'item-12', { mediana: null, familiar: null });
 
     const byName = Object.fromEntries(Array.from(db.options.values()).map(o => [o.name, o]));
     expect(byName['Familiar'].price_adjustment).toBe(20); // conservado, NO 0
-    expect(byName['XL'].price_adjustment).toBe(40);       // conservado, NO 0
   });
 
   it('P0-1: seed con precios numéricos SÍ actualiza price_adjustment', () => {
-    createModifierGroupsForItem(db, 'item-13', { mediana: 0, familiar: 20, xl: 40 });
+    createModifierGroupsForItem(db, 'item-13', { mediana: 0, familiar: 20 });
     // El seed trae precios nuevos (números) → se propagan
-    createModifierGroupsForItem(db, 'item-13', { mediana: 0, familiar: 25, xl: 45 });
+    createModifierGroupsForItem(db, 'item-13', { mediana: 0, familiar: 25 });
 
     const byName = Object.fromEntries(Array.from(db.options.values()).map(o => [o.name, o]));
     expect(byName['Familiar'].price_adjustment).toBe(25);
-    expect(byName['XL'].price_adjustment).toBe(45);
   });
 });
 

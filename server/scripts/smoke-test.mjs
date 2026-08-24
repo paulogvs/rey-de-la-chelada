@@ -68,9 +68,9 @@ const sample = db.prepare(`
   ORDER BY mo.sort_order
 `).all(pizzas[0].id);
 check('First option is Mediana', sample[0]?.name === 'Mediana');
-check('Options are Mediana/Familiar/XL', sample.map(s => s.name).join(',') === 'Mediana,Familiar,XL');
+  check('Options are Mediana/Familiar', sample.map(s => s.name).join(',') === 'Mediana,Familiar');
 check('First option is Mediana', sample[0]?.name === 'Mediana');
-check('Options are Mediana/Familiar/XL', sample.map(s => s.name).join(',') === 'Mediana,Familiar,XL');
+  check('Options are Mediana/Familiar', sample.map(s => s.name).join(',') === 'Mediana,Familiar');
 
 console.log('\n--- Summary ---');
 console.log(`  ${pass} passed, ${fail} failed`);

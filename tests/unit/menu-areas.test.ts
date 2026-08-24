@@ -64,7 +64,7 @@ describe('areaForCategory', () => {
   });
 
   it('primer item bar → barra', () => {
-    expect(areaForCategory('cat-bar', 'Micheladas Signature', items)).toBe('barra');
+    expect(areaForCategory('cat-bar', 'Micheladas Especiales', items)).toBe('barra');
   });
 
   it('categoría sin items → barra (default)', () => {
@@ -74,7 +74,7 @@ describe('areaForCategory', () => {
 
 describe('groupCategoriesByArea', () => {
   const categories = [
-    cat('c1', 'Micheladas Signature'),
+    cat('c1', 'Micheladas Especiales'),
     cat('c2', 'Cheladas'),
     cat('c3', 'Ensaladas'),
     cat('c4', 'Pizzas'),
@@ -90,7 +90,7 @@ describe('groupCategoriesByArea', () => {
 
   it('agrupa por área correctamente', () => {
     const grouped = groupCategoriesByArea(categories, items);
-    expect(grouped.barra.map(c => c.name)).toEqual(['Micheladas Signature', 'Cheladas']);
+    expect(grouped.barra.map(c => c.name)).toEqual(['Micheladas Especiales', 'Cheladas']);
     expect(grouped.cocina.map(c => c.name)).toEqual(['Ensaladas', 'Pizzas']);
     expect(grouped.promos.map(c => c.name)).toEqual(['Promociones']);
   });
@@ -105,7 +105,7 @@ describe('groupCategoriesByArea', () => {
 
 describe('getCategoriesForArea', () => {
   const categories = [
-    cat('c1', 'Micheladas Signature'),
+    cat('c1', 'Micheladas Especiales'),
     cat('c2', 'Ensaladas'),
     cat('c3', 'Promociones'),
   ];

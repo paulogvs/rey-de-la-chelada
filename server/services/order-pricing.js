@@ -133,7 +133,7 @@ export function resolveItemUnitPrice(db, menuItem, { manualPrice, applyPromo = f
   //    price quedó null): el server NUNCA factura 0.
   //    a. manualPrice explícito del mesero → gana (Bs 0 no válido)
   //    b. sin manual → los modifiers pueden dar el precio (pizza con tamaño
-  //       Familiar/XL: el ajuste ES el precio)
+  //       Familiar: el ajuste ES el precio)
   //    c. si nada aporta precio → 400 PRICE_REQUIRED_MANUAL
   const manual = parseManualPrice(manualPrice);
   if (manual != null && manual > 0) {

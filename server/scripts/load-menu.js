@@ -145,6 +145,12 @@ export function loadMenuFromSeed(db, { log = console.log } = {}) {
   let itemsUpdated = 0;
 
   const transaction = db.transaction(() => {
+    // Reconciliation is deliberate: the seed is the complete official catalog.
+    // Historical rows remain available for old orders, but cannot reappear in
+    // menu or order flows after a catalog replacement.
+    db.prepare('UPDATE menu_categories SET is_active = 0').run();
+    db.prepare('UPDATE menu_items SET is_active = 0, is_available = 0').run();
+
     // Process categories
     for (const cat of categories) {
       const existing = db.prepare('SELECT id FROM menu_categories WHERE name = ?').get(cat.name);
@@ -152,7 +158,8 @@ export function loadMenuFromSeed(db, { log = console.log } = {}) {
       if (existing) {
         db.prepare(`
           UPDATE menu_categories
-          SET emoji = COALESCE(?, emoji),
+           SET emoji = COALESCE(?, emoji),
+               is_active = 1,
               sort_order = COALESCE(?, sort_order),
               updated_at = datetime('now')
           WHERE id = ?
@@ -185,21 +192,22 @@ export function loadMenuFromSeed(db, { log = console.log } = {}) {
       const recipeJson = item.recipe_json ? JSON.stringify(item.recipe_json) : null;
 
       if (existing) {
-        // price/promo_price solo se rellenan si la DB está en NULL (CASE WHEN):
-        // el seed es SSOT para el arranque, pero NUNCA pisa un precio que el
-        // admin haya editado (contrato bootstrap.test.js "does NOT overwrite").
+        // The seed is the complete catalog authority. Existing menu rows are
+        // reconciled to it so a catalog replacement cannot retain old prices.
         db.prepare(`
           UPDATE menu_items
           SET subtitle = COALESCE(?, subtitle),
               description = COALESCE(?, description),
-              price = CASE WHEN price IS NULL THEN COALESCE(?, price) ELSE price END,
+              price = ?,
               price_variable = COALESCE(?, price_variable),
-              promo_price = CASE WHEN promo_price IS NULL THEN COALESCE(?, promo_price) ELSE promo_price END,
+              promo_price = ?,
               area = COALESCE(?, area),
               sort_order = COALESCE(?, sort_order),
               preparation_time = COALESCE(?, preparation_time),
               size_variants = COALESCE(?, size_variants),
               image_url = COALESCE(?, image_url),
+              is_active = 1,
+              is_available = 1,
               has_ice = COALESCE(?, has_ice),
               ingredient_list = COALESCE(?, ingredient_list),
               garnish_list = COALESCE(?, garnish_list),

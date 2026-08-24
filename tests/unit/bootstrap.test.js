@@ -8,15 +8,15 @@
  * first boot: staff (admin/mesero/kds) + tables + real menu + prices.
  *
  * Verifica:
- *  - empty DB → staff(4: admin/mesero/kds/caja) + tables(10) + categories(20) + items(105) + prices
+ *  - empty DB → staff(4: admin/mesero/kds/caja) + tables(10) + categories(18) + items(102)
  *  - idempotente: second run duplicates nothing
  *  - S1/v5: DB con staff existente → ensureBootstrap asegura el rol caja sin duplicar
- *  - does NOT overwrite admin-set prices on existing DB
+ *  - official seed prices replace stale catalog prices on existing DB
  *  - Sprint 1 (2026-08-17): menú BAR con precios reales; SOLO quedan NULL los
  *    items "Consultar precio" (price_variable=1, 2) y la promo display
  *    "Jueves de Chelada 2x1" (price_variable=0, no facturable). El demo no
  *    pisa manuales ni promos.
- *  - 2026-08-20: menú COCINA real (32 items, 6 categorías) — BAR 73 + COCINA 32 = 105 items, 20 categorías. Sin XL.
+ *  - 2026-08-20: catálogo oficial — BAR 69 + COCINA 33 = 102 items, 18 categorías. Sin XL.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -43,19 +43,19 @@ describe('ensureBootstrap', () => {
     // Tables: 10
     expect(db.prepare('SELECT COUNT(*) AS n FROM tables').get().n).toBe(10);
 
-    // Real menu: 20 categories, 105 items (BAR 73 + COCINA 32)
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n).toBe(20);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(105);
+    // Real menu: 18 categories, 102 explicit catalog lines.
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n).toBe(18);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(102);
     expect(db.prepare("SELECT COUNT(*) AS n FROM menu_categories WHERE name = 'Cervezas'").get().n).toBe(0);
 
     // Sprint 1: precios REALES del seed cargados (los items BAR ya no son null).
     // Solo quedan NULL: 2 items "Consultar precio" (price_variable=1) + 1 promo
     // display (Jueves de Chelada 2x1, price_variable=0, no facturable) + 5 pizzas
     // (precio por variante Mediana/Familiar, base NULL por diseño).
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND price_variable = 1').get().n).toBe(2);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND price_variable = 1').get().n).toBe(1);
     expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND price_variable = 0').get().n).toBe(6);
     // El demo rellenó TODA la cocina EXCEPTO pizzas (5 con price null por variante)
-    expect(db.prepare("SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND area = 'cocina'").get().n).toBe(5);
+    expect(db.prepare("SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND area = 'cocina'").get().n).toBe(6);
     // Sprint Promos (2026-08-19): Opción A aprobada — el seed ya NO trae
     // promo_price en Signature (Isla Dorada 40) ni artesanales (Negra 15).
     // El descuento vive en las promos por día laboral (botones manuales).
@@ -64,26 +64,9 @@ describe('ensureBootstrap', () => {
       "SELECT promo_price FROM menu_items WHERE name = 'Negra' AND category_id = (SELECT id FROM menu_categories WHERE name = 'Cerveza Artesanal')"
     ).get().promo_price).toBe(null);
 
-    // Sprint 1 (D): adicionales como modifiers — grupo "Adicionales" en las
-    // micheladas (Shot +1500, Doble Escarchado +500), siembra idempotente.
-    const islaId = db.prepare("SELECT id FROM menu_items WHERE name = 'Isla Dorada'").get().id;
-    const addGroup = db.prepare(
-      'SELECT id, type, required, max_select FROM modifier_groups WHERE menu_item_id = ? AND name = ?'
-    ).get(islaId, 'Adicionales');
-    expect(addGroup).toBeDefined();
-    expect(addGroup.type).toBe('multi');
-    expect(addGroup.required).toBe(0);
-    const addOpts = db.prepare(
-      'SELECT name, price_adjustment FROM modifier_options WHERE group_id = ? ORDER BY sort_order'
-    ).all(addGroup.id);
-    expect(addOpts).toEqual([
-      { name: 'Shot + Michelada', price_adjustment: 1500 },
-      { name: 'Doble Escarchado', price_adjustment: 500 },
-    ]);
-    // 17 items de barra con adicionales (8 Signature + 3 Especiales + 6 Cheladas)
-    expect(db.prepare(
-      "SELECT COUNT(*) AS n FROM modifier_groups WHERE name = 'Adicionales'"
-    ).get().n).toBe(17);
+    // El catálogo oficial no inventa adicionales: solo las variantes explícitas
+    // de las pizzas generan modifiers.
+    expect(db.prepare("SELECT COUNT(*) AS n FROM modifier_groups WHERE name = 'Adicionales'").get().n).toBe(0);
 
     // Result summary
     expect(result.seeded).toBe(true);
@@ -98,8 +81,8 @@ describe('ensureBootstrap', () => {
     expect(second.seeded).toBe(false);
     expect(db.prepare('SELECT COUNT(*) AS n FROM staff').get().n).toBe(4);
     expect(db.prepare('SELECT COUNT(*) AS n FROM tables').get().n).toBe(10);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n).toBe(20);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(105);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n).toBe(18);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(102);
     expect(db.prepare('SELECT COUNT(*) AS n FROM modifier_groups').get().n).toBeGreaterThan(0);
     db.close();
   });
@@ -125,7 +108,7 @@ describe('ensureBootstrap', () => {
     db.close();
   });
 
-  it('does NOT overwrite admin-set prices on an existing DB', () => {
+  it('reconciles stale prices to the official seed on an existing DB', () => {
     const db = makeDb();
     ensureBootstrap(db);
 
@@ -135,7 +118,7 @@ describe('ensureBootstrap', () => {
     // Re-run bootstrap (simulates server restart)
     ensureBootstrap(db);
 
-    expect(db.prepare("SELECT price FROM menu_items WHERE name = 'Isla Dorada'").get().price).toBe(9900);
+    expect(db.prepare("SELECT price FROM menu_items WHERE name = 'Isla Dorada'").get().price).toBe(4000);
     db.close();
   });
 
@@ -221,7 +204,7 @@ describe('ensureBootstrap', () => {
 
     ensureBootstrap(db);
 
-    expect(db.prepare("SELECT price FROM menu_items WHERE name = 'Canasta Rey'").get().price).toBe(9900);
+    expect(db.prepare("SELECT price FROM menu_items WHERE name = 'Canasta Rey'").get().price).toBe(6000);
     const fam = db.prepare(`
       SELECT mo.price_adjustment
       FROM modifier_options mo

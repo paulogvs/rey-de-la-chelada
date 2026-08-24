@@ -18,7 +18,7 @@
  *    Tablas y Canastas      Bs 4200 – 8500
  *    Burgers & Sandwiches   Bs 2600 – 4000
  *    Quesadillas            Bs 3200 – 3800
- *    Pizzas (Mediana)       Bs 5000 (Familiar +2000, XL +4000 → 5000–9000)
+ *    Official prices are maintained exclusively in menu-seed.json.
  *    Empanadas              Bs 1200 – 1700
  *    Salsas y Extras        Bs 600 – 1000
  *
@@ -53,7 +53,7 @@ const PRICING_PLAN = {
 const DISPLAY_ONLY_CATEGORIES = new Set(['Promociones']);
 
 /** Tamaños de pizza: ajuste de precio (centavos) sobre el precio base (Mediana). */
-const PIZZA_SIZE_ADJUST = { Mediana: 0, Familiar: 2000, XL: 4000 };
+const PIZZA_SIZE_ADJUST = { Mediana: 0, Familiar: 0 };
 
 const FALLBACK_PRICE = 2500;
 
@@ -67,7 +67,7 @@ const FALLBACK_PRICE = 2500;
  *
  * ⚠️ FIX P0-1 (2026-08-11): bootstrap re-carga el menú en cada arranque y
  * load-menu.js (upsert) escribía price_adjustment = 0 cuando el seed trae
- * null → los +2000/+4000 de Familiar/XL se perdían silenciosamente. Este helper
+ * null → los precios por variante se perdían silenciosamente. Este helper
  * se ejecuta SIEMPRE en el bootstrap (a diferencia de applyDemoPrices, que
  * solo corre cuando hay items sin precio) para garantizar que los ajustes
  * sobrevivan a cada restart SIN pisar precios de items editados por admin.
@@ -195,7 +195,7 @@ export function applyDemoPrices(db, { log = console.log, dryRun = false, reset =
     });
   }
 
-  // Ajustes de tamaño (pizza): Mediana 0, Familiar +2000, XL +4000 — delegado
+  // Ajustes de tamaño legacy — el seed oficial ya contiene precios absolutos.
   // al helper dedicado applyPizzaSizeAdjustments (P0-1: reaplicable siempre).
   const modResultFromHelper = applyPizzaSizeAdjustments(db, { log, dryRun: DRY_RUN });
   if (modResultFromHelper.message === 'applied' || modResultFromHelper.message === 'dry-run') {

@@ -10,8 +10,8 @@
  *  de getDb(). Garantiza una DB usable desde el primer arranque:
  *
  *    1. Si staff está vacío → crea staff (admin/mesero/kds) + mesas
- *    2. Carga el menú REAL (menu-seed.json → 112 items)
- *    3. Aplica precios demo (si los items no tienen precio)
+ *    2. Carga el menú REAL (menu-seed.json, única fuente oficial)
+ *    3. No aplica precios demo: los precios oficiales vienen del seed
  *
  *  Idempotente: si ya hay datos, no duplica nada ni pisa precios
  *  que el admin haya cambiado. Alineado al SSOT (seed.js /
@@ -21,7 +21,7 @@
 
 import { ensureStaff, ensureTables } from './seed.js';
 import { loadMenuFromSeed } from '../scripts/load-menu.js';
-import { applyDemoPrices, applyPizzaSizeAdjustments } from '../scripts/demo-prices.js';
+import { applyPizzaSizeAdjustments } from '../scripts/demo-prices.js';
 
 /**
  * Ensure the DB is bootstrapped (staff + tables + menu + prices).
@@ -73,21 +73,9 @@ export function ensureBootstrap(db, { log = console.log } = {}) {
     steps.push('menu-synced');
   }
 
-  // ── 3. Precios demo (solo si hay items sin precio) ────────
-  const nullPriceCount = db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL').get().n;
-  if (nullPriceCount > 0) {
-    const priceResult = applyDemoPrices(db, { log });
-    log(`[Bootstrap] Precios demo: ${priceResult.updated} items rellenados (${nullPriceCount} sin precio en DB)`);
-    steps.push('prices-applied');
-  } else {
-    log(`[Bootstrap] Todos los items ya tienen precio — skip`);
-    steps.push('prices-existing');
-  }
-
-  // ── 3b. Ajustes de tamaño de pizza — SIEMPRE (P0-1, 2026-08-11) ──
+  // ── 3. Variantes de pizza oficiales — SIEMPRE ────────────
   // load-menu re-upsertea las options en cada arranque y el seed trae
-  // precios null → ANTES los adjustments Familiar +20 / XL +40 se perdían
-  // silenciosamente (pizza vendida a precio Mediana → pérdida de ingresos).
+  // Los precios absolutos viven en size_variants y no se generan aquí.
   // applyPizzaSizeAdjustments es idempotente y SOLO toca modifier_options
   // (no pisa precios de items editados por admin). Correr en cada bootstrap.
   try {
