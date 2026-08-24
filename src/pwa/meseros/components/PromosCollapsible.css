@@ -1,0 +1,90 @@
+/* PromosCollapsible — promos del turno laboral en sección colapsable compacta.
+   Zero hardcoded: solo tokens. Nace colapsado para no empujar los items
+   del pedido en el sidebar (PC/tablet) ni en el bottom-sheet (móvil). */
+
+.promos-collapsible {
+  border: 1px solid color-mix(in srgb, var(--dorado-rey) 45%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--dorado-rey) 7%, transparent);
+  overflow: hidden;
+}
+
+.promos-collapsible__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  list-style: none;
+  cursor: pointer;
+  padding: var(--space-2) var(--space-3);
+  min-height: var(--touch-min-target);
+  user-select: none;
+}
+
+.promos-collapsible__summary::-webkit-details-marker {
+  display: none;
+}
+
+.promos-collapsible__summary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-lg);
+}
+
+.promos-collapsible__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--dorado-rey);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.promos-collapsible__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 0 var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--bg);
+  background: var(--dorado-rey);
+  border-radius: var(--radius-full);
+}
+
+.promos-collapsible--open .promos-collapsible__count {
+  color: var(--dorado-rey);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--dorado-rey) 50%, transparent);
+}
+
+.promos-collapsible__hint {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.promos-collapsible__summary > svg,
+.promos-collapsible__summary .app-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.promos-collapsible__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-3);
+  max-height: 320px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* En contextos estrechos (sidebar 35% / bottom-sheet móvil) limita menos */
+@media (max-width: 1023px) {
+  .promos-collapsible__body {
+    max-height: 260px;
+  }
+}

@@ -22,10 +22,10 @@
 }
 
 /* El contenido principal del modal siempre empieza por los items.
-   Las promos son secundarias y quedan después del pedido, evitando que
-   un bloque de promociones oculte la lista al abrir "Ver pedido". */
+   Las promos (PromosCollapsible) son secundarias y quedan después del
+   pedido en el propio DOM, evitando que un bloque de promociones oculte
+   la lista al abrir "Ver pedido". */
 .cart-modal__items {
-  order: 1;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -40,14 +40,6 @@
 
 .cart-modal__items .order-panel__cart-item {
   flex-shrink: 0;
-}
-
-.cart-modal__items + .order-panel__cart-total {
-  order: 3;
-}
-
-.cart-modal__scroll > .order-panel__promos {
-  order: 2;
 }
 
 .cart-modal__item {
@@ -80,6 +72,13 @@
   backdrop-filter: var(--glass-blur-strong);
   -webkit-backdrop-filter: var(--glass-blur-strong);
   padding-top: var(--space-2);
+}
+
+/* CTA dorado en el modal móvil (mismo criterio que el sidebar PC) */
+.cart-modal .modal-footer .btn--primary {
+  background: var(--dorado-rey);
+  color: var(--bg);
+  border-color: var(--dorado-rey);
 }
 
 @media (min-width: 769px) {

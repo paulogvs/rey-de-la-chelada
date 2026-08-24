@@ -8,6 +8,7 @@ import { formatMoney } from '../../_shared/utils/format';
 import { PROMOTIONS_BY_ID } from '@/core/config/promotions.js';
 import { resolveCartPromoUnitPrice, type PromoCartItem } from '../promoCart';
 import type { CartItem } from '../OrderPanel';
+import { PromosCollapsible } from './PromosCollapsible';
 import './CartModal.css';
 
 function resolveCartUnitPrice(
@@ -84,31 +85,6 @@ export function CartModal({
     >
       <div className="cart-modal__body">
         <div className="cart-modal__scroll" style={{ overscrollBehavior: 'contain' as const }}>
-          {activePromos.length > 0 && (
-            <div className="order-panel__promos">
-              <p className="order-panel__promos-title">Promos de hoy ({businessDayNameLabel})</p>
-              {activePromos.map(promo => {
-                const applied = cart.some(ci => ci.promoType === promo.id);
-                return (
-                  <button
-                    key={promo.id}
-                    className={`order-panel__promo-btn${applied ? ' order-panel__promo-btn--applied' : ''}`}
-                    onClick={() => (applied ? onClearPromo(promo.id) : onApplyPromo(promo.id))}
-                    title={promo.description}
-                    type="button"
-                  >
-                    <span className="order-panel__promo-btn-name">{promo.label}</span>
-                    <span className="order-panel__promo-btn-desc">{promo.description}</span>
-                    <span className="order-panel__promo-btn-action">{applied ? 'Quitar' : 'Aplicar'}</span>
-                  </button>
-                );
-              })}
-              {savings.savings > 0 && (
-                <p className="order-panel__promos-savings">Ahorro aplicado: <strong>{formatMoney(savings.savings)}</strong></p>
-              )}
-            </div>
-          )}
-
           <section className="cart-modal__items" aria-label="Items del pedido">
             <h3 className="cart-modal__items-title">Items del pedido</h3>
             {cart.length === 0 ? (
@@ -183,6 +159,19 @@ export function CartModal({
               })
             )}
           </section>
+
+          {activePromos.length > 0 && (
+            <PromosCollapsible
+              businessDayNameLabel={businessDayNameLabel}
+              promos={activePromos}
+              appliedIds={cart.filter(ci => ci.promoType).map(ci => ci.promoType as string)}
+              onToggle={id => {
+                const applied = cart.some(ci => ci.promoType === id);
+                if (applied) onClearPromo(id); else onApplyPromo(id);
+              }}
+              savings={savings.savings}
+            />
+          )}
 
           {cart.length > 0 && (
             <div className="order-panel__cart-total">

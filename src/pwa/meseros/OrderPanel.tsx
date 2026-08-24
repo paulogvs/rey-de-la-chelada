@@ -30,6 +30,7 @@ import { fetchMenuCategories, fetchMenuItems, fetchMenuItemDetail, type MenuItem
 import { createOrder, fetchOrderById, deliverOrder, addOrderItem, removeOrderItem, type Order } from '../_shared/api/ordersApi';
 import { BottomCartBar } from './components/BottomCartBar';
 import { CartModal } from './components/CartModal';
+import { PromosCollapsible } from './components/PromosCollapsible';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
 import { computeTotals } from '@/core/config/iva';
@@ -801,34 +802,8 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
             <span>Confirma los productos con el cliente</span>
           </div>
 
-          {/* ── Sprint Promos: promos activas del día laboral (botones) ── */}
-          {activePromos.length > 0 && (
-            <div className="order-panel__promos">
-              <p className="order-panel__promos-title">
-                Promos de hoy ({businessDayNameLabel}) — aplicate al carrito
-              </p>
-              {activePromos.map(promo => {
-                const applied = cart.some(ci => ci.promoType === promo.id);
-                return (
-                  <button
-                    key={promo.id}
-                    className={`order-panel__promo-btn${applied ? ' order-panel__promo-btn--applied' : ''}`}
-                    onClick={() => (applied ? handleClearPromo(promo.id) : handleApplyPromo(promo.id))}
-                    title={promo.description}
-                  >
-                    <span className="order-panel__promo-btn-name">{promo.label}</span>
-                    <span className="order-panel__promo-btn-desc">{promo.description}</span>
-                    <span className="order-panel__promo-btn-action">{applied ? 'Quitar' : 'Aplicar'}</span>
-                  </button>
-                );
-              })}
-              {savings.savings > 0 && (
-                <p className="order-panel__promos-savings">
-                  Ahorro aplicado: <strong>{formatMoney(savings.savings)}</strong>
-                </p>
-              )}
-            </div>
-          )}
+          {/* ── Sprint Promos: se renderizan al final del body (PromosCollapsible)
+                 para no empujar los items del pedido — rediseño 2026-08-21 ── */}
 
           {cart.length === 0 && (
             <p className="order-panel__cart-empty">
@@ -910,6 +885,20 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
             );
           })}
 
+          {/* ── Promos del turno laboral: colapsable al final, no empuja items ── */}
+          {activePromos.length > 0 && (
+            <PromosCollapsible
+              businessDayNameLabel={businessDayNameLabel}
+              promos={activePromos}
+              appliedIds={cart.filter(ci => ci.promoType).map(ci => ci.promoType as string)}
+              onToggle={id => {
+                const applied = cart.some(ci => ci.promoType === id);
+                if (applied) handleClearPromo(id); else handleApplyPromo(id);
+              }}
+              savings={savings.savings}
+            />
+          )}
+
           {cart.length > 0 && (
             <div className="order-panel__cart-total">
               <span>Total</span>
@@ -921,6 +910,7 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
               </span>
             </div>
           )}
+          </div>
 
           <div className="order-panel__actions">
             <Button variant="secondary" onClick={editMode ? () => { setEditMode(false); setCart([]); } : onBack}>
@@ -954,7 +944,6 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
                 {submitting ? 'Enviando…' : 'Confirmar y enviar'}
               </Button>
             )}
-          </div>
           </div>
         </div>
       </div>

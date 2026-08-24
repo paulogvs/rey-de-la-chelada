@@ -26,7 +26,7 @@
 export const PROMOTION_DAYS = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
 
 /** Categorías objetivo (nombres SSOT del menú real) */
-export const SIGNATURE_CATEGORY = 'Micheladas Signature';
+export const SIGNATURE_CATEGORY = 'Micheladas Especiales';
 export const ARTESANAL_CATEGORY = 'Cerveza Artesanal';
 
 /**
