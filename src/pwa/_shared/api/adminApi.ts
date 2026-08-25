@@ -260,6 +260,176 @@ export async function fetchClosings(
   return { ...result, closings: result.data.closings };
 }
 
+// ============================================================
+// Menu CRUD (admin) — items + categories + import-seed
+// ============================================================
+
+export interface MenuCategoryRow {
+  id: string;
+  name: string;
+  description: string | null;
+  emoji: string | null;
+  sort_order: number;
+  is_active: number;
+}
+
+export interface MenuCategoryResult extends ApiResult<{ category?: MenuCategoryRow }> {
+  category: MenuCategoryRow | null;
+}
+
+export interface MenuItemCreateInput {
+  name: string;
+  price: number | null;
+  category_id: string;
+  area?: 'bar' | 'cocina';
+  is_available?: boolean;
+  sort_order?: number;
+  preparation_time?: number;
+  subtitle?: string;
+  description?: string;
+}
+
+export interface MenuItemUpdateInput {
+  name?: string;
+  price?: number | null;
+  category_id?: string;
+  area?: 'bar' | 'cocina';
+  is_available?: boolean;
+  is_active?: boolean;
+  sort_order?: number;
+  preparation_time?: number;
+  subtitle?: string;
+  description?: string;
+}
+
+export interface MenuCategoryInput {
+  name: string;
+  emoji?: string;
+  description?: string;
+  sort_order?: number;
+}
+
+/** POST /api/menu/items — crear item (admin) */
+export async function createMenuItem(
+  token: string,
+  input: MenuItemCreateInput,
+  fetchImpl: typeof fetch = fetch
+): Promise<ApiResult<{ item?: AdminMenuItem }>> {
+  return apiFetch<{ success: boolean; item?: AdminMenuItem }>('/api/menu/items', {
+    method: 'POST',
+    token,
+    fetchImpl,
+    body: input,
+  });
+}
+
+/** PUT /api/menu/items/:id — actualizar item (admin) */
+export async function updateMenuItem(
+  token: string,
+  id: string,
+  input: MenuItemUpdateInput,
+  fetchImpl: typeof fetch = fetch
+): Promise<ApiResult<{ item?: AdminMenuItem }>> {
+  return apiFetch<{ success: boolean; item?: AdminMenuItem }>(`/api/menu/items/${id}`, {
+    method: 'PUT',
+    token,
+    fetchImpl,
+    body: input,
+  });
+}
+
+/** PATCH /api/menu/items/:id/toggle — activar/desactivar item */
+export async function toggleMenuItem(
+  token: string,
+  id: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<ApiResult<{ is_active?: boolean }>> {
+  return apiFetch<{ success: boolean; is_active?: boolean }>(`/api/menu/items/${id}/toggle`, {
+    method: 'PATCH',
+    token,
+    fetchImpl,
+  });
+}
+
+/** DELETE /api/menu/items/:id — borrar item (solo sin pedidos) */
+export async function deleteMenuItem(
+  token: string,
+  id: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<ApiResult<{ deleted?: boolean }>> {
+  return apiFetch<{ success: boolean; deleted?: boolean }>(`/api/menu/items/${id}`, {
+    method: 'DELETE',
+    token,
+    fetchImpl,
+  });
+}
+
+/** POST /api/menu/categories — crear categoría (admin) */
+export async function createMenuCategory(
+  token: string,
+  input: MenuCategoryInput,
+  fetchImpl: typeof fetch = fetch
+): Promise<MenuCategoryResult> {
+  const result = await apiFetch<{ success: boolean; category?: MenuCategoryRow }>('/api/menu/categories', {
+    method: 'POST',
+    token,
+    fetchImpl,
+    body: input,
+  });
+  return { ...result, category: result.data?.category ?? null };
+}
+
+/** PUT /api/menu/categories/:id — actualizar categoría (admin) */
+export async function updateMenuCategory(
+  token: string,
+  id: string,
+  input: Partial<MenuCategoryInput> & { is_active?: boolean },
+  fetchImpl: typeof fetch = fetch
+): Promise<MenuCategoryResult> {
+  const result = await apiFetch<{ success: boolean; category?: MenuCategoryRow }>(`/api/menu/categories/${id}`, {
+    method: 'PUT',
+    token,
+    fetchImpl,
+    body: input,
+  });
+  return { ...result, category: result.data?.category ?? null };
+}
+
+/** DELETE /api/menu/categories/:id — borrar categoría (solo vacía) */
+export async function deleteMenuCategory(
+  token: string,
+  id: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<ApiResult<{ deleted?: boolean }>> {
+  return apiFetch<{ success: boolean; deleted?: boolean }>(`/api/menu/categories/${id}`, {
+    method: 'DELETE',
+    token,
+    fetchImpl,
+  });
+}
+
+/** GET /api/menu/categories — listar categorías (incl. inactivas para admin) */
+export async function fetchMenuCategoriesAdmin(
+  token: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<ApiResult<{ categories?: MenuCategoryRow[] }>> {
+  return apiFetch<{ success: boolean; categories?: MenuCategoryRow[] }>(
+    '/api/menu/categories?include_inactive=true',
+    { token, fetchImpl }
+  );
+}
+
+/** POST /api/menu/import-seed — importar items/categorías NUEVOS del seed (no pisa existentes) */
+export async function importSeedItems(
+  token: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<ApiResult<{ createdItems?: string[]; createdCategories?: string[]; message?: string }>> {
+  return apiFetch<{ success: boolean; message?: string; createdItems?: string[]; createdCategories?: string[] }>(
+    '/api/menu/import-seed',
+    { method: 'POST', token, fetchImpl }
+  );
+}
+
 export default {
   fetchAdminMenuItems,
   updateMenuItemPrice,
@@ -270,4 +440,13 @@ export default {
   fetchStaff,
   updateStaff,
   fetchClosings,
+  createMenuItem,
+  updateMenuItem,
+  toggleMenuItem,
+  deleteMenuItem,
+  createMenuCategory,
+  updateMenuCategory,
+  deleteMenuCategory,
+  fetchMenuCategoriesAdmin,
+  importSeedItems,
 };

@@ -52,6 +52,10 @@ import {
   Delete,
   ChefHat,
   Search,
+  Pencil,
+  Eye,
+  EyeOff,
+  Layers,
 } from 'lucide-react';
 import './AppIcon.css';
 
@@ -99,6 +103,10 @@ const ICONS = {
   logout: LogOut,
   delete: Delete,
   search: Search,
+  edit: Pencil,
+  eye: Eye,
+  'eye-off': EyeOff,
+  layers: Layers,
 } as const;
 
 export type AppIconName = keyof typeof ICONS;

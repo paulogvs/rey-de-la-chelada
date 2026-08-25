@@ -63,27 +63,40 @@ export function ensureBootstrap(db, { log = console.log } = {}) {
     steps.push('staff-existing');
   }
 
-  // ── 2. Menú real (siempre upsert idempotente) ─────────────
-  const categoryCount = db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n;
-  const menuResult = loadMenuFromSeed(db, { log });
-  if (categoryCount === 0) {
-    log(`[Bootstrap] Menú real cargado: ${menuResult.itemsCreated} items nuevos`);
-    steps.push('menu-loaded');
-  } else {
-    steps.push('menu-synced');
-  }
+  // ── 2. Menú: modo SEED (default/DEV) o modo ADMIN (PROD) ─────
+  // MENU_MANAGEMENT=admin → el seed solo se importa la PRIMERA vez
+  // (DB de menú vacía). Después, el admin UI es el dueño del menú:
+  // reinicios NO pisan items/precios/ajustes editados en producción.
+  // MENU_MANAGEMENT=seed (default, DEV) → el seed es la autoridad
+  // completa (comportamiento histórico: upsert + reconciliation).
+  const menuManagement = (process.env.MENU_MANAGEMENT || 'seed').toLowerCase();
+  const menuItemCount = db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n;
 
-  // ── 3. Variantes de pizza oficiales — SIEMPRE ────────────
-  // load-menu re-upsertea las options en cada arranque y el seed trae
-  // Los precios absolutos viven en size_variants y no se generan aquí.
-  // applyPizzaSizeAdjustments es idempotente y SOLO toca modifier_options
-  // (no pisa precios de items editados por admin). Correr en cada bootstrap.
-  try {
-    const sizeResult = applyPizzaSizeAdjustments(db, { log });
-    steps.push(`size-adjustments:${sizeResult.message}`);
-  } catch (sizeErr) {
-    log(`[Bootstrap] Error en ajustes de tamaño: ${sizeErr.message}`);
-    steps.push('size-adjustments:error');
+  if (menuManagement === 'admin' && menuItemCount > 0) {
+    log(`[Bootstrap] Menú admin-managed (${menuItemCount} items) — seed NO se importa; el admin UI gestiona.`);
+    steps.push('menu-admin-managed');
+  } else {
+    const categoryCount = db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n;
+    const menuResult = loadMenuFromSeed(db, { log });
+    if (categoryCount === 0) {
+      log(`[Bootstrap] Menú real cargado: ${menuResult.itemsCreated} items nuevos`);
+      steps.push('menu-loaded');
+    } else {
+      steps.push('menu-synced');
+    }
+
+    // ── 3. Variantes de pizza oficiales — SIEMPRE (modo seed) ──
+    // load-menu re-upsertea las options en cada arranque y el seed trae
+    // Los precios absolutos viven en size_variants y no se generan aquí.
+    // applyPizzaSizeAdjustments es idempotente y SOLO toca modifier_options
+    // (no pisa precios de items editados por admin). Correr en cada bootstrap.
+    try {
+      const sizeResult = applyPizzaSizeAdjustments(db, { log });
+      steps.push(`size-adjustments:${sizeResult.message}`);
+    } catch (sizeErr) {
+      log(`[Bootstrap] Error en ajustes de tamaño: ${sizeErr.message}`);
+      steps.push('size-adjustments:error');
+    }
   }
 
   const seeded = staffCount === 0;

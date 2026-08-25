@@ -18,6 +18,9 @@
 
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import {
@@ -27,8 +30,12 @@ import {
   validateBulkModifierPricesRequest,
   applyBulkModifierPriceUpdates,
 } from '../services/menu-bulk-updates.js';
+import { createModifierGroupsForItem, createAdditionsModifiersForItem } from '../scripts/menu-modifier-helpers.js';
 
 const router = Router();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SEED_PATH = path.resolve(__dirname, '../../src/core/data/menu-seed.json');
 
 // ============================================================
 // GET /api/menu/categories — Categorías activas
@@ -500,6 +507,186 @@ router.post('/modifier-options/bulk-prices', requireAuth, requireRole('admin'), 
   } catch (err) {
     console.error('[Menu] Bulk modifier price error:', err.message);
     res.status(500).json({ success: false, error: 'Error al actualizar opciones', code: 'BULK_MODIFIER_PRICE_ERROR' });
+  }
+});
+
+// ============================================================
+// Admin: DELETE /api/menu/items/:id — Borrar item (solo si NO
+// tiene pedidos; el historial nunca se rompe). Para ocultar sin
+// borrar, usar PATCH /items/:id/toggle (desactivar — recomendado).
+// ============================================================
+
+router.delete('/items/:id', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const db = getDb();
+    const item = db.prepare('SELECT id FROM menu_items WHERE id = ?').get(req.params.id);
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Item no encontrado', code: 'ITEM_NOT_FOUND' });
+    }
+
+    const orderCount = db.prepare(
+      'SELECT COUNT(*) AS n FROM order_items WHERE menu_item_id = ?'
+    ).get(req.params.id).n;
+    if (orderCount > 0) {
+      return res.status(409).json({
+        success: false,
+        error: `Este item tiene ${orderCount} pedido(s) — desactívalo en vez de borrarlo (conserva el historial)`,
+        code: 'ITEM_HAS_ORDERS',
+        orderCount,
+      });
+    }
+
+    const tx = db.transaction(() => {
+      // Eliminar opciones y grupos de modificadores del item
+      const groups = db.prepare('SELECT id FROM modifier_groups WHERE menu_item_id = ?').all(req.params.id);
+      for (const g of groups) {
+        db.prepare('DELETE FROM modifier_options WHERE group_id = ?').run(g.id);
+      }
+      db.prepare('DELETE FROM modifier_groups WHERE menu_item_id = ?').run(req.params.id);
+      db.prepare('DELETE FROM menu_items WHERE id = ?').run(req.params.id);
+    });
+    tx();
+
+    res.json({ success: true, message: 'Item eliminado', deleted: true });
+  } catch (err) {
+    console.error('[Menu] Delete item error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al eliminar item', code: 'ITEM_DELETE_ERROR' });
+  }
+});
+
+// ============================================================
+// Admin: DELETE /api/menu/categories/:id — Borrar categoría
+// (solo si está vacía — si tiene items, desactívala o vacíala).
+// ============================================================
+
+router.delete('/categories/:id', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const db = getDb();
+    const cat = db.prepare('SELECT id FROM menu_categories WHERE id = ?').get(req.params.id);
+    if (!cat) {
+      return res.status(404).json({ success: false, error: 'Categoría no encontrada', code: 'CATEGORY_NOT_FOUND' });
+    }
+
+    const itemCount = db.prepare(
+      'SELECT COUNT(*) AS n FROM menu_items WHERE category_id = ?'
+    ).get(req.params.id).n;
+    if (itemCount > 0) {
+      return res.status(409).json({
+        success: false,
+        error: `La categoría tiene ${itemCount} item(s) — vacíala o desactívala antes de borrar`,
+        code: 'CATEGORY_NOT_EMPTY',
+        itemCount,
+      });
+    }
+
+    db.prepare('DELETE FROM menu_categories WHERE id = ?').run(req.params.id);
+    res.json({ success: true, message: 'Categoría eliminada', deleted: true });
+  } catch (err) {
+    console.error('[Menu] Delete category error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al eliminar categoría', code: 'CATEGORY_DELETE_ERROR' });
+  }
+});
+
+// ============================================================
+// Admin: POST /api/menu/import-seed — Importar SOLO items y
+// categorías NUEVOS del seed local (menu-seed.json).
+//
+// Modo admin (MENU_MANAGEMENT=admin en PROD): el bootstrap NO
+// re-importa el seed en cada reinicio. Este endpoint permite traer
+// mejoras de menú desde DEV (push → pull en PROD → import) SIN pisar
+// precios/ediciones existentes: solo crea lo que NO existe.
+//
+// Contrato: nunca toca items/categorías existentes. Devuelve resumen.
+// ============================================================
+
+router.post('/import-seed', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const db = getDb();
+    let seed;
+    try {
+      seed = JSON.parse(fs.readFileSync(SEED_PATH, 'utf8'));
+    } catch {
+      return res.status(500).json({ success: false, error: 'No se pudo leer el seed local', code: 'SEED_READ_ERROR' });
+    }
+
+    const areas = ['BAR', 'COCINA'];
+    const createdCategories = [];
+    const createdItems = [];
+    const skippedCategories = [];
+    const skippedItems = [];
+
+    const tx = db.transaction(() => {
+      for (const areaKey of areas) {
+        const areaData = seed?.restobar?.menu?.[areaKey];
+        if (!areaData?.categorias) continue;
+        const areaLower = areaKey === 'BAR' ? 'bar' : 'cocina';
+
+        for (const cat of areaData.categorias) {
+          const catName = cat.nombre_categoria;
+          let existingCat = db.prepare('SELECT id FROM menu_categories WHERE name = ?').get(catName);
+          if (!existingCat) {
+            const catId = randomUUID();
+            db.prepare(
+              'INSERT INTO menu_categories (id, name, description, emoji, sort_order) VALUES (?, ?, ?, ?, ?)'
+            ).run(catId, catName, '', '🍽', 0);
+            existingCat = { id: catId };
+            createdCategories.push(catName);
+          } else {
+            skippedCategories.push(catName);
+          }
+
+          const items = Array.isArray(cat.items) ? cat.items : [];
+          for (const seedItem of items) {
+            const name = seedItem.nombre;
+            const existingItem = db.prepare(
+              'SELECT id FROM menu_items WHERE name = ? AND category_id = ?'
+            ).get(name, existingCat.id);
+            if (existingItem) {
+              skippedItems.push(name);
+              continue;
+            }
+
+            const itemId = randomUUID();
+            const sizeVariants = cat.variantes_tamanos && seedItem.precios
+              ? seedItem.precios
+              : null;
+            const priceVariable = seedItem.precio_variable === undefined
+              ? 0
+              : (seedItem.precio_variable ? 1 : 0);
+
+            db.prepare(`
+              INSERT INTO menu_items (id, category_id, name, subtitle, description, price, price_variable,
+                                      promo_price, currency, is_active, is_available, preparation_time,
+                                      sort_order, area, size_variants, image_url)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'BOB', 1, 1, ?, ?, ?, ?, ?)
+            `).run(
+              itemId, existingCat.id, name,
+              seedItem.subtitulo || '', seedItem.descripcion || '',
+              seedItem.precio ?? null, priceVariable, seedItem.promo_price ?? null,
+              areaLower === 'bar' ? 5 : 15, 0, areaLower,
+              sizeVariants ? JSON.stringify(sizeVariants) : null, seedItem.image_url || null
+            );
+
+            if (sizeVariants) createModifierGroupsForItem(db, itemId, sizeVariants);
+            if (Array.isArray(seedItem.adicionales)) createAdditionsModifiersForItem(db, itemId, seedItem.adicionales);
+            createdItems.push(name);
+          }
+        }
+      }
+    });
+    tx();
+
+    res.json({
+      success: true,
+      message: `Importación: ${createdItems.length} item(s) creado(s), ${createdCategories.length} apartado(s) creado(s)`,
+      createdItems,
+      createdCategories,
+      skippedItems: skippedItems.length,
+      skippedCategories: skippedCategories.length,
+    });
+  } catch (err) {
+    console.error('[Menu] Import seed error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al importar del seed', code: 'IMPORT_SEED_ERROR' });
   }
 });
 

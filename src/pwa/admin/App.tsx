@@ -26,6 +26,8 @@ import { DashboardView } from './views/DashboardView';
 import { PriceEditorView } from './views/PriceEditorView';
 import { BulkPricesView } from './views/BulkPricesView';
 import { ModifierOptionsView } from './views/ModifierOptionsView';
+import { MenuView } from './views/MenuView';
+import { CategoriesView } from './views/CategoriesView';
 import { StaffView } from './views/StaffView';
 import { TablesView } from './views/TablesView';
 import { ClosingsView } from './views/ClosingsView';
@@ -37,6 +39,8 @@ import './views/views.css';
 
 type AdminView =
   | 'dashboard'
+  | 'menu'
+  | 'categories'
   | 'prices'
   | 'bulk'
   | 'modifiers'
@@ -48,6 +52,8 @@ type AdminView =
 
 const NAV_ITEMS: { id: AdminView; label: string; icon: AppIconName }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+  { id: 'menu', label: 'Menú', icon: 'package' },
+  { id: 'categories', label: 'Apartados', icon: 'layers' },
   { id: 'prices', label: 'Precios', icon: 'cash' },
   { id: 'bulk', label: 'Carga Masiva', icon: 'package' },
   { id: 'modifiers', label: 'Tamaños', icon: 'sliders' },
@@ -153,6 +159,8 @@ function AdminApp() {
           </header>
 
           {view === 'dashboard' && <DashboardView token={token} onToast={handleToast} />}
+          {view === 'menu' && <MenuView token={token} onToast={handleToast} />}
+          {view === 'categories' && <CategoriesView token={token} onToast={handleToast} />}
           {view === 'prices' && <PriceEditorView token={token} onToast={handleToast} />}
           {view === 'bulk' && <BulkPricesView token={token} onToast={handleToast} />}
           {view === 'modifiers' && <ModifierOptionsView token={token} onToast={handleToast} />}

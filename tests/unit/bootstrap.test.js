@@ -220,4 +220,57 @@ describe('ensureBootstrap', () => {
     expect(fam.price_adjustment).toBe(4000);
     db.close();
   });
+
+  // ═══ MENU_MANAGEMENT=admin (2026-08-25): el admin gestiona el menú en PROD ═══
+
+  it('MENU_MANAGEMENT=admin: NO importa el seed si ya hay items (no pisa ediciones)', () => {
+    process.env.MENU_MANAGEMENT = 'admin';
+    try {
+      const db = makeDb();
+      ensureBootstrap(db); // primera vez: DB vacía → importa seed
+
+      // Editar un precio como haría el admin (persiste en la DB)
+      db.prepare("UPDATE menu_items SET price = 7777 WHERE name = 'Canasta Rey'").run();
+
+      ensureBootstrap(db); // segundo arranque en modo admin → NO debe pisar
+
+      const price = db.prepare("SELECT price FROM menu_items WHERE name = 'Canasta Rey'").get().price;
+      expect(price).toBe(7777); // la edición del admin SOBREVIVE al reinicio
+
+      // Y el tamaño de pizza editado también sobrevive
+      db.prepare(`
+        UPDATE modifier_options SET price_adjustment = 5555
+        WHERE id IN (
+          SELECT mo.id FROM modifier_options mo
+          JOIN modifier_groups mg ON mo.group_id = mg.id
+          JOIN menu_items mi ON mg.menu_item_id = mi.id
+          WHERE mi.name = 'La Rey' AND mo.name = 'Familiar'
+        )
+      `).run();
+      ensureBootstrap(db);
+      const fam = db.prepare(`
+        SELECT mo.price_adjustment FROM modifier_options mo
+        JOIN modifier_groups mg ON mo.group_id = mg.id
+        JOIN menu_items mi ON mg.menu_item_id = mi.id
+        WHERE mi.name = 'La Rey' AND mo.name = 'Familiar'
+      `).get();
+      expect(fam.price_adjustment).toBe(5555);
+      db.close();
+    } finally {
+      delete process.env.MENU_MANAGEMENT;
+    }
+  });
+
+  it('MENU_MANAGEMENT=admin: importa el seed en DB VACÍA (primera instalación)', () => {
+    process.env.MENU_MANAGEMENT = 'admin';
+    try {
+      const db = makeDb();
+      const result = ensureBootstrap(db);
+      expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(105);
+      expect(result.steps).toContain('menu-loaded');
+      db.close();
+    } finally {
+      delete process.env.MENU_MANAGEMENT;
+    }
+  });
 });
