@@ -62,8 +62,12 @@ export function TablesView({ token, onToast }: TablesViewProps) {
     setQrLoading(true);
     // Opción A: URL estática estable → el QR es único e imprimible una vez.
     // La sesión se crea lazy en el servidor cuando el cliente abre la URL.
-    const result = await getStaticTableQrUrl(token, table.number);
-    setQrLoading(false);
+    let result;
+    try {
+      result = await getStaticTableQrUrl(token, table.number);
+    } finally {
+      setQrLoading(false);
+    }
     if (result.ok && result.url) {
       setQrUrl(result.url);
     } else {
@@ -138,27 +142,27 @@ export function TablesView({ token, onToast }: TablesViewProps) {
           <h3>Nueva mesa</h3>
           <div className="admin-tables__config">
             <div className="admin-tables__field">
-              <label>Número</label>
+              <label htmlFor="table-number">Número</label>
               <FormField
+                id="table-number"
                 type="number"
                 min="1"
                 max="50"
                 variant="sm" className="form-input--mono"
                 value={newNumber}
                 onChange={e => setNewNumber(e.target.value)}
-                aria-label="Número de mesa"
               />
             </div>
             <div className="admin-tables__field">
-              <label>Capacidad</label>
+              <label htmlFor="table-capacity">Capacidad</label>
               <FormField
+                id="table-capacity"
                 type="number"
                 min="1"
                 max="20"
                 variant="sm" className="form-input--mono"
                 value={newCapacity}
                 onChange={e => setNewCapacity(e.target.value)}
-                aria-label="Capacidad de mesa"
               />
             </div>
             <Button variant="primary" onClick={handleCreate} loading={creating}>Crear mesa</Button>
@@ -205,7 +209,12 @@ export function TablesView({ token, onToast }: TablesViewProps) {
       </Card>
 
       {qrTable && (
-        <div className="admin-modal-overlay" onClick={() => setQrTable(null)}>
+        <div
+          className="admin-modal-overlay"
+          onClick={() => setQrTable(null)}
+          role="button"
+          aria-label="Cerrar modal QR"
+        >
           <Card className="admin-qr-modal" onClick={e => e.stopPropagation()}>
             <div className="admin-qr-modal__head">
               <h3>QR — Mesa {qrTable.number}</h3>

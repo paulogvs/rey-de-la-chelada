@@ -99,6 +99,9 @@ export function useTableSession(): TableSession {
 
   const callWaiterDebounceRef = useRef<number>(0);
   const retryCountRef = useRef(0);
+  // Timer de retry limpio en unmount (fix react-doctor effect-needs-cleanup):
+  // evita setState en componente desmontado si el componente se va antes del retry.
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const MAX_RETRIES = 3;
 
   // Evaluate session state
@@ -189,13 +192,22 @@ export function useTableSession(): TableSession {
 
       // Reset retry count on success
       retryCountRef.current = 0;
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
     } catch (err) {
       console.error('[useTableSession] Error evaluating session:', err);
 
-      // Retry logic
+      // Retry logic (timer limpio en unmount — no setState post-unmount)
       if (retryCountRef.current < MAX_RETRIES) {
         retryCountRef.current++;
-        setTimeout(() => void evaluateSession(), 1000 * Math.pow(2, retryCountRef.current));
+        const delay = 1000 * Math.pow(2, retryCountRef.current);
+        if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = setTimeout(() => {
+          retryTimerRef.current = null;
+          void evaluateSession();
+        }, delay);
       }
 
       setSession(prev => ({
@@ -246,6 +258,10 @@ export function useTableSession(): TableSession {
       unsubscribe();
       stopPolling();
       document.removeEventListener('visibilitychange', onVisibility);
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
     };
   }, [evaluateSession]);
 

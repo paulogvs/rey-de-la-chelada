@@ -13,10 +13,13 @@ export function PaymentsView({ token, onToast }: { token: string; onToast: (type
 
   const load = useCallback(async () => {
     setLoading(true);
-    const result = await fetchPayments(token);
-    if (!result.ok) onToast('error', result.error || 'No se pudieron cargar los pagos');
-    setPayments(result.payments);
-    setLoading(false);
+    try {
+      const result = await fetchPayments(token);
+      if (!result.ok) onToast('error', result.error || 'No se pudieron cargar los pagos');
+      setPayments(result.payments);
+    } finally {
+      setLoading(false);
+    }
   }, [token, onToast]);
 
   useEffect(() => { load(); }, [load]);

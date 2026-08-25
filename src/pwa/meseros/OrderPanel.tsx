@@ -1021,11 +1021,11 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
 
             {/* Modifiers */}
             {detailGroups.map(group => (
-              <div key={group.id} className="order-panel__detail-mod-group">
-                <label className="order-panel__detail-mod-label">
+              <fieldset key={group.id} className="order-panel__detail-mod-group">
+                <legend className="order-panel__detail-mod-label">
                   {group.name}
                   {group.required && <span className="text-muted"> (requerido)</span>}
-                </label>
+                </legend>
                 <div className="order-panel__detail-mod-options">
                   {group.options.map(opt => {
                     const selected = itemModifiers.some(m => m.id === opt.option_id);
@@ -1065,7 +1065,7 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
                     );
                   })}
                 </div>
-              </div>
+              </fieldset>
             ))}
 
             {/* Notes */}

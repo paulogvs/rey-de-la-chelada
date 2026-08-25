@@ -23,12 +23,10 @@ export default defineConfig({
     testTimeout: 60000,
     // F1: pool forks aísla cada archivo → evita contaminación de DB_PATH
     // entre tests de integración que bootean servidores reales.
+    // Vitest 4: `poolOptions.forks.singleFork` fue reemplazado por
+    // `fileParallelism` top-level (singleFork:false ⇔ fileParallelism:true).
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: false,
-      },
-    },
+    fileParallelism: true,
     coverage: {
       provider: 'v8',
       include: ['src/core/engine/**', 'server/**'],

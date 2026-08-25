@@ -25,10 +25,13 @@ export function OrderHistoryView({ token, businessDay, title = 'Pedidos cobrados
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const result = await fetchOrderHistory(token, businessDay);
-    if (result.ok) setOrders(result.orders);
-    else setError(result.error || 'No se pudo cargar el historial');
-    setLoading(false);
+    try {
+      const result = await fetchOrderHistory(token, businessDay);
+      if (result.ok) setOrders(result.orders);
+      else setError(result.error || 'No se pudo cargar el historial');
+    } finally {
+      setLoading(false);
+    }
   }, [token, businessDay]);
 
   useEffect(() => { load(); }, [load, refreshTick]);

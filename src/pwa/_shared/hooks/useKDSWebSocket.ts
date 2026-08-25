@@ -225,8 +225,13 @@ export function useKDSWebSocket(options: UseKDSWebSocketOptions = {}): UseKDSWeb
   const onEventRef = useRef(onEvent);
   const onFallbackRef = useRef(onFallback);
 
-  onEventRef.current = onEvent;
-  onFallbackRef.current = onFallback;
+  // Latest-ref pattern: actualizar los refs en un effect (no durante el
+  // render) — fix react-doctor no-ref-current-in-render. Sin deps para
+  // que el ref SIEMPRE tenga el callback más reciente.
+  useEffect(() => {
+    onEventRef.current = onEvent;
+    onFallbackRef.current = onFallback;
+  });
 
   const reconnect = useCallback(() => {
     setReconnectTick(t => t + 1);

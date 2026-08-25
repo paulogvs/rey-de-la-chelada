@@ -98,15 +98,17 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const result = await fetchPendingOrders(token);
-    if (!result.ok) {
-      setError(result.error || 'No se pudieron cargar los pedidos pendientes');
+    try {
+      const result = await fetchPendingOrders(token);
+      if (!result.ok) {
+        setError(result.error || 'No se pudieron cargar los pedidos pendientes');
+        return;
+      }
+      setOrders(result.orders);
+      setError(null);
+    } finally {
       setLoading(false);
-      return;
     }
-    setOrders(result.orders);
-    setError(null);
-    setLoading(false);
   }, [token]);
 
   useEffect(() => {
@@ -283,8 +285,10 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
                     </div>
 
                     <div className="caja-collect__pay-field">
-                      <label>Modalidad</label>
-                      <SegmentedControl options={[{ value: 'simple', label: 'Un método' }, { value: 'mixed', label: 'Mixto' }]} value={paymentMode} onChange={value => setPaymentMode(value as 'simple' | 'mixed')} />
+                      <fieldset className="caja-collect__pay-group">
+                        <legend className="caja-collect__pay-label">Modalidad</legend>
+                        <SegmentedControl options={[{ value: 'simple', label: 'Un método' }, { value: 'mixed', label: 'Mixto' }]} value={paymentMode} onChange={value => setPaymentMode(value as 'simple' | 'mixed')} />
+                      </fieldset>
                     </div>
 
                     {paymentMode === 'mixed' ? (

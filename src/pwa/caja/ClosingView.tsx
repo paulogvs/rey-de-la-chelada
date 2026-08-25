@@ -50,20 +50,23 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [curResult, dailyResult] = await Promise.all([
-      fetchClosingCurrent(token),
-      fetchDailySales(token, today, ivaRate),
-    ]);
+    try {
+      const [curResult, dailyResult] = await Promise.all([
+        fetchClosingCurrent(token),
+        fetchDailySales(token, today, ivaRate),
+      ]);
 
-    const open = curResult.ok ? curResult.closing : null;
-    setClosing(open);
-    setDaily(dailyResult.ok ? dailyResult.daily : null);
+      const open = curResult.ok ? curResult.closing : null;
+      setClosing(open);
+      setDaily(dailyResult.ok ? dailyResult.daily : null);
 
-    // Pre-fill actual cash with expected when opening fresh
-    if (open && open.expected_cash !== undefined) {
-      setActualCash(open.expected_cash);
+      // Pre-fill actual cash with expected when opening fresh
+      if (open && open.expected_cash !== undefined) {
+        setActualCash(open.expected_cash);
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [token, today, ivaRate]);
 
   useEffect(() => {
@@ -121,7 +124,7 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
         {closing ? (
           <div className="caja-close__fields">
             <div className="caja-close__field">
-              <label>Iniciado</label>
+              <span className="caja-close__field-label">Iniciado</span>
               <div className="caja-close__value">
                 {localDateTimeStr(new Date(closing.opened_at))}
               </div>
@@ -131,15 +134,16 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
               {/* C5 (SSOT): expected_cash = SOLO efectivo físico;
                   ventas QR NO van al cajón. La diferencia contra el
                   efectivo real se calcula contra este total. */}
-              <label>Efectivo esperado en cajón (solo físico — QR es digital)</label>
+              <span className="caja-close__field-label">Efectivo esperado en cajón (solo físico — QR es digital)</span>
               <div className="caja-close__value">
                 {formatMoney(closing.expected_cash ?? 0)}
               </div>
             </div>
 
             <div className="caja-close__field">
-              <label>Efectivo real en caja</label>
+              <label htmlFor="actual-cash">Efectivo real en caja</label>
               <MoneyInput
+                id="actual-cash"
                 variant="lg"
                 className="form-input--mono"
                 value={actualCash}
@@ -148,15 +152,16 @@ export function ClosingView({ token, today, ivaRate, refreshTick, onClosingUpdat
             </div>
 
             <div className="caja-close__field">
-              <label>Diferencia</label>
+              <span className="caja-close__field-label">Diferencia</span>
               <div className={`caja-close__diff ${difference >= 0 ? 'positive' : 'negative'}`}>
                 {difference >= 0 ? '+' : ''}{formatMoney(difference)}
               </div>
             </div>
 
             <div className="caja-close__field">
-              <label>Notas</label>
+              <label htmlFor="closing-notes">Notas</label>
               <textarea
+                id="closing-notes"
                 className="caja-close__textarea"
                 value={notes}
                 onChange={e => setNotes(e.target.value)}

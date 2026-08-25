@@ -118,12 +118,11 @@ export function useClientOrder() {
     retriesRef.current = 0;
     const status = result.data.status;
     const total = result.data.total;
-    setOrder(prev => {
-      if (!prev) return prev;
-      const next = { ...prev, status, total };
-      orderRef.current = next;
-      return next;
-    });
+    // Updater puro (fix react-doctor no-impure-state-updater): NO se toca
+    // orderRef aquí. orderRef se sincroniza automáticamente vía el effect
+    // que observa `order` (más arriba), manteniéndolo estable sin side
+    // effects dentro del updater (evita doble-ejecución en StrictMode).
+    setOrder(prev => (prev ? { ...prev, status, total } : prev));
     if (isTerminalStatus(status)) {
       stopPolling();
       if (status === 'paid') setPhase('paid');

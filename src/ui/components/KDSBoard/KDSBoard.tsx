@@ -103,14 +103,17 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
   const loadOrdersRef = useRef<() => void>(() => {});
   const audioRef = useRef(true);
 
-  audioRef.current = audioEnabled;
-
   // WebSocket — real-time del módulo (inmediatez) + polling 10s SIEMPRE
   // activo como red de seguridad (ver useEffect de polling abajo).
   const ws = useKDSWebSocket({
     module,
     onFallback: () => loadOrdersRef.current(),
   });
+
+  // Mantener audioRef sincronizado fuera del render (no-ref-current-in-render).
+  useEffect(() => {
+    audioRef.current = audioEnabled;
+  }, [audioEnabled]);
 
   // Snapshot inicial con token — arregla el KDS vacío al refrescar.
   useEffect(() => {
@@ -170,7 +173,10 @@ export function KDSBoard({ module, title, icon, token }: KDSBoardProps) {
     setLoading(false);
   }, [module]);
 
-  loadOrdersRef.current = loadOrders;
+  // Sincronizar loadOrdersRef fuera del render (no-ref-current-in-render).
+  useEffect(() => {
+    loadOrdersRef.current = loadOrders;
+  }, [loadOrders]);
 
   // Keep connection badge in sync
   useEffect(() => {

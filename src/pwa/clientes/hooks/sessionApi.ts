@@ -34,6 +34,9 @@ export async function getOrCreateSession(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
+    if (!res.ok) {
+      return { success: false, valid: false, reason: `Servidor respondió ${res.status}` };
+    }
     const data = await res.json().catch(() => null);
     if (!data) {
       return { success: false, valid: false, reason: 'Respuesta inválida del servidor' };
@@ -69,6 +72,9 @@ export async function validateClientSession(
     const res = await fetch(
       `/api/client-sessions/${encodeURIComponent(sessionId)}/validate?mesa=${tableNumber}`
     );
+    if (!res.ok) {
+      return { success: false, valid: false, reason: `Servidor respondió ${res.status}` };
+    }
     const data = await res.json().catch(() => null);
     if (!data) {
       return { success: false, valid: false, reason: 'Respuesta inválida del servidor' };

@@ -101,8 +101,12 @@ export function ModifierOptionsView({ token, onToast }: ModifierOptionsViewProps
     }
 
     setSaving(true);
-    const result = await bulkUpdateModifierPrices(token, updates);
-    setSaving(false);
+    let result;
+    try {
+      result = await bulkUpdateModifierPrices(token, updates);
+    } finally {
+      setSaving(false);
+    }
 
     if (result.ok) {
       const okIds = new Set(result.errors.map(e => e.id));

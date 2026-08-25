@@ -61,8 +61,9 @@ export function InvoiceView() {
 
         <div className="caja-invoice__fields">
           <div className="caja-invoice__field">
-            <label>NIT / CI</label>
+            <label htmlFor="invoice-nit">NIT / CI</label>
             <FormField
+              id="invoice-nit"
               type="text"
               variant="lg"
               value={invoiceNit}
@@ -72,8 +73,9 @@ export function InvoiceView() {
           </div>
 
           <div className="caja-invoice__field">
-            <label>Razón Social / Nombre</label>
+            <label htmlFor="invoice-name">Razón Social / Nombre</label>
             <FormField
+              id="invoice-name"
               type="text"
               variant="lg"
               value={invoiceName}
@@ -83,8 +85,9 @@ export function InvoiceView() {
           </div>
 
           <div className="caja-invoice__field">
-            <label>Nº de Pedido</label>
+            <label htmlFor="invoice-order-id">Nº de Pedido</label>
             <FormField
+              id="invoice-order-id"
               type="text"
               variant="lg"
               value={invoiceOrderId}
@@ -94,8 +97,9 @@ export function InvoiceView() {
           </div>
 
           <div className="caja-invoice__field">
-            <label>Monto (Bs)</label>
+            <label htmlFor="invoice-amount">Monto (Bs)</label>
             <MoneyInput
+              id="invoice-amount"
               variant="lg"
               className="form-input--mono"
               value={invoiceAmount}

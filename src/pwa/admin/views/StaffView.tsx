@@ -138,22 +138,23 @@ export function StaffView({ token, onToast }: StaffViewProps) {
 
                 <div className="admin-staff-row__actions">
                   <div className="admin-staff-field">
-                    <label>Nombre visible</label>
+                    <label htmlFor={`staff-name-${member.id}`}>Nombre visible</label>
                     <div className="admin-staff-inline">
                       <FormField
+                        id={`staff-name-${member.id}`}
                         variant="sm" className="form-input--mono"
                         value={names[member.id] ?? member.display_name}
                         onChange={e => handleNameChange(member.id, e.target.value)}
-                        aria-label={`Nombre de ${ROLE_LABEL[member.role]}`}
                       />
                       <Button variant="ghost" size="sm" onClick={() => handleSaveName(member)}>OK</Button>
                     </div>
                   </div>
 
                   <div className="admin-staff-field">
-                    <label>Nuevo PIN (4-6 dígitos)</label>
+                    <label htmlFor={`staff-pin-${member.id}`}>Nuevo PIN (4-6 dígitos)</label>
                     <div className="admin-staff-inline">
                       <FormField
+                        id={`staff-pin-${member.id}`}
                         type="password"
                         inputMode="numeric"
                         maxLength={6}
@@ -161,7 +162,6 @@ export function StaffView({ token, onToast }: StaffViewProps) {
                         value={pinDraft?.pin ?? ''}
                         placeholder="••••"
                         onChange={e => handlePinChange(member.id, e.target.value)}
-                        aria-label={`Nuevo PIN de ${ROLE_LABEL[member.role]}`}
                       />
                       <Button
                         variant="secondary"

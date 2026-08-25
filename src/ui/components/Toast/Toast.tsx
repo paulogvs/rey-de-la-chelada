@@ -7,7 +7,7 @@
  * Zero hardcoded colors
  */
 
-import React, { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react';
+import React, { useState, useEffect, useCallback, useRef, createContext, useContext, type ReactNode } from 'react';
 import { AppIcon, type AppIconName } from '../AppIcon/AppIcon';
 import './Toast.css';
 
@@ -75,18 +75,35 @@ interface ToastItemProps {
 
 function ToastItemComponent({ toast, onDismiss }: ToastItemProps) {
   const [exiting, setExiting] = useState(false);
+  // Ref único para el timer de dismiss: evita doble-dismiss (click + auto)
+  // y permite limpiarlo en unmount (fix react-doctor effect-needs-cleanup).
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleDismiss = useCallback(() => {
+    if (dismissTimerRef.current) return;
+    dismissTimerRef.current = setTimeout(() => {
+      dismissTimerRef.current = null;
+      onDismiss();
+    }, 300);
+  }, [onDismiss]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const autoTimer = setTimeout(() => {
       setExiting(true);
-      setTimeout(onDismiss, 300);
+      scheduleDismiss();
     }, toast.duration);
-    return () => clearTimeout(timer);
-  }, [toast.duration, onDismiss]);
+    return () => {
+      clearTimeout(autoTimer);
+      if (dismissTimerRef.current) {
+        clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = null;
+      }
+    };
+  }, [toast.duration, scheduleDismiss]);
 
   const handleDismiss = () => {
     setExiting(true);
-    setTimeout(onDismiss, 300);
+    scheduleDismiss();
   };
 
   const classes = [

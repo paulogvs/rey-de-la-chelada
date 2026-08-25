@@ -92,8 +92,12 @@ export function BulkPricesView({ token, onToast }: BulkPricesViewProps) {
     }
 
     setSaving(true);
-    const result = await bulkUpdateItemPrices(token, updates);
-    setSaving(false);
+    let result;
+    try {
+      result = await bulkUpdateItemPrices(token, updates);
+    } finally {
+      setSaving(false);
+    }
 
     if (result.ok) {
       // Mark saved status per updated id

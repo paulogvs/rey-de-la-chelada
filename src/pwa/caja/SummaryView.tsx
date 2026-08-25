@@ -34,15 +34,17 @@ export function SummaryView({ token, today, ivaRate, refreshTick }: SummaryViewP
 
   const load = useCallback(async () => {
     setLoading(true);
-    const result = await fetchDailySales(token, today, ivaRate);
-    if (!result.ok || !result.daily) {
-      setError(result.error || 'No se pudo cargar el reporte diario');
+    try {
+      const result = await fetchDailySales(token, today, ivaRate);
+      if (!result.ok || !result.daily) {
+        setError(result.error || 'No se pudo cargar el reporte diario');
+        return;
+      }
+      setSummary(result.daily);
+      setError(null);
+    } finally {
       setLoading(false);
-      return;
     }
-    setSummary(result.daily);
-    setError(null);
-    setLoading(false);
   }, [token, today, ivaRate]);
 
   useEffect(() => {

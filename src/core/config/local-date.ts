@@ -20,6 +20,39 @@
 /** Zona horaria del negocio (Bolivia, UTC-4, sin DST) */
 export const BUSINESS_TIMEZONE = 'America/La_Paz';
 
+// Formatters hoisteados (react-doctor js-hoist-intl): se crean UNA vez al
+// cargar el módulo. Construir Intl en cada llamada desperdicia CPU, sobre
+// todo en cortes/reportes y render de componentes que formatean fechas.
+const DATE_FMT = new Intl.DateTimeFormat('en-US', {
+  timeZone: BUSINESS_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+const DATETIME_FMT = new Intl.DateTimeFormat('en-US', {
+  timeZone: BUSINESS_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+const TIME_FMT = new Intl.DateTimeFormat('en-US', {
+  timeZone: BUSINESS_TIMEZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+const HOUR_FMT = new Intl.DateTimeFormat('en-US', {
+  timeZone: BUSINESS_TIMEZONE,
+  hour: '2-digit',
+  hour12: false,
+});
+
 /**
  * Hora local en la que inicia el DÍA LABORAL (turno 15:00 → termina 06:00
  * del día siguiente). DEBE coincidir con server/utils/date-utils.js
@@ -34,12 +67,7 @@ export const BUSINESS_DAY_START_HOUR = 15;
  * @returns string 'YYYY-MM-DD' local del negocio
  */
 export function localDateStr(date: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: BUSINESS_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
+  const parts = DATE_FMT.formatToParts(date);
   const get = (type: string) => (parts.find(p => p.type === type) || {}).value;
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
@@ -51,15 +79,7 @@ export function localDateStr(date: Date = new Date()): string {
  * @returns string 'DD/MM/YYYY HH:mm' local del negocio
  */
 export function localDateTimeStr(date: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: BUSINESS_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(date);
+  const parts = DATETIME_FMT.formatToParts(date);
   const get = (type: string) => (parts.find(p => p.type === type) || {}).value;
   return `${get('day')}/${get('month')}/${get('year')} ${get('hour')}:${get('minute')}`;
 }
@@ -71,12 +91,7 @@ export function localDateTimeStr(date: Date = new Date()): string {
  * @returns string 'HH:mm' local del negocio
  */
 export function localTimeStr(date: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: BUSINESS_TIMEZONE,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(date);
+  const parts = TIME_FMT.formatToParts(date);
   const get = (type: string) => (parts.find(p => p.type === type) || {}).value;
   return `${get('hour')}:${get('minute')}`;
 }
@@ -87,11 +102,7 @@ export function localTimeStr(date: Date = new Date()): string {
  * @returns string hora local '00'..'23'
  */
 export function localHour(date: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: BUSINESS_TIMEZONE,
-    hour: '2-digit',
-    hour12: false,
-  }).formatToParts(date);
+  const parts = HOUR_FMT.formatToParts(date);
   const h = parts.find(p => p.type === 'hour')?.value || '00';
   // Intl puede emitir '24' a medianoche (hourCycle h24) → normalizar a '00'
   return h === '24' ? '00' : h;
