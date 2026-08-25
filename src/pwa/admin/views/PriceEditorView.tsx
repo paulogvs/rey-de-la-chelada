@@ -88,7 +88,13 @@ export function PriceEditorView({ token, onToast }: PriceEditorViewProps) {
     });
   }, [items, search, categoryId]);
 
-  const nullCount = useMemo(() => items.filter(i => i.price == null).length, [items]);
+  // La alerta cuenta SOLO productos facturables sin precio base (barra/cocina).
+  // Las promociones (ej. "Jueves de Chelada 2x1") tienen lógica propia de
+  // cálculo (módulo promotions) y NO son productos — no afectan la alerta.
+  const nullCount = useMemo(
+    () => items.filter(i => i.price == null && i.category_name !== 'Promociones').length,
+    [items]
+  );
 
   const handleDraftChange = useCallback((id: string, cents: number) => {
     setDrafts(prev => ({ ...prev, [id]: { value: cents, saving: false, saved: null } }));
