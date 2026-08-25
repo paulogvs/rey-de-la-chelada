@@ -36,6 +36,23 @@ interface ItemDraft {
   saved: 'ok' | 'err' | null;
 }
 
+/**
+ * Etiqueta descriptiva para items SIN precio base (UI admin).
+ * Por diseño hay 3 casos legítimos sin precio:
+ *   - price_variable=1        → "Precio manual" (mesero define al momento)
+ *   - categoría Pizzas        → "Por tamaño" (Mediana/Familiar, la variante define el precio)
+ *   - categoría Promociones   → "Variable 2x1" / "Variable" (promo con lógica propia)
+ */
+function priceLabel(item: AdminMenuItem): string {
+  if (item.price_variable === 1) return 'Precio manual';
+  const cat = (item.category_name ?? '').toLowerCase();
+  if (cat.includes('pizza')) return 'Por tamaño';
+  if (cat.includes('promocion')) {
+    return item.name.toLowerCase().includes('2x1') ? 'Variable 2x1' : 'Variable';
+  }
+  return 'Sin precio';
+}
+
 export function PriceEditorView({ token, onToast }: PriceEditorViewProps) {
   const [items, setItems] = useState<AdminMenuItem[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
@@ -136,7 +153,7 @@ export function PriceEditorView({ token, onToast }: PriceEditorViewProps) {
           <AppIcon name="refresh" size="sm" /> Refrescar
         </Button>
         <Badge variant={nullCount > 0 ? 'pending' : 'paid'}>
-          {nullCount} sin precio
+          {nullCount} sin precio base
         </Badge>
       </div>
 
@@ -163,7 +180,7 @@ export function PriceEditorView({ token, onToast }: PriceEditorViewProps) {
                   <div className="admin-price-row__info">
                     <span className="admin-price-row__name">{item.name}</span>
                     <span className="admin-price-row__cat">{item.category_name}</span>
-                    {item.price == null && <Badge variant="pending">SIN PRECIO</Badge>}
+                    {item.price == null && <Badge variant="pending">{priceLabel(item)}</Badge>}
                   </div>
                   <div className="admin-price-row__edit">
                     <div className="admin-price-input">

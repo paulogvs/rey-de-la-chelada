@@ -22,6 +22,8 @@ export interface AdminMenuItem {
   category_id: string;
   category_name: string;
   price: number | null;
+  /** 1 = precio manual ("Consultar") — el mesero define el precio al momento */
+  price_variable?: number | null;
   is_active: number;
   is_available: number;
   area: string | null;
