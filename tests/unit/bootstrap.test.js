@@ -8,7 +8,7 @@
  * first boot: staff (admin/mesero/kds) + tables + real menu + prices.
  *
  * Verifica:
- *  - empty DB → staff(4: admin/mesero/kds/caja) + tables(10) + categories(18) + items(102)
+ *  - empty DB → staff(4: admin/mesero/kds/caja) + tables(10) + categories(19) + items(105)
  *  - idempotente: second run duplicates nothing
  *  - S1/v5: DB con staff existente → ensureBootstrap asegura el rol caja sin duplicar
  *  - official seed prices replace stale catalog prices on existing DB
@@ -16,7 +16,7 @@
  *    items "Consultar precio" (price_variable=1, 2) y la promo display
  *    "Jueves de Chelada 2x1" (price_variable=0, no facturable). El demo no
  *    pisa manuales ni promos.
- *  - 2026-08-20: catálogo oficial — BAR 69 + COCINA 33 = 102 items, 18 categorías. Sin XL.
+ *  - 2026-08-20: catálogo oficial — BAR 72 + COCINA 33 = 105 items, 19 categorías. Sin XL.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -43,9 +43,9 @@ describe('ensureBootstrap', () => {
     // Tables: 10
     expect(db.prepare('SELECT COUNT(*) AS n FROM tables').get().n).toBe(10);
 
-    // Real menu: 18 categories, 102 explicit catalog lines.
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n).toBe(18);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(102);
+    // Real menu: 19 categories, 105 explicit catalog lines.
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n).toBe(19);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(105);
     expect(db.prepare("SELECT COUNT(*) AS n FROM menu_categories WHERE name = 'Cervezas'").get().n).toBe(0);
 
     // Sprint 1: precios REALES del seed cargados (los items BAR ya no son null).
@@ -81,8 +81,8 @@ describe('ensureBootstrap', () => {
     expect(second.seeded).toBe(false);
     expect(db.prepare('SELECT COUNT(*) AS n FROM staff').get().n).toBe(4);
     expect(db.prepare('SELECT COUNT(*) AS n FROM tables').get().n).toBe(10);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n).toBe(18);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(102);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n).toBe(19);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(105);
     expect(db.prepare('SELECT COUNT(*) AS n FROM modifier_groups').get().n).toBeGreaterThan(0);
     db.close();
   });
