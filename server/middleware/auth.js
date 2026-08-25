@@ -20,12 +20,14 @@ import jwt from 'jsonwebtoken';
 // Config
 // ============================================================
 
-// T5 (S1): JWT_SECRET real. Fail loud — si no hay secret en env, avisamos
-// en consola en vez de seguir en silencio con el fallback de desarrollo.
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-do-not-use-in-production';
+// T5 (S1): JWT_SECRET real. Fail loud — si no hay secret en env, usamos
+// un UUID aleatorio (no funcional) para que JWT sign/verify falle en vez
+// de usar un secret predecible en producción.
+import { randomUUID } from 'node:crypto';
+const JWT_SECRET = process.env.JWT_SECRET || randomUUID();
 if (!process.env.JWT_SECRET) {
   console.warn(
-    '[Auth] ⚠️ JWT_SECRET NO configurado — usando fallback de DESARROLLO. ' +
+    '[Auth] ⚠️ JWT_SECRET NO configurado — usando fallback aleatorio (tokens no funcionarán). ' +
     'Configura JWT_SECRET en .env (ver .env.example) antes de producción.'
   );
 }
