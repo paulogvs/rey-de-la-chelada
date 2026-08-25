@@ -85,17 +85,27 @@ Sin mapa visual. Sin drag-and-drop. Sin posiciones absolutas.
 - [ ] FR08: Basic cash closing (corte de caja with IVA 13%)
 - [ ] FR09: IVA 13% handling (included in all prices)
 
-### Phase 2 — Growth
-- [ ] FR10: Inventory with recipe-based auto-deduction
-- [ ] FR11: Supplier management + purchase orders
-- [ ] FR12: Reports dashboard (sales, products, staff)
-- [ ] FR13: Multi-device sync (local network + cloud via Tailscale)
+## 3b. Recommended Improvements (not roadmap phases)
 
-### Phase 3 — Advanced
-- [ ] FR14: Delivery integration (pedidos ya, etc.)
-- [ ] FR15: Loyalty program (clientes frecuentes)
-- [ ] FR16: Multi-branch support
-- [ ] FR17: AI-powered stock prediction
+> These are NOT pending project phases — they are improvement recommendations to evaluate when the business needs them.
+
+**Operations**
+- Inventory with recipe-based auto-deduction
+- Supplier management + purchase orders
+
+**Analytics**
+- Reports dashboard (sales, products, staff)
+
+**Network**
+- Multi-device sync (local network + cloud via Tailscale)
+
+**Growth**
+- Delivery integration (pedidos ya, etc.)
+- Loyalty program (clientes frecuentes)
+
+**Expansion**
+- Multi-branch support
+- AI-powered stock prediction
 
 ## 4. Architecture
 - **Pattern**: Modular Monolith with domain modules
