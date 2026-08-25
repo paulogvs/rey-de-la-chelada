@@ -49,13 +49,14 @@ describe('ensureBootstrap', () => {
     expect(db.prepare("SELECT COUNT(*) AS n FROM menu_categories WHERE name = 'Cervezas'").get().n).toBe(0);
 
     // Sprint 1: precios REALES del seed cargados (los items BAR ya no son null).
-    // Solo quedan NULL: 2 items "Consultar precio" (price_variable=1) + 1 promo
-    // display (Jueves de Chelada 2x1, price_variable=0, no facturable) + 5 pizzas
-    // (precio por variante Mediana/Familiar, base NULL por diseño).
+    // Solo quedan NULL: 1 item "Consultar precio" (Churrasco Italiano,
+    // price_variable=1) + 1 promo display (Jueves de Chelada 2x1,
+    // price_variable=0, no facturable). Las 5 pizzas AHORA tienen precio base
+    // (Mediana) + ajuste Familiar en modifier_options (Opción B 2026-08-25).
     expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND price_variable = 1').get().n).toBe(1);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND price_variable = 0').get().n).toBe(6);
-    // El demo rellenó TODA la cocina EXCEPTO pizzas (5 con price null por variante)
-    expect(db.prepare("SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND area = 'cocina'").get().n).toBe(6);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND price_variable = 0').get().n).toBe(1);
+    // El demo rellenó TODA la cocina EXCEPTO el item manual (Churrasco Italiano)
+    expect(db.prepare("SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND area = 'cocina'").get().n).toBe(1);
     // Sprint Promos (2026-08-19): Opción A aprobada — el seed ya NO trae
     // promo_price en Signature (Isla Dorada 40) ni artesanales (Negra 15).
     // El descuento vive en las promos por día laboral (botones manuales).
@@ -139,7 +140,7 @@ describe('ensureBootstrap', () => {
     ensureBootstrap(db);
     ensureBootstrap(db);
 
-    // La Rey: Mediana 5000 / Familiar 9000 (centavos)
+    // La Rey (Opción B): precio base 5000 (Mediana) + ajuste Familiar +4000
     const laRey = db.prepare(`
       SELECT mo.name, mo.price_adjustment
       FROM modifier_options mo
@@ -149,9 +150,11 @@ describe('ensureBootstrap', () => {
       ORDER BY mo.sort_order
     `).all();
     expect(laRey).toEqual([
-      { name: 'Mediana', price_adjustment: 5000 },
-      { name: 'Familiar', price_adjustment: 9000 },
+      { name: 'Mediana', price_adjustment: 0 },
+      { name: 'Familiar', price_adjustment: 4000 },
     ]);
+    // La Rey tiene precio base (Mediana) en el item
+    expect(db.prepare("SELECT price FROM menu_items WHERE name = 'La Rey'").get().price).toBe(5000);
     // No existe XL en ningún pizza
     const xlCount = db.prepare(`
       SELECT COUNT(*) AS n FROM modifier_options mo
@@ -183,7 +186,7 @@ describe('ensureBootstrap', () => {
       JOIN menu_items mi ON mg.menu_item_id = mi.id
       WHERE mg.name = 'Tamaño' AND mi.name = 'La Rey' AND mo.name = 'Familiar'
     `).get();
-    expect(fam.price_adjustment).toBe(9000);
+    expect(fam.price_adjustment).toBe(4000);
     db.close();
   });
 
@@ -212,9 +215,9 @@ describe('ensureBootstrap', () => {
       JOIN menu_items mi ON mg.menu_item_id = mi.id
       WHERE mi.name = 'La Rey' AND mo.name = 'Familiar'
     `).get();
-    // Admin puso 9999 → bootstrap NO lo pisa (es un price_adjustment editado, pero el seed tiene valor explícito 9000; el helper conserva si ya existe? Revisar: con precio explícito, el helper hace UPDATE con el valor del seed sólo si hasSeedPrice=true → pisa. Pero la lógica P0-1 conserva solo si seed es null. Con seed explícito (5000/9000), el UPDATE pisaría. Por eso este test verifica que el bootstrap NO pisa el precio del item (Canasta Rey 9900) — el modifier sí se reaplica al valor del seed (9000) si el admin lo cambió. Para este caso, esperamos que reaplique a 9000 porque el seed es explícito.
-    // Ajustamos expectativa: el modifier vuelve al seed (9000) — el item price se conserva.
-    expect(fam.price_adjustment).toBe(9000);
+    // Admin puso 9999 → bootstrap NO lo pisa (es un price_adjustment editado, pero el seed tiene valor explícito 4000; el helper conserva si ya existe? Revisar: con precio explícito, el helper hace UPDATE con el valor del seed sólo si hasSeedPrice=true → pisa. Pero la lógica P0-1 conserva solo si seed es null. Con seed explícito (0/4000), el UPDATE pisaría. Por eso este test verifica que el bootstrap NO pisa el precio del item (Canasta Rey 9900) — el modifier sí se reaplica al valor del seed (4000) si el admin lo cambió. Para este caso, esperamos que reaplique a 4000 porque el seed es explícito.
+    // Ajustamos expectativa: el modifier vuelve al seed (4000) — el item price se conserva.
+    expect(fam.price_adjustment).toBe(4000);
     db.close();
   });
 });

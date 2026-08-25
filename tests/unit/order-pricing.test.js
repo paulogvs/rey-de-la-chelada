@@ -128,17 +128,19 @@ describe('resolveItemUnitPrice', () => {
     expect(r.unitPrice).toBe(1235);
   });
 
-  it('pizza (price null) con tamaño Familiar → el ajuste ES el precio', () => {
-    const pizza = { id: 'm5', name: 'Pizza La Rey', price: null, price_variable: 0, promo_price: null };
+  it('pizza con precio base (Mediana) + tamaño Familiar → base + ajuste', () => {
+    // Opción B (2026-08-25): pizzas con price base + ajuste Familiar en la opción.
+    const pizza = { id: 'm5', name: 'Pizza La Rey', price: 5000, price_variable: 0, promo_price: null };
     const r = resolveItemUnitPrice(db, pizza, { modifiers: [{ optionName: 'Shot + Michelada' }] }); // +1500
     expect(r.error).toBeNull();
-    expect(r.unitPrice).toBe(1500);
+    expect(r.unitPrice).toBe(6500);
   });
 
-  it('pizza (price null) SIN tamaño ni manual → PRICE_REQUIRED_MANUAL (nunca facturar 0)', () => {
-    const pizza = { id: 'm5', name: 'Pizza La Rey', price: null, price_variable: 0, promo_price: null };
+  it('pizza con precio base SIN tamaño → cobra el precio base (nunca 0)', () => {
+    const pizza = { id: 'm5', name: 'Pizza La Rey', price: 5000, price_variable: 0, promo_price: null };
     const r = resolveItemUnitPrice(db, pizza, {});
-    expect(r.error?.code).toBe('PRICE_REQUIRED_MANUAL');
+    expect(r.error).toBeNull();
+    expect(r.unitPrice).toBe(5000);
   });
 
   it('manual explícito gana sobre el ajuste de modifiers', () => {
