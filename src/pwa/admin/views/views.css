@@ -236,6 +236,90 @@
   font-weight: 700;
 }
 
+.admin-bulk-item__saving {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+/* ---- MenuPanel: header de apartado (título + acciones a la derecha) ---- */
+
+.admin-menu-cat__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.admin-menu-cat__header h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.admin-menu-cat__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+/* Header del item: nombre a la izquierda, acciones a la derecha */
+.admin-bulk-item__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.admin-bulk-item__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.admin-bulk-item__prices {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.admin-price-input--familiar {
+  margin-left: var(--space-4);
+}
+
+/* ---- MenuPanel: forms de crear/editar ---- */
+
+.admin-menu-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.admin-menu-form--inline {
+  flex-direction: row;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.admin-menu-form__label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.admin-menu-form__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 /* ---- Staff rows ---- */
 
 .admin-staff-row {
