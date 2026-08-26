@@ -35,6 +35,8 @@ if (!targetSeed && !targetDb) {
 const MOJIBAKE_MAP = [
   // Doble mojibake (triple encoding) — raro pero posible
   ['ÃƒÂ±', 'ñ'], ['ÃƒÂ¡', 'á'], ['ÃƒÂ©', 'é'], ['ÃƒÂ­', 'í'], ['ÃƒÂ³', 'ó'], ['ÃƒÂº', 'ú'], ['ÃƒÂ¼', 'ü'],
+  // Doble-encoding 2ª generación (Jägermeister → "JÍ¤germeister" en el seed viejo)
+  ['Í¤', 'ä'], ['Û¢', 'ü'], ['Ä©', 'é'], ['Ä°', 'í'], ['Ã¼', 'ü'], ['Ä³', 'ó'], ['Ã¡', 'á'],
   // Mojibake simple UTF-8→Latin-1 (el caso real)
   ['Ã±', 'ñ'], ['Ã¡', 'á'], ['Ã©', 'é'], ['Ã­', 'í'], ['Ã³', 'ó'], ['Ãº', 'ú'], ['Ã¼', 'ü'],
   ['Ã€', 'À'], ['Ã‰', 'É'], ['Ãš', 'Ú'], ['Ã“', 'Ó'], ['Ãœ', 'Ü'], ['Ã', 'Í'],

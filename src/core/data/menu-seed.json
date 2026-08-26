@@ -24,13 +24,13 @@
             { "id": "BAR-064", "nombre": "Paraíso Perdido", "precio": 10000 }, { "id": "BAR-065", "nombre": "Sigo Siendo el Rey", "precio": 7000 }, { "id": "BAR-066", "nombre": "Anhelo", "precio": 6500 }
           ]},
           { "nombre_categoria": "Botellas", "items": [
-            { "id": "BAR-037", "nombre": "Flor de Caña", "precio": 26000 }, { "id": "BAR-038", "nombre": "Fernet Menta", "precio": 25000 }, { "id": "BAR-039", "nombre": "Fernet Branca", "precio": 26000 }, { "id": "BAR-040", "nombre": "Havana Reserva 7 Años", "precio": 35000 }, { "id": "BAR-041", "nombre": "Havana Reserva", "precio": 26000 }, { "id": "BAR-042", "nombre": "Havana Especial", "precio": 24000 }, { "id": "BAR-043", "nombre": "JÍ¤germeister", "precio": 37000 }, { "id": "BAR-044", "nombre": "Casa Real Etiqueta Negra", "precio": 25000 }
+            { "id": "BAR-037", "nombre": "Flor de Caña", "precio": 26000 }, { "id": "BAR-038", "nombre": "Fernet Menta", "precio": 25000 }, { "id": "BAR-039", "nombre": "Fernet Branca", "precio": 26000 }, { "id": "BAR-040", "nombre": "Havana Reserva 7 Años", "precio": 35000 }, { "id": "BAR-041", "nombre": "Havana Reserva", "precio": 26000 }, { "id": "BAR-042", "nombre": "Havana Especial", "precio": 24000 }, { "id": "BAR-043", "nombre": "Jägermeister", "precio": 37000 }, { "id": "BAR-044", "nombre": "Casa Real Etiqueta Negra", "precio": 25000 }
           ]},
           { "nombre_categoria": "Jarras", "items": [
             { "id": "BAR-045", "nombre": "Fernet", "precio": 6000 }, { "id": "BAR-046", "nombre": "Chuflay", "precio": 5000 }, { "id": "BAR-047", "nombre": "Mojito", "precio": 5000 }, { "id": "BAR-048", "nombre": "Havana", "precio": 5500 }
           ]},
           { "nombre_categoria": "Shots", "items": [
-            { "id": "BAR-049", "nombre": "Tequila", "precio": 2500 }, { "id": "BAR-050", "nombre": "JÍ¤germeister", "precio": 3500 }, { "id": "BAR-051", "nombre": "Casa Real Etiqueta Negra", "precio": 2000 }
+            { "id": "BAR-049", "nombre": "Tequila", "precio": 2500 }, { "id": "BAR-050", "nombre": "Jägermeister", "precio": 3500 }, { "id": "BAR-051", "nombre": "Casa Real Etiqueta Negra", "precio": 2000 }
           ]},
           { "nombre_categoria": "Jugos", "items": [
             { "id": "BAR-052", "nombre": "Limonada", "precio": 1200 }, { "id": "BAR-053", "nombre": "Maracuyá", "precio": 1200 }, { "id": "BAR-054", "nombre": "Frutilla", "precio": 1200 }, { "id": "BAR-055", "nombre": "Mango", "precio": 1200 }, { "id": "BAR-056", "nombre": "Piña", "precio": 1200 }, { "id": "BAR-057", "nombre": "Limonada con Hierbabuena y Jengibre", "precio": 1500 }
