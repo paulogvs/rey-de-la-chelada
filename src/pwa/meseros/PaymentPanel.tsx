@@ -1,21 +1,22 @@
 /**
- * PaymentPanel — Cobro (API-driven) — REDISEÑO 2026-08-26
+ * PaymentPanel — Cobro (API-driven) — REDISEÑO 2026-08-26 v2
  *
- * Flujo directo SIN toggle "único/mixto":
- *   💵 EFECTIVO: monto del total en efectivo + lo que el cliente entrega
- *   📱 QR:       monto del total por QR + botón cámara (se activa con monto
- *                QR > 0) — permite TOMAR VARIAS FOTOS (varias personas pagan
- *                QR con comprobantes separados; todas se enlazan al pago).
- *   💱 CAMBIO:   card debajo de formas de pago (si hay vuelto: recibido > efectivo):
- *                cambio en EFECTIVO + cambio POR QR. Si el cambio es por QR,
- *                el local transfiere y se toma foto del comprobante (retiro QR).
+ * Modelo DINÁMICO (intuitivo):
+ *   💵 Efectivo (monto entregado)   → lo que el cliente da en efectivo
+ *   📱 QR (monto)                   → lo que paga por QR
  *
- * Modelo (SSOT server):
- *   - El cobro cubre el total: cashAmount + qrAmount = order.total
- *   - El vuelto total = received − cashAmount; se divide en cambioEfectivo +
- *     cambioQr (server valida la suma).
- *   - El retiro QR (cambioQr) se registra como payment qr transfer_out (amount
- *     negativo) — NO toca el saldo del pedido, SÍ afecta el QR del día.
+ *   💱 CAMBIO (card SIEMPRE visible):
+ *     - Se habilita cuando  Efectivo + QR > Pedido  → hay EXCESO a devolver
+ *     - Cambio disponible = Efectivo + QR − Pedido
+ *     - Se reparte: cambio en EFECTIVO (máx. lo que entró en efectivo) +
+ *       el resto por QR (retiro, con foto opcional).
+ *     - Validación: cambioEfectivo + cambioQr = cambioDisponible.
+ *
+ * Al cobrar (SSOT server):
+ *   efectivoAplicado = Efectivo − cambioEfectivo   (cubre el pedido)
+ *   qrAplicado       = QR − cambioQr
+ *   efectivoAplicado + qrAplicado = Pedido  (siempre ✓ si el cambio cuadra)
+ *   + retiro QR (transfer_out) por cambioQr (con foto)
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -28,10 +29,9 @@ import { Loader } from '@/ui/components/Loader';
 import { MoneyInput } from '@/ui/components/MoneyInput/MoneyInput';
 import { useToast } from '@/ui/components/Toast';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
-import { apiFetch } from '../_shared/api/apiFetch';
 import { processMixedPayment, processPayment, uploadPaymentProof } from '../_shared/api/paymentsApi';
 import { buildMixedPaymentPayload } from '../_shared/utils/paymentAllocations';
-import type { Order } from '../_shared/api/ordersApi';
+import { fetchOrderById, type Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
 import { formatMoney } from '../_shared/utils/format';
@@ -45,7 +45,6 @@ interface PaymentPanelProps {
   onBack: () => void;
 }
 
-/** Lee un archivo imagen → data URL */
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -61,14 +60,12 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
   const [order, setOrder] = useState<Order | null>(null);
   const [loadingOrder, setLoadingOrder] = useState(true);
   // Formas de pago
-  const [cashAmount, setCashAmount] = useState(0);   // del total, en efectivo
-  const [received, setReceived] = useState(0);       // lo que entrega el cliente
-  const [qrAmount, setQrAmount] = useState(0);       // del total, por QR
-  const [proofPhotos, setProofPhotos] = useState<string[]>([]); // fotos de pagos QR
+  const [cashGiven, setCashGiven] = useState(0);   // efectivo entregado por el cliente
+  const [qrGiven, setQrGiven] = useState(0);       // monto pagado por QR
+  const [proofPhotos, setProofPhotos] = useState<string[]>([]);      // fotos de pagos QR
   // Card CAMBIO
-  const [changeCash, setChangeCash] = useState(0);   // vuelto en efectivo
-  const [changeQr, setChangeQr] = useState(0);       // vuelto por QR (retiro)
-  const [changeQrPhotos, setChangeQrPhotos] = useState<string[]>([]); // fotos del retiro
+  const [changeCash, setChangeCash] = useState(0); // vuelto en efectivo
+  const [changeQrPhotos, setChangeQrPhotos] = useState<string[]>([]); // fotos del retiro QR
   const [processing, setProcessing] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
 
@@ -80,10 +77,11 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
     (async () => {
       setLoadingOrder(true);
       try {
-        const result = await apiFetch<{ success: boolean; order?: Order }>(`/api/orders/${orderId}`, { token });
+        // fetchOrderById NORMALIZA (camelCase) → resumen completo
+        const result = await fetchOrderById(orderId, token);
         if (disposed) return;
-        if (result.ok && result.data?.order) {
-          setOrder(result.data.order as unknown as Order);
+        if (result.ok && result.order) {
+          setOrder(result.order);
         } else {
           addToast({ type: 'error', message: result.error || 'No se pudo cargar el pedido', duration: 5000 });
         }
@@ -99,66 +97,60 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
 
   const amountToCollect = order?.total ?? 0;
 
-  // ── Cálculos ──
-  const hasCash = cashAmount > 0;
-  const hasQr = qrAmount > 0;
-  // Vuelto total (solo efectivo con recibido mayor al monto efectivo aplicado)
-  const totalChange = Math.max(0, received - cashAmount);
-  const changeValid = totalChange === 0 || (changeCash + changeQr === totalChange);
-  // El cobro cubre el total (con cambio, el efectivo aplicado cubre su parte)
-  const coversTotal = cashAmount + qrAmount === amountToCollect;
-  const canPay = coversTotal && changeValid && (hasCash || hasQr) && qrEnabled !== false;
+  // ── Cálculos dinámicos ──
+  const hasQr = qrGiven > 0;
+  // Exceso de pago → cambio disponible (Efectivo + QR − Pedido)
+  const changeAvailable = Math.max(0, cashGiven + qrGiven - amountToCollect);
+  const hasChange = changeAvailable > 0;
+  // Reparto por defecto: todo el cambio en efectivo (si cabe), resto a QR
+  useEffect(() => {
+    if (!hasChange) { setChangeCash(0); return; }
+    const maxCash = Math.min(changeAvailable, cashGiven);
+    setChangeCash(maxCash);
+  }, [changeAvailable, cashGiven, hasChange]);
 
-  // ── Fotos ──
+  const changeQr = hasChange ? changeAvailable - changeCash : 0;
+  const changeValid = !hasChange || (changeCash + changeQr === changeAvailable && changeCash <= cashGiven && changeQr <= qrGiven);
+
+  // Montos aplicados al pedido
+  const cashApplied = Math.max(0, cashGiven - changeCash);
+  const qrApplied = Math.max(0, qrGiven - changeQr);
+  const coversTotal = cashApplied + qrApplied === amountToCollect;
+  const canPay = coversTotal && changeValid && (cashApplied > 0 || qrApplied > 0);
+
   const handleAddPhoto = useCallback(async (file: File, kind: 'qr' | 'change') => {
     if (!file) return;
     const dataUrl = await readFileAsDataUrl(file).catch(() => null);
-    if (!dataUrl) {
-      addToast({ type: 'error', message: 'No se pudo leer la imagen', duration: 3000 });
-      return;
-    }
+    if (!dataUrl) { addToast({ type: 'error', message: 'No se pudo leer la imagen', duration: 3000 }); return; }
     if (kind === 'qr') setProofPhotos(prev => [...prev, dataUrl]);
     else setChangeQrPhotos(prev => [...prev, dataUrl]);
     addToast({ type: 'success', message: 'Comprobante agregado', duration: 2500 });
   }, [addToast]);
 
-  // ── Cobrar ──
   const processPaymentNow = useCallback(async () => {
     if (!order) return;
     setProcessing(true);
     try {
-      const idempotencyKey = crypto.randomUUID();
-
-      // 1. Cobro del pedido (cash + qr)
+      // 1. Cobro del pedido con los montos APLICADOS (netos de cambio)
       let qrPayments: Array<{ id: string }> = [];
-      if (hasCash && hasQr) {
+      if (cashApplied > 0 && qrApplied > 0) {
         const result = await processMixedPayment(token, buildMixedPaymentPayload(order.id, [
-          { method: 'cash', amount: cashAmount, received, change: changeCash },
-          { method: 'qr', amount: qrAmount },
-        ], idempotencyKey));
-        if (!result.ok) {
-          addToast({ type: 'error', message: result.error || 'Error al registrar el pago', duration: 5000 });
-          return;
-        }
+          { method: 'cash', amount: cashApplied, received: cashGiven, change: changeCash },
+          { method: 'qr', amount: qrApplied },
+        ], crypto.randomUUID()));
+        if (!result.ok) { addToast({ type: 'error', message: result.error || 'Error al registrar el pago', duration: 5000 }); return; }
         qrPayments = result.payments?.filter(p => p.method === 'qr') ?? [];
-      } else if (hasCash) {
+      } else if (cashApplied > 0) {
         const result = await processPayment(token, {
-          order_id: order.id, amount: cashAmount, method: 'cash',
-          received, change: changeCash, idempotency_key: idempotencyKey,
+          order_id: order.id, amount: cashApplied, method: 'cash',
+          received: cashGiven, change: changeCash, idempotency_key: crypto.randomUUID(),
         });
-        if (!result.ok) {
-          addToast({ type: 'error', message: result.error || 'Error al registrar el pago', duration: 5000 });
-          return;
-        }
-      } else if (hasQr) {
+        if (!result.ok) { addToast({ type: 'error', message: result.error || 'Error al registrar el pago', duration: 5000 }); return; }
+      } else if (qrApplied > 0) {
         const result = await processPayment(token, {
-          order_id: order.id, amount: qrAmount, method: 'qr',
-          idempotency_key: idempotencyKey,
+          order_id: order.id, amount: qrApplied, method: 'qr', idempotency_key: crypto.randomUUID(),
         });
-        if (!result.ok) {
-          addToast({ type: 'error', message: result.error || 'Error al registrar el pago', duration: 5000 });
-          return;
-        }
+        if (!result.ok) { addToast({ type: 'error', message: result.error || 'Error al registrar el pago', duration: 5000 }); return; }
         const payment = result.data?.payment;
         if (payment) qrPayments = [payment];
       }
@@ -167,38 +159,27 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
       let changeQrPaymentId: string | null = null;
       if (changeQr > 0) {
         const retiro = await processPayment(token, {
-          order_id: order.id, amount: changeQr, method: 'qr',
-          transfer_out: true, idempotency_key: crypto.randomUUID(),
+          order_id: order.id, amount: changeQr, method: 'qr', transfer_out: true, idempotency_key: crypto.randomUUID(),
         });
-        if (retiro.ok && retiro.data?.payment) {
-          changeQrPaymentId = retiro.data.payment.id;
-        } else {
-          addToast({ type: 'warning', message: 'Pago OK pero el retiro QR no se registró', duration: 5000 });
-        }
+        if (retiro.ok && retiro.data?.payment) changeQrPaymentId = retiro.data.payment.id;
+        else addToast({ type: 'warning', message: 'Pago OK pero el retiro QR no se registró', duration: 5000 });
       }
 
-      // 3. Subir fotos: cada foto QR → a todos los payments QR del cobro;
-      //    fotos del retiro → al payment del retiro
+      // 3. Subir fotos
       let uploadErrors = 0;
       if (proofPhotos.length > 0 && qrPayments.length > 0) {
-        for (const photo of proofPhotos) {
-          for (const payment of qrPayments) {
-            const up = await uploadPaymentProof(token, payment.id, photo);
-            if (!up.ok) uploadErrors++;
-          }
+        for (const photo of proofPhotos) for (const payment of qrPayments) {
+          const up = await uploadPaymentProof(token, payment.id, photo); if (!up.ok) uploadErrors++;
         }
       }
       if (changeQrPhotos.length > 0 && changeQrPaymentId) {
         for (const photo of changeQrPhotos) {
-          const up = await uploadPaymentProof(token, changeQrPaymentId, photo);
-          if (!up.ok) uploadErrors++;
+          const up = await uploadPaymentProof(token, changeQrPaymentId, photo); if (!up.ok) uploadErrors++;
         }
       }
-      if (uploadErrors > 0) {
-        addToast({ type: 'warning', message: 'Pago OK pero uno o más comprobantes no se guardaron', duration: 5000 });
-      }
+      if (uploadErrors > 0) addToast({ type: 'warning', message: 'Pago OK pero uno o más comprobantes no se guardaron', duration: 5000 });
 
-      addToast({ type: 'success', message: `Pago completado — Mesa ${table.number}`, duration: 3000 });
+      addToast({ type: 'success', message: `Pago completado — ${table.number === 0 ? 'Barra' : `Mesa ${table.number}`}`, duration: 3000 });
       setTimeout(onPaymentComplete, 500);
     } catch (err) {
       console.error('[PaymentPanel] process error:', err);
@@ -206,20 +187,15 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
     } finally {
       setProcessing(false);
     }
-  }, [order, amountToCollect, hasCash, hasQr, cashAmount, qrAmount, received, changeCash, changeQr,
+  }, [order, amountToCollect, cashApplied, qrApplied, cashGiven, changeCash, changeQr,
     proofPhotos, changeQrPhotos, token, table.number, addToast, onPaymentComplete]);
 
-  if (loadingOrder) {
-    return <div className="payment-panel"><Loader block label="Cargando pedido…" /></div>;
-  }
-
+  if (loadingOrder) return <div className="payment-panel"><Loader block label="Cargando pedido…" /></div>;
   if (!order) {
-    return (
-      <div className="payment-panel">
-        <p className="payment-panel__loading">Pedido no encontrado</p>
-        <Button variant="secondary" onClick={onBack}>Volver</Button>
-      </div>
-    );
+    return <div className="payment-panel">
+      <p className="payment-panel__loading">Pedido no encontrado</p>
+      <Button variant="secondary" onClick={onBack}>Volver</Button>
+    </div>;
   }
 
   return (
@@ -230,7 +206,6 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
           <h3>Resumen</h3>
           <Badge variant="info">{table.number === 0 ? 'BARRA' : `Mesa ${table.number}`}</Badge>
         </div>
-
         <div className="payment-panel__items">
           {order.items.map(item => {
             const mods = item.modifiers ?? [];
@@ -245,16 +220,10 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
                     </span>
                     {mods.length > 0 && (
                       <span className="payment-panel__item-mods">
-                        {mods.map((m, i) => (
-                          <span key={i} className="payment-panel__item-mod">
-                            {m.optionName}{m.priceAdjustment ? ` +${formatMoney(m.priceAdjustment)}` : ''}
-                          </span>
-                        ))}
+                        {mods.map((m, i) => <span key={i} className="payment-panel__item-mod">{m.optionName}{m.priceAdjustment ? ` +${formatMoney(m.priceAdjustment)}` : ''}</span>)}
                       </span>
                     )}
-                    {item.unitPrice != null && (
-                      <span className="payment-panel__item-unit">c/u {formatMoney(item.unitPrice)}</span>
-                    )}
+                    {item.unitPrice != null && <span className="payment-panel__item-unit">c/u {formatMoney(item.unitPrice)}</span>}
                   </div>
                 </div>
                 <span className="payment-panel__item-price">{formatMoney(item.subtotal)}</span>
@@ -262,147 +231,95 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
             );
           })}
         </div>
-
         <PriceDisplay priceWithIVA={order.total} showBreakdown className="payment-panel__total" />
       </Card>
 
-      {/* ── Formas de pago (directo) ── */}
+      {/* ── Formas de pago (lado a lado) ── */}
       <Card className="payment-panel__splits">
         <div className="payment-panel__splits-header"><h4>Formas de pago</h4></div>
-
-        <div className="payment-panel__method-block">
-          <label className="payment-panel__method-label" htmlFor="pay-cash-amount">
-            <AppIcon name="banknote" size="sm" /> Efectivo (monto)
-          </label>
-          <MoneyInput
-            id="pay-cash-amount"
-            value={cashAmount}
-            onChange={cents => setCashAmount(cents)}
-            placeholder="0"
-          />
-          <label className="payment-panel__method-label" htmlFor="pay-cash-received">
-            Efectivo recibido
-          </label>
-          <MoneyInput
-            id="pay-cash-received"
-            value={received}
-            onChange={cents => setReceived(cents)}
-            placeholder="0"
-          />
-        </div>
-
-        <div className="payment-panel__method-block">
-          <label className="payment-panel__method-label" htmlFor="pay-qr-amount">
-            <AppIcon name="smartphone" size="sm" /> QR (monto)
-          </label>
-          <MoneyInput
-            id="pay-qr-amount"
-            value={qrAmount}
-            onChange={cents => setQrAmount(cents)}
-            placeholder="0"
-          />
-          {qrEnabled && qrImageUrl && hasQr && (
-            <img src={qrImageUrl} alt="QR de pago del restobar" className="payment-panel__qr-image" />
-          )}
-          <Button
-            variant="secondary"
-            fullWidth
-            disabled={qrAmount <= 0 || processing}
-            onClick={() => document.getElementById('payment-proof-input')?.click()}
-            title={qrAmount <= 0 ? 'Ingresa un monto QR para activar la cámara' : 'Tomar foto del comprobante'}
-          >
-            <AppIcon name="camera" size="sm" />
-            {proofPhotos.length > 0 ? `Comprobantes (${proofPhotos.length}) — agregar foto` : 'Tomar fotografía'}
-          </Button>
-          {proofPhotos.length > 0 && (
-            <div className="payment-panel__proofs">
-              {proofPhotos.map((photo, i) => (
-                <img key={i} src={photo} alt={`Comprobante QR ${i + 1}`} className="payment-panel__proof-thumb" />
-              ))}
-            </div>
-          )}
-          <input id="payment-proof-input" type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-            onChange={e => { const file = e.target.files?.[0]; if (file) void handleAddPhoto(file, 'qr'); e.target.value = ''; }} />
+        <div className="payment-panel__methods">
+          <div className="payment-panel__method-block">
+            <label className="payment-panel__method-label" htmlFor="pay-cash">
+              <AppIcon name="banknote" size="sm" /> Efectivo (monto entregado)
+            </label>
+            <MoneyInput id="pay-cash" value={cashGiven} onChange={cents => setCashGiven(cents)} placeholder="0" />
+          </div>
+          <div className="payment-panel__method-block">
+            <label className="payment-panel__method-label" htmlFor="pay-qr">
+              <AppIcon name="smartphone" size="sm" /> QR (monto)
+            </label>
+            <MoneyInput id="pay-qr" value={qrGiven} onChange={cents => setQrGiven(cents)} placeholder="0" />
+            {qrEnabled && qrImageUrl && hasQr && <img src={qrImageUrl} alt="QR de pago del restobar" className="payment-panel__qr-image" />}
+            <Button variant="secondary" fullWidth disabled={qrGiven <= 0 || processing}
+              onClick={() => document.getElementById('payment-proof-input')?.click()}
+              title={qrGiven <= 0 ? 'Ingresa un monto QR para activar la cámara' : 'Tomar foto del comprobante'}>
+              <AppIcon name="camera" size="sm" />
+              {proofPhotos.length > 0 ? `Comprobantes (${proofPhotos.length}) — agregar` : 'Tomar fotografía'}
+            </Button>
+            {proofPhotos.length > 0 && <div className="payment-panel__proofs">
+              {proofPhotos.map((photo, i) => <img key={i} src={photo} alt={`Comprobante QR ${i + 1}`} className="payment-panel__proof-thumb" />)}
+            </div>}
+            <input id="payment-proof-input" type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+              onChange={e => { const file = e.target.files?.[0]; if (file) void handleAddPhoto(file, 'qr'); e.target.value = ''; }} />
+          </div>
         </div>
       </Card>
 
-      {/* ── Card CAMBIO (si hay vuelto) ── */}
-      {totalChange > 0 && (
-        <Card className="payment-panel__change-card">
-          <div className="payment-panel__splits-header">
-            <h4>CAMBIO</h4>
-            <span className="payment-panel__change-total">Vuelto: {formatMoney(totalChange)}</span>
+      {/* ── Card CAMBIO (SIEMPRE visible, se habilita con exceso) ── */}
+      <Card className={`payment-panel__change-card ${hasChange ? '' : 'payment-panel__change-card--idle'}`}>
+        <div className="payment-panel__splits-header">
+          <h4>CAMBIO</h4>
+          <span className="payment-panel__change-total">
+            {hasChange ? `Cambio disponible: ${formatMoney(changeAvailable)}` : 'Sin cambio (Efectivo + QR = Pedido)'}
+          </span>
+        </div>
+        <div className="payment-panel__change-grid">
+          <div>
+            <label className="payment-panel__method-label" htmlFor="change-cash">Cambio en efectivo</label>
+            <MoneyInput id="change-cash" value={changeCash} disabled={!hasChange} onChange={cents => setChangeCash(Math.min(cents, cashGiven))} placeholder="0" />
           </div>
-          <div className="payment-panel__change-grid">
-            <div>
-              <label className="payment-panel__method-label" htmlFor="change-cash">Cambio en efectivo</label>
-              <MoneyInput id="change-cash" value={changeCash} onChange={cents => setChangeCash(cents)} placeholder="0" />
-            </div>
-            <div>
-              <label className="payment-panel__method-label" htmlFor="change-qr">Cambio por QR</label>
-              <MoneyInput id="change-qr" value={changeQr} onChange={cents => setChangeQr(cents)} placeholder="0" />
-            </div>
+          <div>
+            <label className="payment-panel__method-label" htmlFor="change-qr">Cambio por QR</label>
+            <MoneyInput id="change-qr" value={changeQr} disabled={!hasChange} onChange={() => {}} placeholder="0" />
           </div>
-          {!changeValid && (
-            <p className="payment-panel__change-error">El cambio debe sumar {formatMoney(totalChange)}</p>
-          )}
-
-          {changeQr > 0 && (
-            <div className="payment-panel__change-qr-block">
-              <Button
-                variant="secondary"
-                fullWidth
-                disabled={processing}
-                onClick={() => document.getElementById('change-proof-input')?.click()}
-              >
-                <AppIcon name="camera" size="sm" />
-                {changeQrPhotos.length > 0 ? `Comprobantes retiro (${changeQrPhotos.length}) — agregar` : 'Tomar foto del retiro QR'}
-              </Button>
-              {changeQrPhotos.length > 0 && (
-                <div className="payment-panel__proofs">
-                  {changeQrPhotos.map((photo, i) => (
-                    <img key={i} src={photo} alt={`Retiro QR ${i + 1}`} className="payment-panel__proof-thumb" />
-                  ))}
-                </div>
-              )}
-              <input id="change-proof-input" type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-                onChange={e => { const file = e.target.files?.[0]; if (file) void handleAddPhoto(file, 'change'); e.target.value = ''; }} />
-            </div>
-          )}
-        </Card>
-      )}
+        </div>
+        {!hasChange && <p className="payment-panel__change-hint">Ingresa más en Efectivo + QR que el total del pedido para habilitar el cambio.</p>}
+        {hasChange && !changeValid && <p className="payment-panel__change-error">El cambio debe sumar {formatMoney(changeAvailable)} (efectivo ≤ {formatMoney(cashGiven)}, QR ≤ {formatMoney(qrGiven)}).</p>}
+        {hasChange && changeQr > 0 && (
+          <div className="payment-panel__change-qr-block">
+            <Button variant="secondary" fullWidth disabled={processing}
+              onClick={() => document.getElementById('change-proof-input')?.click()}>
+              <AppIcon name="camera" size="sm" />
+              {changeQrPhotos.length > 0 ? `Comprobantes retiro (${changeQrPhotos.length}) — agregar` : 'Tomar foto del retiro QR'}
+            </Button>
+            {changeQrPhotos.length > 0 && <div className="payment-panel__proofs">
+              {changeQrPhotos.map((photo, i) => <img key={i} src={photo} alt={`Retiro QR ${i + 1}`} className="payment-panel__proof-thumb" />)}
+            </div>}
+            <input id="change-proof-input" type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+              onChange={e => { const file = e.target.files?.[0]; if (file) void handleAddPhoto(file, 'change'); e.target.value = ''; }} />
+          </div>
+        )}
+      </Card>
 
       {/* ── Acciones ── */}
       <div className="payment-panel__actions">
-        <Button variant="secondary" onClick={onBack} disabled={processing}>
-          Volver
-        </Button>
+        <Button variant="secondary" onClick={onBack} disabled={processing}>Volver</Button>
         <Button variant="secondary" onClick={() => setPrintOpen(true)} disabled={processing}>
           <AppIcon name="printer" size="sm" /> Imprimir
         </Button>
-        <Button
-          variant="primary"
-          onClick={processPaymentNow}
-          loading={processing}
-          disabled={processing || !canPay}
-          fullWidth
-        >
+        <Button variant="primary" onClick={processPaymentNow} loading={processing} disabled={processing || !canPay} fullWidth>
           {processing ? 'Procesando...' : `Cobrar ${formatMoney(amountToCollect)}`}
         </Button>
       </div>
       {!coversTotal && amountToCollect > 0 && (
         <p className="payment-panel__remaining">
-          Faltan {formatMoney(Math.max(0, amountToCollect - cashAmount - qrAmount))} — el efectivo + QR deben sumar el total.
+          El cobro aplicado (Efectivo − cambio + QR − cambio) debe sumar {formatMoney(amountToCollect)}.
         </p>
       )}
 
-      <PrintReceipt
-        open={printOpen}
-        onClose={() => setPrintOpen(false)}
-        kind="order"
+      <PrintReceipt open={printOpen} onClose={() => setPrintOpen(false)} kind="order"
         receipt={buildReceiptData(order)}
-        label={`${table.number === 0 ? 'BARRA' : `Mesa ${table.number}`} — Pedido ${order.id.slice(0, 8)}`}
-      />
+        label={`${table.number === 0 ? 'BARRA' : `Mesa ${table.number}`} — Pedido ${order.id.slice(0, 8)}`} />
     </div>
   );
 }

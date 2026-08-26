@@ -1557,7 +1557,17 @@
   color: var(--text-muted);
 }
 
-/* 2026-08-26: formas de pago directo + card CAMBIO */
+/* 2026-08-26: formas de pago lado a lado + card CAMBIO siempre visible */
+.payment-panel__methods {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+@media (max-width: 640px) {
+  .payment-panel__methods { grid-template-columns: 1fr; }
+}
+
 .payment-panel__method-block {
   display: flex;
   flex-direction: column;
@@ -1568,8 +1578,25 @@
   border-radius: var(--radius-md);
 }
 
-.payment-panel__method-block + .payment-panel__method-block {
+.payment-panel__change-card--idle {
+  opacity: 0.55;
+}
+
+.payment-panel__change-hint {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.payment-panel__change-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
   margin-top: var(--space-3);
+}
+
+@media (max-width: 640px) {
+  .payment-panel__change-grid { grid-template-columns: 1fr; }
 }
 
 .payment-panel__method-label {
@@ -1615,13 +1642,6 @@
   font-size: var(--text-sm);
   color: var(--ambar-cerveza);
   font-weight: 700;
-}
-
-.payment-panel__change-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
-  margin-top: var(--space-3);
 }
 
 .payment-panel__change-error {
