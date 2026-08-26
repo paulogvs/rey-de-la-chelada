@@ -48,7 +48,6 @@ export function TablesView({ token, onToast }: TablesViewProps) {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [newNumber, setNewNumber] = useState('');
-  const [newCapacity, setNewCapacity] = useState('4');
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [qrTable, setQrTable] = useState<Table | null>(null);
@@ -89,18 +88,14 @@ export function TablesView({ token, onToast }: TablesViewProps) {
 
   const handleCreate = useCallback(async () => {
     const number = parseInt(newNumber, 10);
-    const capacity = parseInt(newCapacity, 10);
     if (Number.isNaN(number) || number < 1 || number > 50) {
       onToast('error', 'Número de mesa inválido (1-50)');
       return;
     }
-    if (Number.isNaN(capacity) || capacity < 1) {
-      onToast('error', 'Capacidad inválida');
-      return;
-    }
 
     setCreating(true);
-    const result = await createTable(token, { number, capacity });
+    // Las mesas ya NO tienen capacidad (2026-08-25) — el server la ignora.
+    const result = await createTable(token, { number });
     setCreating(false);
     if (result.ok && result.table) {
       setTables(prev => [...prev, result.table!].sort((a, b) => a.number - b.number));
@@ -110,7 +105,7 @@ export function TablesView({ token, onToast }: TablesViewProps) {
     } else {
       onToast('error', result.error ?? 'Error al crear mesa');
     }
-  }, [token, newNumber, newCapacity, onToast]);
+  }, [token, newNumber, onToast]);
 
   const handleDelete = useCallback(async (table: Table) => {
     if (!window.confirm(`¿Eliminar Mesa ${table.number}? No se puede si tiene pedidos activos.`)) return;
@@ -153,18 +148,6 @@ export function TablesView({ token, onToast }: TablesViewProps) {
                 onChange={e => setNewNumber(e.target.value)}
               />
             </div>
-            <div className="admin-tables__field">
-              <label htmlFor="table-capacity">Capacidad</label>
-              <FormField
-                id="table-capacity"
-                type="number"
-                min="1"
-                max="20"
-                variant="sm" className="form-input--mono"
-                value={newCapacity}
-                onChange={e => setNewCapacity(e.target.value)}
-              />
-            </div>
             <Button variant="primary" onClick={handleCreate} loading={creating}>Crear mesa</Button>
           </div>
         </Card>
@@ -179,11 +162,11 @@ export function TablesView({ token, onToast }: TablesViewProps) {
           <div className="admin-tables__list">
             {tables.map(t => (
               <div key={t.id} className="admin-tables__item">
-                <span className="admin-tables__number">Mesa {t.number}</span>
+                <span className="admin-tables__number">{t.number === 0 ? 'BARRA' : `Mesa ${t.number}`}</span>
                 <Badge variant={STATUS_BADGE[t.status] ?? 'info'}>
                   {STATUS_LABEL[t.status] ?? t.status}
                 </Badge>
-                <span className="admin-tables__capacity">{t.capacity} pers. · {t.section}</span>
+                <span className="admin-tables__section">{t.section}</span>
                 <Button
                   variant="secondary"
                   size="sm"

@@ -19,6 +19,7 @@
  * ═══════════════════════════════════════════════════════════
  */
 
+import { randomUUID } from 'node:crypto';
 import { ensureStaff, ensureTables } from './seed.js';
 import { loadMenuFromSeed } from '../scripts/load-menu.js';
 import { applyPizzaSizeAdjustments } from '../scripts/demo-prices.js';
@@ -53,6 +54,16 @@ export function ensureBootstrap(db, { log = console.log } = {}) {
   ensureStaff(db, { pin: KDS_PIN, role: 'kds', display_name: 'KDS' });
   ensureStaff(db, { pin: CAJA_PIN, role: 'caja', display_name: 'Cajero' });
   const tables = ensureTables(db, defaultTables);
+
+  // Mesa "BARRA" (número 0) — pedidos de clientes sentados en la barra.
+  // Idempotente: solo se crea si no existe. No cuenta como mesa del salón.
+  const barraTable = db.prepare('SELECT id FROM tables WHERE number = 0').get();
+  if (!barraTable) {
+    db.prepare(
+      "INSERT INTO tables (id, number, capacity, status, section, position) VALUES (?, 0, 0, 'free', 'barra', 0)"
+    ).run(randomUUID());
+    log('[Bootstrap] Mesa BARRA (0) creada');
+  }
 
   const staffRoles = db.prepare('SELECT role FROM staff ORDER BY role').all().map(r => r.role);
   if (staffCount === 0) {

@@ -56,6 +56,7 @@ import {
   Eye,
   EyeOff,
   Layers,
+  BarChart3,
 } from 'lucide-react';
 import './AppIcon.css';
 
@@ -107,6 +108,7 @@ const ICONS = {
   eye: Eye,
   'eye-off': EyeOff,
   layers: Layers,
+  chart: BarChart3,
 } as const;
 
 export type AppIconName = keyof typeof ICONS;

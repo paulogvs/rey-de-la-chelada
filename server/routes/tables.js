@@ -147,10 +147,12 @@ router.get('/:id', requireAuth, (req, res) => {
 
 router.post('/', requireAuth, requireRole('admin'), (req, res) => {
   try {
-    const { number, capacity, section, position } = req.body;
+    // 2026-08-25: las mesas ya NO tienen capacidad fija (decisión del dueño).
+    // El cliente puede enviarla, pero se ignora (siempre 0).
+    const { number, section, position } = req.body;
 
-    if (number === undefined || capacity === undefined) {
-      return res.status(400).json({ success: false, error: 'Número y capacidad son requeridos', code: 'TABLE_DATA_REQUIRED' });
+    if (number === undefined) {
+      return res.status(400).json({ success: false, error: 'Número es requerido', code: 'TABLE_DATA_REQUIRED' });
     }
 
     const db = getDb();
@@ -164,7 +166,7 @@ router.post('/', requireAuth, requireRole('admin'), (req, res) => {
     const id = randomUUID();
     db.prepare(
       'INSERT INTO tables (id, number, capacity, status, section, position) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(id, number, capacity, 'free', section || 'interior', position ?? 0);
+    ).run(id, number, 0, 'free', section || 'interior', position ?? 0);
 
     const table = db.prepare('SELECT * FROM tables WHERE id = ?').get(id);
     res.status(201).json({ success: true, table });

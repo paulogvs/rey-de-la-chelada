@@ -67,40 +67,6 @@ export async function updateMenuItemPrice(
   );
 }
 
-export interface BulkPriceResult extends ApiResult<{ updated?: number; failed?: number }> {
-  updated: number;
-  failed: number;
-  errors: Array<{ id: string; reason: string }>;
-}
-
-/** POST /api/menu/items/bulk-prices — returns per-item results */
-export async function bulkUpdateItemPrices(
-  token: string,
-  updates: Array<{ id: string; price: number }>,
-  fetchImpl: typeof fetch = fetch
-): Promise<BulkPriceResult> {
-  const result = await apiFetch<{
-    success: boolean;
-    updated?: number;
-    failed?: number;
-    errors?: Array<{ id: string; reason: string }>;
-  }>('/api/menu/items/bulk-prices', { method: 'POST', token, body: { updates }, fetchImpl });
-
-  if (!result.ok || !result.data) {
-    return { ...result, data: null, updated: 0, failed: 0, errors: [] } as BulkPriceResult;
-  }
-  return {
-    ...result,
-    updated: result.data.updated ?? 0,
-    failed: result.data.failed ?? 0,
-    errors: result.data.errors ?? [],
-  };
-}
-
-// ============================================================
-// Modifier options (pizza sizes, etc)
-// ============================================================
-
 export interface ModifierOptionRow {
   id: string;
   name: string;
@@ -144,35 +110,6 @@ export async function updateModifierOptionPrice(
     `/api/menu/modifier-options/${optionId}/price`,
     { method: 'PATCH', token, body: { priceAdjustment }, fetchImpl }
   );
-}
-
-/** POST /api/menu/modifier-options/bulk-prices */
-export async function bulkUpdateModifierPrices(
-  token: string,
-  updates: Array<{ id: string; priceAdjustment: number }>,
-  fetchImpl: typeof fetch = fetch
-): Promise<BulkPriceResult> {
-  const result = await apiFetch<{
-    success: boolean;
-    updated?: number;
-    failed?: number;
-    errors?: Array<{ id: string; reason: string }>;
-  }>('/api/menu/modifier-options/bulk-prices', {
-    method: 'POST',
-    token,
-    body: { updates },
-    fetchImpl,
-  });
-
-  if (!result.ok || !result.data) {
-    return { ...result, data: null, updated: 0, failed: 0, errors: [] } as BulkPriceResult;
-  }
-  return {
-    ...result,
-    updated: result.data.updated ?? 0,
-    failed: result.data.failed ?? 0,
-    errors: result.data.errors ?? [],
-  };
 }
 
 // ============================================================
@@ -238,6 +175,13 @@ export interface ClosingRow {
   cash_difference: number;
   is_reconciled: number;
   notes: string;
+  // v13 (2026-08-25): desglose completo del cierre
+  opening_cash?: number;
+  expenses_cash?: number;
+  expenses_qr?: number;
+  expected_qr?: number;
+  total_general?: number;
+  transactions?: number;
 }
 
 export interface ClosingsResult extends ApiResult<{ closings?: ClosingRow[] }> {
@@ -433,10 +377,8 @@ export async function importSeedItems(
 export default {
   fetchAdminMenuItems,
   updateMenuItemPrice,
-  bulkUpdateItemPrices,
   fetchModifierOptions,
   updateModifierOptionPrice,
-  bulkUpdateModifierPrices,
   fetchStaff,
   updateStaff,
   fetchClosings,

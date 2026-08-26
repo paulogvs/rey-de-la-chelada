@@ -305,15 +305,17 @@ describe('C5 — expected_cash = solo efectivo', () => {
     expect(cur.json.today.cash).toBe(baselineCash);
     expect(cur.json.today.total).toBeGreaterThan(0); // el día sí registra ventas (QR)
 
+    // v13: cerrar con el EXPECTED real (opening + cash − gastos) → cuadra
+    const expected = cur.json.breakdown.expected_cash;
     const close = await api('/api/payments/closing/close', {
-      method: 'PUT', token: adminToken, body: { actual_cash: baselineCash, is_reconciled: false },
+      method: 'PUT', token: adminToken, body: { actual_cash: expected, is_reconciled: false },
     });
     expect(close.status).toBe(200);
     expect(close.json.closing.difference).toBe(0);
     expect(close.json.closing.is_reconciled).toBe(1);
   });
 
-  it('corte mixto: expected = SOLO cash; el vuelto (change) ya está descontado en amount', async () => {
+  it('corte mixto: expected = opening + SOLO cash; el vuelto (change) ya está descontado en amount', async () => {
     const before = await api('/api/payments/closing/current', { token: adminToken });
     const baselineCash = before.json?.today?.cash || 0;
     const baselineTotal = before.json?.today?.total || 0;
@@ -334,8 +336,15 @@ describe('C5 — expected_cash = solo efectivo', () => {
     expect(cur.json.today.cash).toBe(Math.round((baselineCash + oB.total) * 100) / 100);
     expect(cur.json.today.total).toBe(Math.round((baselineTotal + oA.total + oB.total) * 100) / 100);
 
+    // v13: opening heredado del cierre anterior + efectivo del día − gastos (0)
+    expect(cur.json.breakdown.opening_cash).toBe(open.json.closing.opening_cash);
+    expect(cur.json.breakdown.expected_cash).toBe(
+      Math.round((open.json.closing.opening_cash + baselineCash + oB.total) * 100) / 100
+    );
+
+    const expected = cur.json.breakdown.expected_cash;
     const closeOk = await api('/api/payments/closing/close', {
-      method: 'PUT', token: adminToken, body: { actual_cash: baselineCash + oB.total, is_reconciled: false },
+      method: 'PUT', token: adminToken, body: { actual_cash: expected, is_reconciled: false },
     });
     expect(closeOk.status).toBe(200);
     expect(closeOk.json.closing.difference).toBe(0);
@@ -344,8 +353,12 @@ describe('C5 — expected_cash = solo efectivo', () => {
     // Nuevo corte; cerrar con efectivo incorrecto → server decide no reconciliado
     const open2 = await api('/api/payments/closing', { method: 'POST', token: adminToken, body: {} });
     expect(open2.json.closing.expected).toBe(Math.round((baselineCash + oB.total) * 100) / 100);
+    // v13: el nuevo cierre hereda el efectivo contado del cierre anterior
+    expect(open2.json.closing.opening_cash).toBe(expected);
+    const cur2 = await api('/api/payments/closing/current', { token: adminToken });
+    const expected2 = cur2.json.breakdown.expected_cash;
     const closeBad = await api('/api/payments/closing/close', {
-      method: 'PUT', token: adminToken, body: { actual_cash: baselineCash + oB.total - 10, is_reconciled: true },
+      method: 'PUT', token: adminToken, body: { actual_cash: expected2 - 10, is_reconciled: true },
     });
     expect(closeBad.status).toBe(200);
     expect(closeBad.json.closing.difference).toBe(-10);

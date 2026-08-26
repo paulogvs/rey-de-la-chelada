@@ -128,7 +128,8 @@ export async function updateTableStatus(
 /** POST /api/tables — create a table (admin) */
 export async function createTable(
   token: string,
-  payload: { number: number; capacity: number; section?: string },
+  // 2026-08-25: sin capacidad (no es fija) — el server la ignora.
+  payload: { number: number; section?: string },
   fetchImpl: typeof fetch = fetch
 ): Promise<TableResult> {
   const result = await apiFetch<{ success: boolean; table?: ServerTable }>('/api/tables', {

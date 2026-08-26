@@ -461,6 +461,16 @@ router.get('/closing/current', requireAuth, requireRole('admin', 'caja'), (req, 
       WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed' AND method = 'cash'
     `).get(today);
 
+    const qrToday = db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) as total FROM payments
+      WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed' AND method = 'qr'
+    `).get(today);
+
+    const txToday = db.prepare(`
+      SELECT COUNT(*) as n FROM payments
+      WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed'
+    `).get(today);
+
     // F3-2: efectivo al centavo — lo que el cliente entregó (received) y el vuelto
     // (change) del día. Neto en caja = received_total - change_total == cash.
     const cashFlowToday = db.prepare(`
@@ -477,6 +487,16 @@ router.get('/closing/current', requireAuth, requireRole('admin', 'caja'), (req, 
       FROM orders WHERE ${businessDayExpr('created_at')} = ?
     `).get(today);
 
+    // v13 (2026-08-25): efectivo INICIAL = efectivo contado (actual_cash) del
+    // cierre cerrado más reciente ANTERIOR al día laboral actual. Si es el
+    // primer cierre de la historia → 0. El opening se congela al ABRIR el
+    // cierre (POST /closing) y aquí se expone el snapshot + el cálculo vivo.
+    const openingCash = current?.opening_cash ?? 0;
+    const cash = cashToday?.total || 0;
+    const qr = qrToday?.total || 0;
+    const expensesCash = current?.expenses_cash ?? 0;
+    const expensesQr = current?.expenses_qr ?? 0;
+
     res.json({
       success: true,
       closing: current || null,
@@ -484,10 +504,22 @@ router.get('/closing/current', requireAuth, requireRole('admin', 'caja'), (req, 
         date: today,
         payments: summary,
         total: totalToday?.total || 0,
-        cash: cashToday?.total || 0,
+        cash,
+        qr,
         received_total: cashFlowToday?.received || 0,
         change_total: cashFlowToday?.change || 0,
         orders: ordersToday,
+      },
+      breakdown: {
+        opening_cash: openingCash,
+        cash_today: cash,
+        qr_today: qr,
+        total_general: openingCash + cash + qr,
+        transactions: txToday?.n || 0,
+        expenses_cash: expensesCash,
+        expenses_qr: expensesQr,
+        expected_cash: openingCash + cash - expensesCash,
+        expected_qr: qr - expensesQr,
       },
     });
   } catch (err) {
@@ -519,13 +551,22 @@ router.post('/closing', requireAuth, requireRole('admin', 'caja'), (req, res) =>
       WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed' AND method = 'cash'
     `).get(today);
 
+    // v13 (2026-08-25): efectivo INICIAL = efectivo contado (actual_cash) del
+    // cierre cerrado más reciente. El primer cierre de la historia abre con 0.
+    const prevClosing = db.prepare(`
+      SELECT actual_cash FROM cash_closings
+      WHERE closed_at IS NOT NULL
+      ORDER BY closed_at DESC LIMIT 1
+    `).get();
+    const openingCash = prevClosing?.actual_cash ?? 0;
+
     const id = randomUUID();
     const openedAt = new Date().toISOString();
 
     db.prepare(`
-      INSERT INTO cash_closings (id, closing_date, opened_at, opened_by, expected_cash, actual_cash, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, today, openedAt, req.user.sub, expected?.total || 0, expected?.total || 0, '');
+      INSERT INTO cash_closings (id, closing_date, opened_at, opened_by, expected_cash, actual_cash, opening_cash, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, today, openedAt, req.user.sub, expected?.total || 0, expected?.total || 0, openingCash, '');
 
     res.status(201).json({
       success: true,
@@ -535,6 +576,7 @@ router.post('/closing', requireAuth, requireRole('admin', 'caja'), (req, res) =>
         opened_at: openedAt,
         expected: expected?.total || 0,
         actual: expected?.total || 0,
+        opening_cash: openingCash,
         difference: 0,
       },
     });
@@ -550,7 +592,11 @@ router.post('/closing', requireAuth, requireRole('admin', 'caja'), (req, res) =>
 
 router.put('/closing/close', requireAuth, requireRole('admin', 'caja'), (req, res) => {
   try {
-    const { actual_cash, notes } = req.body;
+    // v13 (2026-08-25): la cajera ingresa al cerrar:
+    //   actual_cash    → efectivo CONTADO al final del día
+    //   expenses_cash  → gastos/retiros de caja en EFECTIVO (luz, etc.)
+    //   expenses_qr    → gastos/retiros de caja en QR
+    const { actual_cash, expenses_cash, expenses_qr, notes } = req.body;
     // M9: el cliente puede enviar is_reconciled, pero el SERVER lo ignora y lo
     // recalcula — nunca confiar en el valor del cliente. (ver línea de `reconciled`)
 
@@ -565,9 +611,32 @@ router.put('/closing/close', requireAuth, requireRole('admin', 'caja'), (req, re
       return res.status(404).json({ success: false, error: 'No hay corte de caja abierto', code: 'NO_OPEN_CLOSING' });
     }
 
+    // Recalcular el desglose vivo del día laboral del cierre (SSOT):
+    const closingDay = open.closing_date;
+    const cashDay = db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) as total FROM payments
+      WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed' AND method = 'cash'
+    `).get(closingDay);
+    const qrDay = db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) as total FROM payments
+      WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed' AND method = 'qr'
+    `).get(closingDay);
+    const txDay = db.prepare(`
+      SELECT COUNT(*) as n FROM payments
+      WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed'
+    `).get(closingDay);
+
+    const openingCash = open.opening_cash ?? 0;
+    const expensesCash = Math.max(0, Number(expenses_cash) || 0);
+    const expensesQr = Math.max(0, Number(expenses_qr) || 0);
+    const expectedCash = openingCash + (cashDay?.total || 0) - expensesCash;
+    const expectedQr = (qrDay?.total || 0) - expensesQr;
+    const totalGeneral = openingCash + (cashDay?.total || 0) + (qrDay?.total || 0);
+    const transactions = txDay?.n || 0;
+
     const closedAt = new Date().toISOString();
     // C5: difference = actual - expected SOLO efectivo.
-    const difference = round2(Number(actual_cash) - open.expected_cash);
+    const difference = round2(Number(actual_cash) - expectedCash);
     // M9: el SERVER decide is_reconciled (el valor del cliente se ignora y se
     // recalcula): |actual - expected| <= 0.01 → cuadra al centavo.
     const reconciled = Math.abs(difference) <= 0.01 ? 1 : 0;
@@ -575,9 +644,13 @@ router.put('/closing/close', requireAuth, requireRole('admin', 'caja'), (req, re
     db.prepare(`
       UPDATE cash_closings
       SET closed_at = ?, closed_by = ?, actual_cash = ?, cash_difference = ?,
-          is_reconciled = ?, notes = ?
+          is_reconciled = ?, notes = ?,
+          expected_cash = ?, expenses_cash = ?, expenses_qr = ?,
+          expected_qr = ?, total_general = ?, transactions = ?
       WHERE id = ?
-    `).run(closedAt, req.user.sub, Number(actual_cash), difference, reconciled, notes || open.notes, open.id);
+    `).run(closedAt, req.user.sub, Number(actual_cash), difference, reconciled,
+      notes || open.notes, expectedCash, expensesCash, expensesQr,
+      expectedQr, totalGeneral, transactions, open.id);
 
     res.json({
       success: true,
@@ -586,7 +659,13 @@ router.put('/closing/close', requireAuth, requireRole('admin', 'caja'), (req, re
         id: open.id,
         opened_at: open.opened_at,
         closed_at: closedAt,
-        expected: open.expected_cash,
+        opening_cash: openingCash,
+        expected: expectedCash,
+        expected_qr: expectedQr,
+        total_general: totalGeneral,
+        transactions,
+        expenses_cash: expensesCash,
+        expenses_qr: expensesQr,
         actual: Number(actual_cash),
         difference,
         is_reconciled: reconciled,

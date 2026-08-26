@@ -244,14 +244,36 @@ export interface ServerClosing {
   difference?: number;
   is_reconciled?: number;
   notes?: string;
+  // v13 (2026-08-25): desglose completo del cierre
+  opening_cash?: number;
+  expenses_cash?: number;
+  expenses_qr?: number;
+  expected_qr?: number;
+  total_general?: number;
+  transactions?: number;
+}
+
+/** Desglose vivo del día laboral (v13) — devuelto por /closing/current */
+export interface ClosingBreakdown {
+  opening_cash: number;
+  cash_today: number;
+  qr_today: number;
+  total_general: number;
+  transactions: number;
+  expenses_cash: number;
+  expenses_qr: number;
+  expected_cash: number;
+  expected_qr: number;
 }
 
 export interface ClosingCurrentResult extends ApiResult<{
   closing?: ServerClosing | null;
   today?: { date: string; total: number; payments: unknown[] };
+  breakdown?: ClosingBreakdown;
 }> {
   closing: ServerClosing | null;
   today: { date: string; total: number; payments: unknown[] } | null;
+  breakdown: ClosingBreakdown | null;
 }
 
 /** GET /api/payments/closing/current — current open closing + today summary */
@@ -263,16 +285,18 @@ export async function fetchClosingCurrent(
     success: boolean;
     closing?: ServerClosing | null;
     today?: { date: string; total: number; payments: unknown[] };
+    breakdown?: ClosingBreakdown;
   }>('/api/payments/closing/current', { token, fetchImpl });
 
   if (!result.ok || !result.data) {
-    return { ...result, data: null, closing: null, today: null } as ClosingCurrentResult;
+    return { ...result, data: null, closing: null, today: null, breakdown: null } as ClosingCurrentResult;
   }
 
   return {
     ...result,
     closing: result.data.closing ?? null,
     today: result.data.today ?? null,
+    breakdown: result.data.breakdown ?? null,
   };
 }
 
@@ -290,18 +314,24 @@ export async function openClosing(
   });
 }
 
-/** PUT /api/payments/closing/close — close the open closing */
+/** PUT /api/payments/closing/close — close the open closing (v13: + gastos) */
 export async function closeClosing(
   token: string,
   actualCash: number,
-  isReconciled = false,
-  notes = '',
+  opts: { isReconciled?: boolean; notes?: string; expensesCash?: number; expensesQr?: number } = {},
   fetchImpl: typeof fetch = fetch
 ): Promise<ApiResult<{ success: boolean; closing?: ServerClosing }>> {
+  const { isReconciled = false, notes = '', expensesCash = 0, expensesQr = 0 } = opts;
   return apiFetch<{ success: boolean; closing?: ServerClosing }>('/api/payments/closing/close', {
     method: 'PUT',
     token,
-    body: { actual_cash: actualCash, is_reconciled: isReconciled, notes },
+    body: {
+      actual_cash: actualCash,
+      is_reconciled: isReconciled,
+      notes,
+      expenses_cash: expensesCash,
+      expenses_qr: expensesQr,
+    },
     fetchImpl,
   });
 }

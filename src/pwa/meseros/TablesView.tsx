@@ -75,19 +75,19 @@ export function TablesView({ tables, loading, error, onTableSelect, onRefresh }:
           const statusStyle = STATUS_VARS[table.status] || STATUS_VARS.free;
           const { served, modules } = tableAlertState(table.activeOrder);
           const hasModuleAlerts = modules.length > 0;
+          const isBarra = table.number === 0;
           return (
             <button
               key={table.id}
-              className={`table-card${served ? ' table-card--charge' : ''}${hasModuleAlerts ? ' table-card--alert' : ''}`}
+              className={`table-card${isBarra ? ' table-card--barra' : ''}${served ? ' table-card--charge' : ''}${hasModuleAlerts ? ' table-card--alert' : ''}`}
               onClick={() => onTableSelect(table)}
               style={{ borderColor: statusStyle.border }}
-              aria-label={`Mesa ${table.number} — ${statusStyle.label}${served ? ' — todo entregado, por cobrar' : ''}`}
+              aria-label={`${isBarra ? 'Barra' : `Mesa ${table.number}`} — ${statusStyle.label}${served ? ' — todo entregado, por cobrar' : ''}`}
             >
-              <span className="table-card__number">{table.number}</span>
+              <span className="table-card__number">{isBarra ? 'BARRA' : table.number}</span>
               <span className="table-card__status" style={{ color: statusStyle.border }}>
                 {statusStyle.label}
               </span>
-              <span className="table-card__capacity">{table.capacity} pers.</span>
 
               {/* FASE 4.5: alertas por módulo (verde = listo, amarillo = en proceso) */}
               {!served && hasModuleAlerts && (

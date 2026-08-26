@@ -36,7 +36,17 @@
 //   - order_items.promo_label TEXT NULL â€” 'Promo' cuando la lÃ­nea se facturÃ³ con
 //     promo_price (el ticket imprime "(Promo)" discreto para la caja).
 //   Las 3 son ADD COLUMN no destructivas (los registros existentes quedan con defaults).
-const SCHEMA_VERSION = 12;
+// v13 (2026-08-25): CIERRE DE CAJA REDISEÑADO (desglose completo del día laboral).
+//   cash_closings + columnas (INTEGER centavos, ADD COLUMN no destructivo):
+//     - opening_cash   → efectivo INICIAL con el que se abrió (heredado del cierre anterior)
+//     - expenses_cash  → gastos/retiros de caja en EFECTIVO (luz, etc.) — la cajera al cerrar
+//     - expenses_qr    → gastos/retiros de caja en QR
+//     - expected_qr    → QR esperado = QR ingresado del día − gastos QR
+//     - total_general  → opening + efectivo del día + QR del día
+//     - transactions   → nº de transacciones del día laboral
+//   El cierre viejo (v12) solo guardaba expected_cash (efectivo del día); los
+//   cierres históricos quedan con las nuevas columnas en 0 (no se pierde nada).
+const SCHEMA_VERSION = 13;
 
 const CREATE_TABLES = [
   // â”€â”€ Staff / Users (v5: 4 roles â€” admin, mesero, kds, caja) â”€â”€â”€â”€â”€
@@ -219,6 +229,13 @@ const CREATE_TABLES = [
     cash_difference INTEGER NOT NULL DEFAULT 0, -- v11: centavos
     is_reconciled   INTEGER NOT NULL DEFAULT 0,
     notes           TEXT NOT NULL DEFAULT '',
+    -- v13 (2026-08-25): desglose completo del cierre
+    opening_cash    INTEGER NOT NULL DEFAULT 0, -- efectivo inicial (del cierre anterior)
+    expenses_cash   INTEGER NOT NULL DEFAULT 0, -- gastos/retiros efectivo
+    expenses_qr     INTEGER NOT NULL DEFAULT 0, -- gastos/retiros QR
+    expected_qr     INTEGER NOT NULL DEFAULT 0, -- QR esperado (QR día − gastos QR)
+    total_general   INTEGER NOT NULL DEFAULT 0, -- inicial + efectivo + QR
+    transactions    INTEGER NOT NULL DEFAULT 0, -- nº transacciones del día
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (opened_by) REFERENCES staff(id),
     FOREIGN KEY (closed_by) REFERENCES staff(id)
@@ -424,6 +441,22 @@ function applySchema(db) {
        // v12: financial operation and private proof metadata tables are created
        // with IF NOT EXISTS so partially upgraded databases remain repairable.
        db.exec(CREATE_TABLES.filter(sql => sql.includes('payment_operations') || sql.includes('payment_proofs') || sql.includes('idx_payment_')).join(';'));
+       // v13 (2026-08-25): cierre rediseñado — 6 columnas nuevas (ADD COLUMN
+       // no destructivo; cierres históricos quedan con defaults 0).
+       const CLOSING_V13_COLUMNS = [
+         ['opening_cash', 'INTEGER NOT NULL DEFAULT 0'],
+         ['expenses_cash', 'INTEGER NOT NULL DEFAULT 0'],
+         ['expenses_qr', 'INTEGER NOT NULL DEFAULT 0'],
+         ['expected_qr', 'INTEGER NOT NULL DEFAULT 0'],
+         ['total_general', 'INTEGER NOT NULL DEFAULT 0'],
+         ['transactions', 'INTEGER NOT NULL DEFAULT 0'],
+       ];
+       for (const [col, ddl] of CLOSING_V13_COLUMNS) {
+         if (!hasColumn(db, 'cash_closings', col)) {
+           db.exec(`ALTER TABLE cash_closings ADD COLUMN ${col} ${ddl}`);
+           console.log(`[DB] Migration v13: cash_closings.${col} (cierre rediseñado)`);
+         }
+       }
        // Record schema version
       db.prepare(`INSERT OR REPLACE INTO schema_version (version) VALUES (?)`).run(SCHEMA_VERSION);
     });

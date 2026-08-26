@@ -40,8 +40,12 @@ describe('ensureBootstrap', () => {
     const roles = db.prepare('SELECT role FROM staff ORDER BY role').all().map(r => r.role);
     expect(roles).toEqual(['admin', 'caja', 'kds', 'mesero']);
 
-    // Tables: 10
-    expect(db.prepare('SELECT COUNT(*) AS n FROM tables').get().n).toBe(10);
+    // Tables: 10 salón + 1 BARRA (mesa 0) = 11 (2026-08-25)
+    expect(db.prepare('SELECT COUNT(*) AS n FROM tables').get().n).toBe(11);
+    // La BARRA existe con number 0 y section 'barra'
+    const barra = db.prepare("SELECT number, section FROM tables WHERE number = 0").get();
+    expect(barra).toBeTruthy();
+    expect(barra.section).toBe('barra');
 
     // Real menu: 19 categories, 105 explicit catalog lines.
     expect(db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n).toBe(19);
@@ -81,7 +85,7 @@ describe('ensureBootstrap', () => {
 
     expect(second.seeded).toBe(false);
     expect(db.prepare('SELECT COUNT(*) AS n FROM staff').get().n).toBe(4);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM tables').get().n).toBe(10);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM tables').get().n).toBe(11); // 10 salón + BARRA
     expect(db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n).toBe(19);
     expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(105);
     expect(db.prepare('SELECT COUNT(*) AS n FROM modifier_groups').get().n).toBeGreaterThan(0);

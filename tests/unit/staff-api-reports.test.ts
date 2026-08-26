@@ -87,10 +87,10 @@ describe('openClosing / closeClosing', () => {
       success: true,
       closing: { id: 'c1', actual: 52000, difference: 2000 },
     }));
-    const result = await closeClosing('tok-1', 52000, false, '', fetchMock as unknown as typeof fetch);
+    const result = await closeClosing('tok-1', 52000, { isReconciled: false }, fetchMock as unknown as typeof fetch);
     expect(result.ok).toBe(true);
     expect(result.data?.closing?.difference).toBe(2000);
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(JSON.parse(init.body as string)).toEqual({ actual_cash: 52000, is_reconciled: false, notes: '' });
+    expect(JSON.parse(init.body as string)).toEqual({ actual_cash: 52000, is_reconciled: false, notes: '', expenses_cash: 0, expenses_qr: 0 });
   });
 });

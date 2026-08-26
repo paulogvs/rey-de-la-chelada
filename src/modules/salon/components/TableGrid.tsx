@@ -39,24 +39,24 @@ interface TableCardProps {
 
 function TableCard({ table, onSelect }: TableCardProps) {
   const statusStyle = STATUS_VARS[table.status] || STATUS_VARS.free;
+  // Mesa 0 = BARRA (pedidos de clientes en la barra) — etiqueta especial,
+  // sin número ni capacidad (2026-08-25).
+  const isBarra = table.number === 0;
 
   return (
     <button
-      className="table-card"
+      className={`table-card ${isBarra ? 'table-card--barra' : ''}`}
       onClick={() => onSelect(table)}
       style={{
         borderColor: statusStyle.border,
       }}
-      aria-label={`Mesa ${table.number} — ${statusStyle.label}`}
+      aria-label={`${isBarra ? 'Barra' : `Mesa ${table.number}`} — ${statusStyle.label}`}
     >
       <span className="table-card__number">
-        {table.number}
+        {isBarra ? 'BARRA' : table.number}
       </span>
       <span className="table-card__status" style={{ color: statusStyle.border }}>
         {statusStyle.label}
-      </span>
-      <span className="table-card__capacity">
-        {table.capacity} pers.
       </span>
     </button>
   );

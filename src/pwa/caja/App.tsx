@@ -28,15 +28,17 @@ import { ClosingView } from './ClosingView';
 import { InvoiceView } from './InvoiceView';
 import { CollectView } from './CollectView';
 import { OrderHistoryView } from '../_shared/components/OrderHistoryView';
+import { ReportView } from '../_shared/components/ReportView';
 import './App.css';
 
-type ViewState = 'summary' | 'collect' | 'history' | 'close' | 'invoice';
+type ViewState = 'summary' | 'collect' | 'history' | 'close' | 'invoice' | 'reports';
 
 const VIEW_OPTIONS: SegmentedOption[] = [
   { value: 'summary', label: 'Resumen' },
   { value: 'collect', label: 'Cobrar' },
   { value: 'history', label: 'Pedidos' },
   { value: 'close', label: 'Cierre' },
+  { value: 'reports', label: 'Reportes' },
   { value: 'invoice', label: 'Facturación' },
 ];
 
@@ -165,6 +167,8 @@ function CajaApp() {
               onClosingUpdated={handleClosingUpdated}
             />
           )}
+
+          {view === 'reports' && <ReportView token={token} onToast={(type, message) => addToast({ type, message, duration: 3000 })} />}
 
           {view === 'invoice' && <InvoiceView />}
         </main>

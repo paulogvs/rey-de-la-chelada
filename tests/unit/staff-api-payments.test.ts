@@ -145,23 +145,25 @@ describe('openClosing / closeClosing', () => {
       success: true,
       closing: { id: 'c1', closed_at: '2026-08-01T22:00:00.000Z', actual: 520, difference: 20 },
     }));
-    const result = await closeClosing('tok-1', 520, false, '', fetchMock as unknown as typeof fetch);
+    const result = await closeClosing('tok-1', 520, { isReconciled: false }, fetchMock as unknown as typeof fetch);
     expect(result.ok).toBe(true);
     expect(result.data?.closing?.actual).toBe(520);
     expect(result.data?.closing?.difference).toBe(20);
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(JSON.parse(init.body as string)).toEqual({ actual_cash: 520, is_reconciled: false, notes: '' });
+    expect(JSON.parse(init.body as string)).toEqual({ actual_cash: 520, is_reconciled: false, notes: '', expenses_cash: 0, expenses_qr: 0 });
   });
 
   it('closes with notes + reconciled flag', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ success: true, closing: { id: 'c1' } }));
-    const result = await closeClosing('tok-1', 510, true, 'Faltante en caja', fetchMock as unknown as typeof fetch);
+    const result = await closeClosing('tok-1', 510, { isReconciled: true, notes: 'Faltante en caja' }, fetchMock as unknown as typeof fetch);
     expect(result.ok).toBe(true);
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(JSON.parse(init.body as string)).toEqual({
       actual_cash: 510,
       is_reconciled: true,
       notes: 'Faltante en caja',
+      expenses_cash: 0,
+      expenses_qr: 0,
     });
   });
 });

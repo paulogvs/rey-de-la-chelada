@@ -8,10 +8,8 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   fetchAdminMenuItems,
   updateMenuItemPrice,
-  bulkUpdateItemPrices,
   fetchModifierOptions,
   updateModifierOptionPrice,
-  bulkUpdateModifierPrices,
   fetchStaff,
   updateStaff,
   fetchClosings,
@@ -67,30 +65,6 @@ describe('updateMenuItemPrice', () => {
   });
 });
 
-describe('bulkUpdateItemPrices', () => {
-  it('returns per-item updated/failed counts', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
-      success: true,
-      updated: 2,
-      failed: 1,
-      errors: [{ id: 'nope', reason: 'not_found' }],
-    }));
-    const result = await bulkUpdateItemPrices('tok', [{ id: 'i1', price: 10 }], fetchMock as unknown as typeof fetch);
-    expect(result.ok).toBe(true);
-    expect(result.updated).toBe(2);
-    expect(result.failed).toBe(1);
-    expect(result.errors[0].reason).toBe('not_found');
-  });
-
-  it('normalizes failure to zeros', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ success: false, error: 'x' }, 400));
-    const result = await bulkUpdateItemPrices('tok', [], fetchMock as unknown as typeof fetch);
-    expect(result.ok).toBe(false);
-    expect(result.updated).toBe(0);
-    expect(result.failed).toBe(0);
-  });
-});
-
 describe('modifier options', () => {
   const option: ModifierOptionRow = {
     id: 'mo1', name: 'Familiar', price_adjustment: 0, is_default: 0, sort_order: 1,
@@ -111,13 +85,6 @@ describe('modifier options', () => {
     expect(result.ok).toBe(true);
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(JSON.parse(init.body as string)).toEqual({ priceAdjustment: 35 });
-  });
-
-  it('bulkUpdateModifierPrices returns counts', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ success: true, updated: 3, failed: 0, errors: [] }));
-    const result = await bulkUpdateModifierPrices('tok', [{ id: 'mo1', priceAdjustment: 25 }], fetchMock as unknown as typeof fetch);
-    expect(result.ok).toBe(true);
-    expect(result.updated).toBe(3);
   });
 });
 
