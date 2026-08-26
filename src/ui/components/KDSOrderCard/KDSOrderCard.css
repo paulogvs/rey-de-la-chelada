@@ -113,6 +113,20 @@
 .kds-order__item-check { font-size: 16px; width: 28px; text-align: center; flex-shrink: 0; opacity: 0.7; }
 .kds-order__item-qty { font-family: var(--font-mono); font-weight: 700; color: var(--dorado-rey); min-width: 28px; font-size: 14px; }
 .kds-order__item-name { flex: 1; font-weight: 550; font-size: 14px; color: var(--kds-text); }
+/* 2026-08-26: apartado (categoría) arriba + nombre debajo, tamaño/instrucciones */
+.kds-order__item-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kds-order__item-cat {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--kds-text) 55%, transparent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kds-order__item-title { font-weight: 600; font-size: 15px; color: var(--kds-text); line-height: 1.15; }
 .kds-order__item-mods { font-size: 12px; color: color-mix(in srgb, var(--kds-text) 45%, transparent); }
 .kds-order__item-promo { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--bg); background: var(--dorado-rey); border-radius: var(--radius-full); padding: 1px 8px; margin-left: 4px; white-space: nowrap; }
 .kds-order__item-notes { font-size: 12px; color: var(--status-pending); font-style: italic; }

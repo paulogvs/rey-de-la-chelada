@@ -90,9 +90,10 @@ function buildOrder(db, orderId) {
   if (!order) return null;
 
   order.items = db.prepare(`
-    SELECT oi.*, mi.name as item_name, mi.area as kds_module
+    SELECT oi.*, mi.name as item_name, mi.area as kds_module, mc.name as category_name
     FROM order_items oi
     LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+    LEFT JOIN menu_categories mc ON mi.category_id = mc.id
     WHERE oi.order_id = ?
     ORDER BY oi.created_at ASC
   `).all(orderId);
@@ -215,9 +216,11 @@ router.get('/kds/:module', requireAuth, requireRole('admin', 'kds'), (req, res) 
       let itemSql = `
         SELECT oi.id, oi.menu_item_id, mi.name as item_name, oi.quantity,
                oi.unit_price, oi.preparation_notes as item_notes, oi.status as item_status,
-               oi.modifiers_json, oi.created_at, oi.round, oi.promo_label, mi.area as kds_module
+               oi.modifiers_json, oi.created_at, oi.round, oi.promo_label, mi.area as kds_module,
+               mc.name as category_name
         FROM order_items oi
         JOIN menu_items mi ON oi.menu_item_id = mi.id
+        LEFT JOIN menu_categories mc ON mi.category_id = mc.id
         WHERE oi.order_id = ?
       `;
       const itemParams = [order.id];

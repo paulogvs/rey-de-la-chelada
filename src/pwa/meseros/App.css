@@ -761,6 +761,9 @@
   border-radius: var(--radius-lg);
   padding: var(--space-3);
   background: color-mix(in srgb, var(--surface) 72%, transparent);
+  /* 2026-08-26: cada card CRECE con su contenido (no se comprime) — el
+     body del carrito hace scroll cuando hay muchos items */
+  flex-shrink: 0;
 }
 
 .order-panel__cart-item-line {
@@ -1507,6 +1510,140 @@
   border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
 }
 
+/* 2026-08-26: resumen item por item (nombre + apartado + mods + c/u) */
+.payment-panel__item-main {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.payment-panel__item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.payment-panel__item-cat {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 0 var(--space-1);
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+}
+
+.payment-panel__item-mods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.payment-panel__item-mod {
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  color: var(--ambar-cerveza);
+}
+
+.payment-panel__item-unit {
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+/* 2026-08-26: formas de pago directo + card CAMBIO */
+.payment-panel__method-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.payment-panel__method-block + .payment-panel__method-block {
+  margin-top: var(--space-3);
+}
+
+.payment-panel__method-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.payment-panel__qr-image {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  margin: 0 auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.payment-panel__proofs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.payment-panel__proof-thumb {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.payment-panel__change-card {
+  border-color: var(--ambar-cerveza);
+}
+
+.payment-panel__change-total {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--ambar-cerveza);
+  font-weight: 700;
+}
+
+.payment-panel__change-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.payment-panel__change-error {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--status-cancelled);
+}
+
+.payment-panel__change-qr-block {
+  margin-top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.payment-panel__remaining {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--status-cancelled);
+  text-align: center;
+}
+
 .payment-panel__item:last-child {
   border-bottom: none;
 }
@@ -2218,5 +2355,35 @@
   .bottom-cart-bar,
   .cart-modal {
     display: none !important;
+  }
+}
+
+/* 2026-08-26: PC (mouse) — botones compactos en TODA la PWA Meseros.
+   En tablets táctiles (<1024px) se mantienen los touch targets >=48px (AGENTS.md). */
+@media (min-width: 1024px) {
+  .meseros-app .btn {
+    min-height: 34px;
+    padding: 5px 12px;
+    font-size: 13px;
+  }
+  .meseros-app .btn--sm {
+    min-height: 30px;
+    padding: 3px 9px;
+    font-size: 12px;
+  }
+  .meseros-app .btn--lg,
+  .meseros-app .btn--kds {
+    min-height: 44px;
+    padding: 8px 16px;
+  }
+  .meseros-app .table-card {
+    min-height: 72px;
+  }
+  .meseros-app .order-panel__item {
+    min-height: 56px;
+    padding: var(--space-2);
+  }
+  .meseros-app .order-panel__cart-item {
+    padding: var(--space-2);
   }
 }

@@ -120,9 +120,11 @@ describe('POST /api/payments/:id/proof — comprobante foto QR', () => {
     const payment = getDb().prepare('SELECT proof_photo FROM payments WHERE id = ?').get(paymentId);
     expect(payment.proof_photo).toBe(body.proof_photo);
 
-    // Verificar que el archivo existe en disco
-    const absPath = path.resolve(__dirname, '..', '..', 'data', 'payment-proofs', `${paymentId}.png`);
-    expect(fs.existsSync(absPath)).toBe(true);
+    // Verificar que el archivo existe en disco (2026-08-26: filename ÚNICO por foto)
+    const proofsDir = path.resolve(__dirname, '..', '..', 'data', 'payment-proofs');
+    const files = fs.existsSync(proofsDir) ? fs.readdirSync(proofsDir) : [];
+    const match = files.find(f => f.startsWith(`${paymentId}-`) && f.endsWith('.png'));
+    expect(match).toBeTruthy();
   });
 
   it('rechaza imagen sin data URL', async () => {

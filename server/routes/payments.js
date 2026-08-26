@@ -113,9 +113,11 @@ export function processPayment(db, args) {
 
   // F3-2: efectivo al centavo. received = lo que entrega el cliente.
   // Si no se envía (retrocompat) → received = amount, change = 0.
+  // 2026-08-26: change explícito (cambio por QR) y transferOut (retiro QR).
   return recordPayment(db, { orderId: args.order_id, method: canonicalMethod, amount: amountValue,
     ivaAmount: args.iva_amount, reference: args.reference, notes: args.notes, status: canonicalStatus,
-    processedBy: args.processed_by, received: args.received, idempotencyKey: args.idempotency_key });
+    processedBy: args.processed_by, received: args.received, change: args.change,
+    transferOut: args.transfer_out, idempotencyKey: args.idempotency_key });
 }
 
 export function round2(n) {
@@ -214,7 +216,7 @@ router.get('/:id', requireAuth, (req, res) => {
 
 router.post('/', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res) => {
   try {
-    const { order_id, amount, method, iva_amount, reference, notes, status, received, idempotency_key } = req.body;
+    const { order_id, amount, method, iva_amount, reference, notes, status, received, change, transfer_out, idempotency_key } = req.body;
 
     if (!order_id || amount === undefined || !method) {
       return res.status(400).json({
@@ -224,10 +226,10 @@ router.post('/', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res)
       });
     }
 
-    // B2 (2026-08-13): amount DEBE ser numérico ≥ 0. Decisión documentada:
-    // se aceptan strings numéricas ("34.5") por retrocompat con clientes
-    // legacy que serializan montos como string (Number("34.5") es finito).
-    // Se rechaza: 'abc', NaN, null, '', booleanos, arrays y negativos.
+    // B2 (2026-08-13): amount DEBE ser numérico ≥ 0 para pagos. EXCEPCIÓN
+    // (2026-08-26): RETIRO QR — method='qr' + transfer_out=true con amount
+    // POSITIVO → se registra como SALIDA QR (amount negativo en la DB) para
+    // devolver cambio por QR. Ver payment-calculator (transferOut).
     if (amount === null || amount === '' ||
         (typeof amount !== 'number' && typeof amount !== 'string') ||
         !Number.isFinite(Number(amount)) || Number(amount) < 0) {
@@ -246,27 +248,63 @@ router.post('/', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res)
       });
     }
 
-    // F3-2: el efectivo al centavo exige received ≥ 0 y recibido ≥ cobrado
-    if (received !== undefined && received !== null) {
-      if (typeof received !== 'number' || Number.isNaN(received) || received < 0) {
+    // Retiro QR: solo method qr + transfer_out; received/change no aplican
+    if (transfer_out) {
+      if (PAYMENT_METHOD_MAP[method] !== 'qr') {
         return res.status(400).json({
           success: false,
-          error: 'Monto recibido inválido (debe ser un número ≥ 0)',
-          code: 'INVALID_RECEIVED',
+          error: 'El retiro QR solo aplica a method=qr',
+          code: 'TRANSFER_OUT_ONLY_QR',
         });
       }
-      if (PAYMENT_METHOD_MAP[method] === 'cash' && round2(Number(received)) < round2(Number(amount))) {
+      if (Number(amount) <= 0) {
         return res.status(400).json({
           success: false,
-          error: 'El monto recibido no puede ser menor al monto cobrado',
-          code: 'INVALID_RECEIVED',
+          error: 'El retiro QR debe ser mayor que cero',
+          code: 'INVALID_AMOUNT',
         });
+      }
+    } else {
+      // F3-2: el efectivo al centavo exige received ≥ 0 y recibido ≥ cobrado
+      if (received !== undefined && received !== null) {
+        if (typeof received !== 'number' || Number.isNaN(received) || received < 0) {
+          return res.status(400).json({
+            success: false,
+            error: 'Monto recibido inválido (debe ser un número ≥ 0)',
+            code: 'INVALID_RECEIVED',
+          });
+        }
+        if (PAYMENT_METHOD_MAP[method] === 'cash' && round2(Number(received)) < round2(Number(amount))) {
+          return res.status(400).json({
+            success: false,
+            error: 'El monto recibido no puede ser menor al monto cobrado',
+            code: 'INVALID_RECEIVED',
+          });
+        }
+      }
+      // change explícito (cambio por QR): ≤ vuelto total
+      if (change !== undefined && change !== null) {
+        if (typeof change !== 'number' || Number.isNaN(change) || change < 0) {
+          return res.status(400).json({
+            success: false,
+            error: 'Cambio inválido (debe ser un número ≥ 0)',
+            code: 'INVALID_CHANGE',
+          });
+        }
+        if (PAYMENT_METHOD_MAP[method] === 'cash' && Number(change) > round2(Number(received) - Number(amount))) {
+          return res.status(400).json({
+            success: false,
+            error: 'El cambio no puede exceder el vuelto total',
+            code: 'INVALID_CHANGE',
+          });
+        }
       }
     }
 
     const db = getDb();
     const result = processPayment(db, {
-      order_id, amount, method, iva_amount, reference, notes, status, received,
+      order_id, amount, method, iva_amount, reference, notes, status, received, change,
+      transfer_out: !!transfer_out,
       idempotency_key,
       processed_by: req.user.sub,
     });
@@ -393,7 +431,10 @@ router.post('/:id/proof', proofJsonParser, requireAuth, requireRole('admin', 'me
 
     // Asegurar directorio (idempotente)
     fs.mkdirSync(PROOF_DIR, { recursive: true });
-    const filename = `${payment.id}.${ext}`;
+    // 2026-08-26: FOTOS MÚLTIPLES por pago QR — filename ÚNICO por foto
+    // (antes `${payment.id}.${ext}` colisionaba y sobrescribía). Varias
+    // personas de una mesa pagan QR → varios comprobantes del mismo pago.
+    const filename = `${payment.id}-${randomUUID().slice(0, 8)}.${ext}`;
     const absPath = path.join(PROOF_DIR, filename);
     fs.writeFileSync(absPath, buffer);
 
@@ -403,8 +444,10 @@ router.post('/:id/proof', proofJsonParser, requireAuth, requireRole('admin', 'me
       payment.notes || 'Comprobante QR adjunto',
       payment.id
     );
-    db.prepare(`INSERT OR REPLACE INTO payment_proofs (id, payment_id, storage_key, mime, size, hash, status)
-      VALUES (?, ?, ?, ?, ?, ?, 'pending')`).run(randomUUID(), payment.id, filename, `image/${ext === 'jpg' ? 'jpeg' : ext}`, buffer.length, createHash('sha256').update(buffer).digest('hex'));
+    // INSERT normal (no OR REPLACE): una fila por foto en payment_proofs
+    db.prepare(`INSERT INTO payment_proofs (id, payment_id, storage_key, mime, size, hash, status)
+      VALUES (?, ?, ?, ?, ?, ?, 'pending')`).run(randomUUID(), payment.id, filename,
+      `image/${ext === 'jpg' ? 'jpeg' : ext}`, buffer.length, createHash('sha256').update(buffer).digest('hex'));
 
     res.json({ success: true, proof_photo: proofUrl, message: 'Comprobante guardado' });
   } catch (err) {
@@ -414,9 +457,10 @@ router.post('/:id/proof', proofJsonParser, requireAuth, requireRole('admin', 'me
 });
 
 router.get('/:id/proof', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res) => {
-  const proof = getDb().prepare('SELECT id, payment_id, storage_key, mime, size, hash, status, reviewer, supersedes, created_at, updated_at FROM payment_proofs WHERE payment_id = ? ORDER BY created_at DESC LIMIT 1').get(req.params.id);
-  if (!proof) return res.status(404).json({ success: false, error: 'Comprobante no encontrado', code: 'PROOF_NOT_FOUND' });
-  res.json({ success: true, proof });
+  // 2026-08-26: devolver TODAS las fotos del pago QR (varias personas → varios comprobantes)
+  const proofs = getDb().prepare('SELECT id, payment_id, storage_key, mime, size, hash, status, reviewer, supersedes, created_at, updated_at FROM payment_proofs WHERE payment_id = ? ORDER BY created_at DESC').all(req.params.id);
+  if (proofs.length === 0) return res.status(404).json({ success: false, error: 'Comprobante no encontrado', code: 'PROOF_NOT_FOUND' });
+  res.json({ success: true, proofs, proof: proofs[0], count: proofs.length });
 });
 
 router.get('/:id/proof/content', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res) => {
@@ -456,11 +500,17 @@ router.get('/closing/current', requireAuth, requireRole('admin', 'caja'), (req, 
       WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed'
     `).get(today);
 
+    // v13 (2026-08-26): "efectivo ingresado" = NETO FÍSICO que entra al cajón =
+    // SUM(received) − SUM(change). Con recibido=amount y change=0 → = amount
+    // (igual que antes). Con cambio en efectivo: received=amount+X, change=X
+    // → neto = amount ✓. Con cambio POR QR: received=amount+Y, change=0 →
+    // neto = amount+Y ✓ (el vuelto no salió del cajón; el QR lo absorbe).
     const cashToday = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total FROM payments
+      SELECT COALESCE(SUM(received), 0) - COALESCE(SUM(change), 0) as total FROM payments
       WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed' AND method = 'cash'
     `).get(today);
 
+    // QR del día: SUM(amount) — incluye retiros QR (amount negativo, cambio por QR)
     const qrToday = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total FROM payments
       WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed' AND method = 'qr'
@@ -613,8 +663,9 @@ router.put('/closing/close', requireAuth, requireRole('admin', 'caja'), (req, re
 
     // Recalcular el desglose vivo del día laboral del cierre (SSOT):
     const closingDay = open.closing_date;
+    // v13: efectivo = neto físico (received − change); QR = SUM(amount) (incluye retiros)
     const cashDay = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total FROM payments
+      SELECT COALESCE(SUM(received), 0) - COALESCE(SUM(change), 0) as total FROM payments
       WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed' AND method = 'cash'
     `).get(closingDay);
     const qrDay = db.prepare(`

@@ -16,8 +16,12 @@ export interface PaymentPayload {
   reference?: string;
   notes?: string;
   status?: string;
-  /** F3-2: efectivo al centavo — lo que el cliente ENTREGA (el server calcula el vuelto) */
+  /** F3-2: efectivo al centavo - lo que el cliente ENTREGA (el server calcula el vuelto) */
   received?: number;
+  /** 2026-08-26: cambio entregado EN EFECTIVO (con "cambio por QR", menor al vuelto) */
+  change?: number;
+  /** 2026-08-26: retiro QR (transferencia saliente del local — devolver cambio por QR) */
+  transfer_out?: boolean;
   idempotency_key?: string;
 }
 

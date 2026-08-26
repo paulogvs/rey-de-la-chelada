@@ -157,6 +157,8 @@ export interface OrderLineItem {
   round?: number;
   /** Sprint 1 (E): "Promo" cuando el item se facturó con promo manual */
   promoLabel?: string | null;
+  /** KDS (2026-08-26): apartado (categoría) del item — "PIZZA", "BARRA", etc. */
+  categoryName?: string;
 }
 
 /** Customer order */

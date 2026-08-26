@@ -137,7 +137,10 @@ export function KDSOrderCard({
                   : item.status === 'preparing' ? '○' : '·'}
             </span>
             <span className="kds-order__item-qty">{item.quantity}x</span>
-            <span className="kds-order__item-name">{item.menuItemName}</span>
+            <span className="kds-order__item-name">
+              {item.categoryName && <span className="kds-order__item-cat">{item.categoryName}</span>}
+              <span className="kds-order__item-title">{item.menuItemName}</span>
+            </span>
             {item.promoLabel && (
               <span className="kds-order__item-promo">{item.promoLabel}</span>
             )}

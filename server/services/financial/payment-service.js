@@ -5,7 +5,8 @@ function operationResult(db, operation) {
   const order = db.prepare('SELECT total FROM orders WHERE id = ?').get(operation.order_id);
   const payments = db.prepare('SELECT * FROM payments WHERE payment_operation_id = ? ORDER BY rowid').all(operation.id);
   const allPayments = db.prepare("SELECT method, amount FROM payments WHERE order_id = ? AND status = 'completed'").all(operation.order_id);
-  const paid = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE order_id = ? AND status = 'completed'").get(operation.order_id).total;
+  // 2026-08-26: retiros QR (amount negativo) NO cuentan en el saldo del pedido
+  const paid = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE order_id = ? AND status = 'completed' AND amount > 0").get(operation.order_id).total;
   const byMethod = { cash: 0, qr: 0 };
   for (const payment of allPayments) byMethod[payment.method] += payment.amount;
   return {
@@ -45,7 +46,8 @@ export function recordMixedPayment(db, { orderId, idempotencyKey, processedBy, a
       return operationResult(db, existing);
     }
     const order = ensureOrder(db, orderId);
-    const paidBefore = db.prepare("SELECT COALESCE(SUM(amount), 0) total FROM payments WHERE order_id = ? AND status = 'completed'").get(orderId).total;
+    // Saldo pagado = SOLO montos positivos (los retiros QR no bajan el saldo)
+    const paidBefore = db.prepare("SELECT COALESCE(SUM(amount), 0) total FROM payments WHERE order_id = ? AND status = 'completed' AND amount > 0").get(orderId).total;
     const calculation = calculateMixedPayments(order.total, paidBefore, allocations);
     const operation = { id: randomUUID(), order_id: orderId };
     db.prepare('INSERT INTO payment_operations (id, order_id, total_amount, status, idempotency_key, created_by) VALUES (?, ?, ?, ?, ?, ?)')
@@ -67,15 +69,17 @@ export function recordPayment(db, args) {
       const existing = db.prepare('SELECT * FROM payment_operations WHERE idempotency_key = ?').get(args.idempotencyKey);
       if (existing) return operationResult(db, existing);
     }
-    const paid = db.prepare("SELECT COALESCE(SUM(amount), 0) total FROM payments WHERE order_id = ? AND status = 'completed'").get(order.id).total;
-    if ((args.status || 'completed') === 'completed' && paid + payment.amount > order.total) throw Object.assign(new Error('El monto excede el saldo pendiente'), { code: 'PAYMENT_CONFLICT' });
+    // Saldo pagado = SOLO montos positivos (los retiros QR no bajan el saldo)
+    const paid = db.prepare("SELECT COALESCE(SUM(amount), 0) total FROM payments WHERE order_id = ? AND status = 'completed' AND amount > 0").get(order.id).total;
+    const delta = payment.amount >= 0 ? payment.amount : 0; // retiro QR → no toca saldo
+    if ((args.status || 'completed') === 'completed' && paid + delta > order.total) throw Object.assign(new Error('El monto excede el saldo pendiente'), { code: 'PAYMENT_CONFLICT' });
     const operation = args.idempotencyKey ? { id: randomUUID() } : null;
     if (operation) db.prepare('INSERT INTO payment_operations (id, order_id, total_amount, status, idempotency_key, created_by) VALUES (?, ?, ?, ?, ?, ?)').run(operation.id, order.id, payment.amount, 'completed', args.idempotencyKey, args.processedBy);
     const id = args.paymentId || randomUUID();
     db.prepare(`INSERT INTO payments (id, order_id, method, amount, iva_amount, received, change, reference, status, processed_by, notes, synced_at, payment_operation_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(id, order.id, payment.method, payment.amount, order.iva_amount || 0, payment.received, payment.change, args.reference || '', args.status || 'completed', args.processedBy, args.notes || '', new Date().toISOString(), operation?.id || null);
-    const totalPaid = paid + (args.status === 'completed' || !args.status ? payment.amount : 0);
+    const totalPaid = paid + (args.status === 'completed' || !args.status ? delta : 0);
     const fullyPaid = args.status === 'completed' || !args.status ? updateOrder(db, order, totalPaid, payment.method, args.reference) : false;
     return { paymentId: id, fullyPaid, remaining: order.total - totalPaid };
   });

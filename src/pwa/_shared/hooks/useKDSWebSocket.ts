@@ -150,6 +150,8 @@ export function normalizeServerItem(raw: unknown): OrderLineItem | null {
     id: src.id,
     menuItemId: typeof src.menu_item_id === 'string' ? src.menu_item_id : '',
     menuItemName: typeof src.item_name === 'string' ? src.item_name : 'Item',
+    // KDS (2026-08-26): apartado (categoría) del item para mostrar "PIZZA" + nombre
+    categoryName: typeof src.category_name === 'string' ? src.category_name : undefined,
     quantity,
     unitPrice,
     modifiers,

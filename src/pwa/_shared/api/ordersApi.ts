@@ -26,6 +26,8 @@ export interface ServerOrderItem {
   round?: number;
   /** Sprint 1 (E): "Promo" cuando el item se facturó con promo manual */
   promo_label?: string | null;
+  /** KDS/Cobro (2026-08-26): apartado (categoría) del item */
+  category_name?: string;
 }
 
 /** Server order row (snake_case) */
@@ -71,6 +73,8 @@ export interface OrderLineItem {
   round?: number;
   /** Sprint 1 (E): "Promo" cuando el item se facturó con promo manual */
   promoLabel?: string | null;
+  /** KDS/Cobro (2026-08-26): apartado (categoría) del item */
+  categoryName?: string;
 }
 
 export interface Order {
@@ -151,6 +155,7 @@ function normalizeItem(item: ServerOrderItem): OrderLineItem {
     kdsModule: item.kds_module,
     round: typeof item.round === 'number' ? item.round : 1,
     promoLabel: item.promo_label ?? null,
+    categoryName: item.category_name || undefined,
   };
 }
 

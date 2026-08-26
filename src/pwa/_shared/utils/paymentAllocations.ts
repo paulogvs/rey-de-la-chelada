@@ -4,6 +4,9 @@ export interface PaymentAllocationInput {
   method: AllocationMethod;
   amount: number;
   received?: number;
+  /** 2026-08-26: cambio entregado EN EFECTIVO (default = todo el vuelto).
+   *  Con "cambio por QR", change < received − amount (el resto sale por QR). */
+  change?: number;
   reference?: string;
 }
 
@@ -52,6 +55,7 @@ export function buildMixedPaymentPayload(
       method: allocation.method,
       amount: allocation.amount,
       ...(allocation.method === 'cash' && allocation.received !== undefined ? { received: allocation.received } : {}),
+      ...(allocation.method === 'cash' && allocation.change !== undefined ? { change: allocation.change } : {}),
       ...(allocation.method === 'qr' && allocation.reference ? { reference: allocation.reference } : {}),
     })),
   };
