@@ -108,6 +108,28 @@ function multiPwaOutput(): Plugin {
           if (!fs.existsSync(modSwSrc)) continue;
           const destDir = path.join(distRoot, mod.id);
           fs.mkdirSync(destDir, { recursive: true });
+          // INYECCIÓN clientsClaim (FIX 2026-08-26): vite-plugin-pwa v1.3 NO
+          // añade self.clients.claim() al SW aunque workbox.clientsClaim=true.
+          // Sin claim, el SW nuevo no toma control de las pestañas abiertas →
+          // el SW viejo (con la caché 401 atrapada) seguía mandando. Inyectamos
+          // el handler activate + limpieza de cachés runtime obsoletas.
+          let swContent = fs.readFileSync(modSwSrc, 'utf-8');
+          if (!swContent.includes('self.clients.claim')) {
+            swContent = swContent + [
+              '',
+              '/** FORCH.iA inyectado: clientsClaim + limpieza cachés runtime obsoletas. */',
+              'self.addEventListener("activate",(e)=>{e.waitUntil((async()=>{',
+              '  if(!self.clients)return;',
+              '  await self.clients.claim();',
+              `  const prefix = "${mod.id}-api-";`,
+              '  if(!self.caches)return;',
+              '  const keys = await self.caches.keys();',
+              '  await Promise.all(keys.filter(k=>k.startsWith(prefix)).map(k=>self.caches.delete(k)));',
+              '})());});',
+              '',
+            ].join('\n');
+            fs.writeFileSync(modSwSrc, swContent, 'utf-8');
+          }
           fs.copyFileSync(modSwSrc, path.join(destDir, 'sw.js'));
           // Chunks de workbox compartidos
           const workboxChunks = fs.readdirSync(distRoot)
@@ -176,6 +198,13 @@ export default defineConfig({
         // Nombre único por módulo para que cada SW tenga SU precache/runtime
         filename: `${mod.id}-sw.js`,
         workbox: {
+          // CRÍTICO (2026-08-26): skipWaiting + clientsClaim → el SW nuevo se
+          // activa AL INSTANTE y RECLAMA el control de las pestañas abiertas.
+          // Sin clientsClaim, el SW viejo (con la caché 401 atrapada) seguía
+          // controlando la página → el usuario no podía entrar sin hard refresh.
+          // Con estos dos, el auto-update del deploy aplica SOLO.
+          skipWaiting: true,
+          clientsClaim: true,
           globPatterns: [`${mod.id}/**/*.{js,css,png,svg}`],
           // navegación NUNCA cache-first: tras un deploy el index.html viejo
           // (con hashes que ya no existen) dejaba al usuario atrapado en la

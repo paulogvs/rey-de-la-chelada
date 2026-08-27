@@ -10,7 +10,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { registerServiceWorkerWithAutoUpdate } from '../../src/pwa/_shared/serviceWorkerAutoUpdate';
+import {
+  registerServiceWorkerWithAutoUpdate,
+  clearRuntimeCaches,
+} from '../../src/pwa/_shared/serviceWorkerAutoUpdate';
 
 /** Crea un worker mock con estado configurable (state mutable para transiciones) */
 function makeWorker(initialState = 'installed') {
@@ -141,5 +144,31 @@ describe('registerServiceWorkerWithAutoUpdate', () => {
     await registerServiceWorkerWithAutoUpdate('clientes', sw as never, { location: { reload: reloadSpy } } as never);
 
     expect(registration.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('clearRuntimeCaches', () => {
+  it('borra SOLO las cachés runtime del módulo (prefijo <mod>-api-)', async () => {
+    const keys = [
+      'meseros-api-get',  // 401 atrapado → debe borrarse
+      'cocina-api-get',   // otro módulo → NO tocar
+      'meseros-workbox-precache-v2', // precache → NO tocar
+      'workbox-precache', // precache global → NO tocar
+    ];
+    const deleted: string[] = [];
+    const windowObj = {
+      location: { reload: vi.fn() },
+      caches: {
+        keys: () => Promise.resolve(keys),
+        delete: (k: string) => { deleted.push(k); return Promise.resolve(true); },
+      },
+    };
+    await clearRuntimeCaches('meseros', windowObj as never);
+    expect(deleted).toEqual(['meseros-api-get']);
+  });
+
+  it('no crashea si window.caches no está disponible', async () => {
+    const windowObj = { location: { reload: vi.fn() } };
+    await expect(clearRuntimeCaches('meseros', windowObj as never)).resolves.toBeUndefined();
   });
 });
