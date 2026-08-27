@@ -206,19 +206,19 @@ export default defineConfig({
                 expiration: { maxEntries: 5, maxAgeSeconds: 60 * 60 * 24 * 7 },
               },
             },
-            // GET /api/* → NetworkFirst con expiración de 60s
+            // GET /api/* → NetworkOnly (SIEMPRE la red, NUNCA caché).
+            // CRÍTICO: antes era NetworkFirst y cacheaba respuestas 401
+            // (INVALID_TOKEN) de un token viejo → el SW las reutilizaba aunque
+            // el usuario re-logueara con token nuevo → LOOP INFINITO de
+            // "Token inválido o expirado". Las APIs son en tiempo real (polling)
+            // en un restaurante con red — no necesitan caché, y el polling ya
+            // da tolerancia a fallos. NetworkOnly elimina cualquier caché
+            // de respuestas de error (401/403/500).
             {
               urlPattern: ({ url, request }) =>
                 url.pathname.startsWith('/api/') && request.method === 'GET',
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: `${mod.id}-api-get`,
-                expiration: {
-                  maxEntries: 100,
-                  maxAgeSeconds: 60,
-                },
-                networkTimeoutSeconds: 3,
-              },
+              handler: 'NetworkOnly',
+              options: { cacheName: `${mod.id}-api-get` },
             },
             // POST/PUT/DELETE /api/* → NetworkOnly (nunca cachear writes)
             {
