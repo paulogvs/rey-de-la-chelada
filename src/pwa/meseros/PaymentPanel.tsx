@@ -77,8 +77,11 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
     (async () => {
       setLoadingOrder(true);
       try {
-        // fetchOrderById NORMALIZA (camelCase) → resumen completo
-        const result = await fetchOrderById(orderId, token);
+        // fetchOrderById NORMALIZA (camelCase) → resumen completo.
+        // FIRMA: fetchOrderById(token, orderId) — token PRIMERO, orderId segundo.
+        // (FIX 2026-08-27: estaban invertidos → el JWT iba como orderId en la
+        // URL y el UUID como Bearer → 401 INVALID_TOKEN en cada cobro.)
+        const result = await fetchOrderById(token, orderId);
         if (disposed) return;
         if (result.ok && result.order) {
           setOrder(result.order);

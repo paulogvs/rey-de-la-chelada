@@ -11,6 +11,7 @@ import {
   updateOrderStatus,
   submitOrder,
   fetchOrdersByStatus,
+  fetchOrderById,
   type OrderPayload,
   type ServerOrder,
   type ServerOrderItem,
@@ -157,5 +158,41 @@ describe('fetchOrdersByStatus', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toContain('/api/orders');
     expect(url).toContain('status=called');
+  });
+});
+
+describe('fetchOrderById — FIRMA (regresión 2026-08-27)', () => {
+  // FIX 2026-08-27: PaymentPanel llamaba fetchOrderById(orderId, token) pero
+  // la firma es (token, orderId) → el JWT iba como orderId en la URL y el
+  // UUID como Bearer → 401 INVALID_TOKEN en cada cobro. Este test fija el
+  // contrato: token en el header Authorization, orderId en la URL.
+  it('usa el TOKEN en el header y el ORDER_ID en la URL (NUNCA invertidos)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ success: true, order: serverOrder })
+    );
+    const token = 'JWT-de-sesion-abc123';
+    const orderId = 'uuid-del-pedido-987';
+    const result = await fetchOrderById(token, orderId, fetchMock as unknown as typeof fetch);
+
+    expect(result.ok).toBe(true);
+    expect(result.order?.id).toBe('o1');
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    // La URL debe contener el ORDER_ID (no el token)
+    expect(url).toContain(`/api/orders/${orderId}`);
+    expect(url).not.toContain(token);
+    // El header Authorization debe llevar el TOKEN (no el orderId)
+    const headers = init.headers as Record<string, string>;
+    expect(headers.Authorization).toBe(`Bearer ${token}`);
+    expect(headers.Authorization).not.toContain(orderId);
+  });
+
+  it('devuelve order null si el server no responde con order (404/401)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ success: false, code: 'ORDER_NOT_FOUND', error: 'no' }, 404)
+    );
+    const result = await fetchOrderById('tok', 'o1', fetchMock as unknown as typeof fetch);
+    expect(result.ok).toBe(false);
+    expect(result.order).toBeNull();
   });
 });
