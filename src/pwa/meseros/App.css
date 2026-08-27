@@ -1676,6 +1676,36 @@
   border: 1px solid var(--border);
 }
 
+/* Contenedor de la miniatura + botón X para eliminar la foto del comprobante
+   (2026-08-27). El botón se superpone arriba-derecha en un círculo rojo. */
+.payment-panel__proof-thumb-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.payment-panel__proof-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--status-cancelled);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.payment-panel__proof-remove:hover {
+  transform: scale(1.15);
+}
+
 .payment-panel__change-card {
   border-color: var(--ambar-cerveza);
 }

@@ -42,6 +42,10 @@ function MeserosApp() {
   const [view, setView] = useState<ViewState>('tables');
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  // FIX 2026-08-27: señal que refresca el detalle del pedido abierto en el
+  // OrderPanel cuando llega un evento WS de ESE pedido (barra/cocina marca
+  // un item como "Listo" → el mesero lo ve en vivo sin salir de la mesa).
+  const [orderRefreshTick, setOrderRefreshTick] = useState(0);
 
   // Tables — real API with WS refresh + polling
   const tables = useTables({ token, pollMs: 15000 });
@@ -80,12 +84,22 @@ function MeserosApp() {
       }
       // Any order event → refresh table statuses (actualiza las alertas)
       tables.wsEvent(event);
+
+      // FIX 2026-08-27: si el evento pertenece al pedido ABIERTO en pantalla,
+      // refresca su detalle (items "EN PROCESO" → "LISTO") en vivo. Solo
+      // re-refresca el pedido que el mesero está viendo, no todos.
+      if (activeOrderId && event.orderId === activeOrderId) {
+        setOrderRefreshTick(t => t + 1);
+      }
     },
   });
 
   const handleTableSelect = useCallback((table: Table) => {
     setSelectedTable(table);
     setView('order-panel');
+    // FIX 2026-08-27: sincronizar activeOrderId con el pedido activo de la mesa
+    // (si lo tiene) para que el WS refresque el detalle del pedido correcto.
+    setActiveOrderId(table.currentOrderId ?? null);
     // Refrescar para que el detalle vea el pedido activo actualizado
     tables.refresh();
   }, [tables]);
@@ -233,6 +247,7 @@ function MeserosApp() {
               onCancel={handleOrderCancelled}
               onBack={handleBackToTables}
               onRequestPayment={handleRequestPayment}
+              wsRefresh={orderRefreshTick}
             />
           )}
 

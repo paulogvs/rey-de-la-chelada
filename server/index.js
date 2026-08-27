@@ -136,10 +136,13 @@ app.use(securityHeaders);
 // Logging
 app.use(morgan('combined'));
 
-// Body parsing — 2mb: pedidos grandes (muchos items + modificadores) y
-// sync push con N pedidos en una sola llamada pueden superar 1mb.
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+// Body parsing — 12mb: pedidos grandes (muchos items + modificadores) y
+// sync push con N pedidos en una sola llamada pueden superar 1mb. Además,
+// los comprobantes QR van en base64 dentro del body de POST /api/payments/:id/proof
+// (ruta usa su propio parser de 20mb) — el global DEBE ser >= para no
+// rechazar la foto del comprobante con 413 antes de llegar a la ruta.
+app.use(express.json({ limit: '12mb' }));
+app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 
 // Rate limiting global para /api/*
 // F1 2026-08-10: lecturas (polling) con techo alto, escrituras estrictas.

@@ -30,7 +30,7 @@ import { MoneyInput } from '@/ui/components/MoneyInput/MoneyInput';
 import { useToast } from '@/ui/components/Toast';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { processMixedPayment, processPayment, uploadPaymentProof } from '../_shared/api/paymentsApi';
-import { buildMixedPaymentPayload } from '../_shared/utils/paymentAllocations';
+import { buildMixedPaymentPayload, resolveChangeSplit } from '../_shared/utils/paymentAllocations';
 import { fetchOrderById, type Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
@@ -52,6 +52,37 @@ function readFileAsDataUrl(file: File): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+/**
+ * Convierte una foto a data URL COMPRIMIDA (reescala a máx ~1280px, JPEG q0.8).
+ * FIX 2026-08-27: las fotos `capture="environment"` en base64 pesan 3-8 MB —
+ * superaban el límite del body-parser → "comprobantes no se guardaron".
+ * Al comprimir en el cliente (canvas) la foto baja a <300 KB y sube sin error,
+ * además de no llenar el disco con PNGs gigantes.
+ */
+async function compressImageToDataUrl(file: File, maxDim = 1280, quality = 0.8): Promise<string> {
+  const original = await readFileAsDataUrl(file).catch(() => null);
+  if (!original || typeof document === 'undefined') return original ?? '';
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = reject;
+      el.src = original;
+    });
+    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+    if (scale >= 1) return original; // ya es chica, no comprimir
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return original;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', quality);
+  } catch {
+    return original; // si falla el canvas, usa la original (sigue el límite global)
+  }
 }
 
 export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack }: PaymentPanelProps) {
@@ -105,15 +136,13 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
   // Exceso de pago → cambio disponible (Efectivo + QR − Pedido)
   const changeAvailable = Math.max(0, cashGiven + qrGiven - amountToCollect);
   const hasChange = changeAvailable > 0;
-  // Reparto por defecto: todo el cambio en efectivo (si cabe), resto a QR
-  useEffect(() => {
-    if (!hasChange) { setChangeCash(0); return; }
-    const maxCash = Math.min(changeAvailable, cashGiven);
-    setChangeCash(maxCash);
-  }, [changeAvailable, cashGiven, hasChange]);
-
-  const changeQr = hasChange ? changeAvailable - changeCash : 0;
-  const changeValid = !hasChange || (changeCash + changeQr === changeAvailable && changeCash <= cashGiven && changeQr <= qrGiven);
+  // Reparto del cambio (FIX 2026-08-27): función pura testeable que respeta
+  // el rango factible (cambio QR nunca supera lo pagado por QR).
+  const changeSplit = resolveChangeSplit(changeAvailable, cashGiven, qrGiven);
+  const minChangeCash = changeSplit.minChangeCash;
+  const maxChangeCash = changeSplit.maxChangeCash;
+  const changeQr = changeSplit.changeQr;
+  const changeValid = changeSplit.valid;
 
   // Montos aplicados al pedido
   const cashApplied = Math.max(0, cashGiven - changeCash);
@@ -121,14 +150,34 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
   const coversTotal = cashApplied + qrApplied === amountToCollect;
   const canPay = coversTotal && changeValid && (cashApplied > 0 || qrApplied > 0);
 
+  // Sincronizar el estado changeCash con el DEFAULT al cambiar los montos
+  // (si el usuario no lo ha editado aún). Si ya editó, se respeta y se clampea.
+  useEffect(() => {
+    if (!hasChange) { setChangeCash(0); return; }
+    setChangeCash(prev => {
+      const clamped = Math.min(maxChangeCash, Math.max(minChangeCash, prev));
+      // Si prev está en 0 (sin editar) → va al default (máx. efectivo).
+      return prev === 0 ? changeSplit.changeCash : clamped;
+    });
+  }, [changeAvailable, cashGiven, qrGiven, hasChange, minChangeCash, maxChangeCash]);
+
   const handleAddPhoto = useCallback(async (file: File, kind: 'qr' | 'change') => {
     if (!file) return;
-    const dataUrl = await readFileAsDataUrl(file).catch(() => null);
+    // FIX 2026-08-27: comprimir la foto (canvas, máx 1280px, JPEG q0.8) para
+    // que el data URL no supere el límite del body-parser → ya no falla
+    // "comprobantes no se guardaron".
+    const dataUrl = await compressImageToDataUrl(file).catch(() => null);
     if (!dataUrl) { addToast({ type: 'error', message: 'No se pudo leer la imagen', duration: 3000 }); return; }
     if (kind === 'qr') setProofPhotos(prev => [...prev, dataUrl]);
     else setChangeQrPhotos(prev => [...prev, dataUrl]);
     addToast({ type: 'success', message: 'Comprobante agregado', duration: 2500 });
   }, [addToast]);
+
+  // Eliminar una foto del estado local (no subida al server todavía).
+  const handleRemovePhoto = useCallback((kind: 'qr' | 'change', index: number) => {
+    if (kind === 'qr') setProofPhotos(prev => prev.filter((_, i) => i !== index));
+    else setChangeQrPhotos(prev => prev.filter((_, i) => i !== index));
+  }, []);
 
   const processPaymentNow = useCallback(async () => {
     if (!order) return;
@@ -168,11 +217,15 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
         else addToast({ type: 'warning', message: 'Pago OK pero el retiro QR no se registró', duration: 5000 });
       }
 
-      // 3. Subir fotos
+      // 3. Subir fotos — FIX 2026-08-27: antes hacía producto cartesiano
+      // (cada foto × cada pago QR = N×M subidas). Ahora cada foto se sube
+      // UNA sola vez al primer pago QR del pedido (los comprobantes son del
+      // pedido, no por transacción). Evita subidas duplicadas e innecesarias.
       let uploadErrors = 0;
-      if (proofPhotos.length > 0 && qrPayments.length > 0) {
-        for (const photo of proofPhotos) for (const payment of qrPayments) {
-          const up = await uploadPaymentProof(token, payment.id, photo); if (!up.ok) uploadErrors++;
+      const qrTarget = qrPayments[0];
+      if (proofPhotos.length > 0 && qrTarget) {
+        for (const photo of proofPhotos) {
+          const up = await uploadPaymentProof(token, qrTarget.id, photo); if (!up.ok) uploadErrors++;
         }
       }
       if (changeQrPhotos.length > 0 && changeQrPaymentId) {
@@ -260,7 +313,13 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
               {proofPhotos.length > 0 ? `Comprobantes (${proofPhotos.length}) — agregar` : 'Tomar fotografía'}
             </Button>
             {proofPhotos.length > 0 && <div className="payment-panel__proofs">
-              {proofPhotos.map((photo, i) => <img key={i} src={photo} alt={`Comprobante QR ${i + 1}`} className="payment-panel__proof-thumb" />)}
+              {proofPhotos.map((photo, i) => (
+                <div className="payment-panel__proof-thumb-wrap" key={`qr-${i}`}>
+                  <img src={photo} alt={`Comprobante QR ${i + 1}`} className="payment-panel__proof-thumb" />
+                  <button type="button" className="payment-panel__proof-remove" aria-label="Eliminar comprobante"
+                    onClick={() => handleRemovePhoto('qr', i)}>×</button>
+                </div>
+              ))}
             </div>}
             <input id="payment-proof-input" type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
               onChange={e => { const file = e.target.files?.[0]; if (file) void handleAddPhoto(file, 'qr'); e.target.value = ''; }} />
@@ -279,7 +338,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
         <div className="payment-panel__change-grid">
           <div>
             <label className="payment-panel__method-label" htmlFor="change-cash">Cambio en efectivo</label>
-            <MoneyInput id="change-cash" className="payment-panel__money" value={changeCash} disabled={!hasChange} onChange={cents => setChangeCash(Math.min(cents, cashGiven))} placeholder="0" />
+            <MoneyInput id="change-cash" className="payment-panel__money" value={changeCash} disabled={!hasChange} onChange={cents => setChangeCash(Math.min(maxChangeCash, Math.max(minChangeCash, cents)))} placeholder="0" />
           </div>
           <div>
             <label className="payment-panel__method-label" htmlFor="change-qr">Cambio por QR</label>
@@ -287,6 +346,16 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
           </div>
         </div>
         {!hasChange && <p className="payment-panel__change-hint">Ingresa más en Efectivo + QR que el total del pedido para habilitar el cambio.</p>}
+        {hasChange && qrGiven === 0 && (
+          <p className="payment-panel__change-hint">
+            Sin pago por QR: el cambio se entrega solo en efectivo ({formatMoney(changeAvailable)}).
+          </p>
+        )}
+        {hasChange && qrGiven > 0 && (
+          <p className="payment-panel__change-hint">
+            Repartí el cambio entre efectivo y QR (el QR no puede superar lo pagado por QR).
+          </p>
+        )}
         {hasChange && !changeValid && <p className="payment-panel__change-error">El cambio debe sumar {formatMoney(changeAvailable)} (efectivo ≤ {formatMoney(cashGiven)}, QR ≤ {formatMoney(qrGiven)}).</p>}
         {hasChange && changeQr > 0 && (
           <div className="payment-panel__change-qr-block">
@@ -296,7 +365,13 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
               {changeQrPhotos.length > 0 ? `Comprobantes retiro (${changeQrPhotos.length}) — agregar` : 'Tomar foto del retiro QR'}
             </Button>
             {changeQrPhotos.length > 0 && <div className="payment-panel__proofs">
-              {changeQrPhotos.map((photo, i) => <img key={i} src={photo} alt={`Retiro QR ${i + 1}`} className="payment-panel__proof-thumb" />)}
+              {changeQrPhotos.map((photo, i) => (
+                <div className="payment-panel__proof-thumb-wrap" key={`chg-${i}`}>
+                  <img src={photo} alt={`Retiro QR ${i + 1}`} className="payment-panel__proof-thumb" />
+                  <button type="button" className="payment-panel__proof-remove" aria-label="Eliminar comprobante retiro"
+                    onClick={() => handleRemovePhoto('change', i)}>×</button>
+                </div>
+              ))}
             </div>}
             <input id="change-proof-input" type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
               onChange={e => { const file = e.target.files?.[0]; if (file) void handleAddPhoto(file, 'change'); e.target.value = ''; }} />

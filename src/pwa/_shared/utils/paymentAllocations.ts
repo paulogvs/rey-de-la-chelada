@@ -60,3 +60,32 @@ export function buildMixedPaymentPayload(
     })),
   };
 }
+
+/**
+ * Reparto del cambio entre efectivo y QR (FIX 2026-08-27).
+ *
+ * Regla de negocio: el cambio por QR NO puede superar lo que efectivamente se
+ * cobró por QR (`ruleQrGiven`), porque no se puede "devolver" por QR dinero que
+ * no entró por QR. Si QR=0, el cambio es SOLO en efectivo.
+ *
+ * @param changeAvailable cambio total a devolver (efectivo + QR recibido − pedido)
+ * @param cashGiven       efectivo entregado por el cliente
+ * @param qrGiven         monto pagado por QR (el "techo" del cambio QR)
+ * @returns { changeCash, changeQr, minChangeCash, maxChangeCash, valid }
+ */
+export function resolveChangeSplit(changeAvailable: number, cashGiven: number, qrGiven: number) {
+  const available = Math.max(0, changeAvailable);
+  // max cambio en efectivo = lo que cabe en el efectivo recibido.
+  const maxChangeCash = Math.min(available, cashGiven);
+  // min cambio en efectivo = cambio que NO se puede dar por QR (resta el techo QR).
+  const minChangeCash = Math.max(0, available - qrGiven);
+  // default: dar el cambio en efectivo tanto como sea posible.
+  const defaultChangeCash = maxChangeCash;
+  // clamp de un valor de cambio en efectivo al rango factible.
+  const clampChangeCash = (value: number) =>
+    Math.min(maxChangeCash, Math.max(minChangeCash, value));
+  const changeCash = clampChangeCash(defaultChangeCash);
+  const changeQr = available - changeCash;
+  const valid = changeQr >= 0 && changeQr <= qrGiven && changeCash >= 0 && changeCash <= cashGiven;
+  return { changeCash, changeQr, minChangeCash, maxChangeCash, valid };
+}

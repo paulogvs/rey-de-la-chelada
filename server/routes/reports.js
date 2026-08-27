@@ -118,18 +118,21 @@ router.get('/orders', requireAuth, requireRole('admin', 'caja'), (req, res) => {
     for (const order of orders) {
       order.items = db.prepare(`
         SELECT oi.id, oi.menu_item_name, oi.quantity, oi.unit_price, oi.subtotal,
-               oi.notes, oi.round, oi.promo_label, mi.area as kds_module
+               oi.preparation_notes as notes, oi.round, oi.promo_label, mi.area as kds_module
         FROM order_items oi
         LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
         WHERE oi.order_id = ?
         ORDER BY oi.round ASC, oi.created_at ASC
       `).all(order.id);
       order.payments = db.prepare(`
-        SELECT id, method, amount, received, change, reference, status, processed_at,
-               processor, proof_photo
-        FROM payments
-        WHERE order_id = ?
-        ORDER BY processed_at ASC
+        SELECT p.id, p.method, p.amount, p.received, p.change, p.reference, p.status, p.processed_at,
+               p.processed_by,
+               s2.display_name as processor,   -- FIX 2026-08-27: 'processor' no existe en payments; la columna real es processed_by (FK staff). Se JOINTA a staff para exponer el nombre como 'processor' (mismo shape de salida).
+               p.proof_photo
+        FROM payments p
+        LEFT JOIN staff s2 ON p.processed_by = s2.id
+        WHERE p.order_id = ?
+        ORDER BY p.processed_at ASC
       `).all(order.id);
       order.payment_summary = db.prepare(`
         SELECT method, SUM(amount) as total, COUNT(*) as count

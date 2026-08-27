@@ -74,6 +74,9 @@ interface OrderPanelProps {
   onBack: () => void;
   /** FASE 4C: cobrar el pedido (solo habilitado cuando served — TODO entregado) */
   onRequestPayment: (orderId: string) => void;
+  /** FIX 2026-08-27: señal del WS (App.tsx) — al cambiar, re-consulta el
+   *  pedido abierto para reflejar items "EN PROCESO" → "LISTO" en vivo. */
+  wsRefresh?: number;
 }
 
 export interface CartItem {
@@ -123,7 +126,7 @@ interface DetailGroup {
   options: DetailModifier[];
 }
 
-export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, onBack, onRequestPayment }: OrderPanelProps) {
+export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, onBack, onRequestPayment, wsRefresh = 0 }: OrderPanelProps) {
   const { addToast } = useToast();
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -210,7 +213,10 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
       }
     })();
     return () => { disposed = true; };
-  }, [table.currentOrderId, token, activeOrderTick]);
+    // FIX 2026-08-27: `wsRefresh` en deps → al cambiar (evento WS del pedido
+    // abierto: barra/cocina marca item "LISTO") re-consulta el detalle y el
+    // mesero lo ve EN VIVO sin salir de la mesa.
+  }, [table.currentOrderId, token, activeOrderTick, wsRefresh]);
 
   // FASE 4C: entregar por ronda+módulo — el botón "Pedido Entregado"
   // entrega TODA la ronda de ESE módulo de una vez (cocina / bar).
