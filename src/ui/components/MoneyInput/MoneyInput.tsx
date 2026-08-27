@@ -38,7 +38,10 @@ export function MoneyInput({ value, onChange, variant, className = '', placehold
   // Display editable con coma decimal ("10,5"); vacío cuando es 0 para mostrar placeholder.
   const display = value === 0 ? '' : String(value / 100).replace('.', ',');
 
-  const cls = variant ? buildFormInputClass(variant, className) : className;
+  // SIEMPRE usar buildFormInputClass → con variant/className vacíos produce
+  // la clase base `form-input` (estilo oscuro unificado). Estandariza todos
+  // los MoneyInput de la app sin depender de CSS local por call site.
+  const cls = buildFormInputClass(variant, className);
 
   return (
     <input

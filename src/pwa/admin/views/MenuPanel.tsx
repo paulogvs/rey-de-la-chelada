@@ -378,11 +378,43 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
                   const famDraft = familiar ? drafts[`fam-${familiar.id}`] : null;
                   return (
                     <div key={item.id} className={`admin-bulk-item ${item.is_active === 1 ? '' : 'admin-menu-row--inactive'}`}>
-                      <div className="admin-bulk-item__head">
-                        <span className="admin-bulk-item__name" title={item.name}>
-                          {item.name}
-                          {item.is_active !== 1 && <Badge variant="cancelled">oculto</Badge>}
-                        </span>
+                      <div className="admin-bulk-item__name" title={item.name}>
+                        {item.name}
+                        {item.is_active !== 1 && <Badge variant="cancelled">oculto</Badge>}
+                      </div>
+                      <div className="admin-bulk-item__row">
+                        <div className="admin-bulk-item__prices">
+                          <div className="admin-price-input">
+                            <span className="admin-price-input__prefix">Bs</span>
+                            <MoneyInput
+                              variant="sm" className="form-input--mono"
+                              value={item.price ?? 0}
+                              placeholder="—"
+                              onChange={cents => handlePriceChange(item.id, cents)}
+                              onBlur={() => handlePriceBlur(item)}
+                              aria-label={`Precio de ${item.name}`}
+                            />
+                            {draft?.saving && <span className="admin-bulk-item__saving">…</span>}
+                            {draft?.saved === 'ok' && <span className="admin-bulk-item__ok"><AppIcon name="check" size="sm" /></span>}
+                            {draft?.saved === 'err' && <span className="admin-bulk-item__err"><AppIcon name="x" size="sm" /></span>}
+                          </div>
+                          {familiar && (
+                            <div className="admin-price-input admin-price-input--familiar">
+                              <span className="admin-price-input__prefix">Fam +Bs</span>
+                              <MoneyInput
+                                variant="sm" className="form-input--mono"
+                                value={familiar.price_adjustment}
+                                placeholder="0"
+                                onChange={cents => handleFamiliarChange(familiar.id, cents)}
+                                onBlur={() => handleFamiliarBlur(familiar)}
+                                aria-label={`Ajuste Familiar de ${item.name}`}
+                              />
+                              {famDraft?.saving && <span className="admin-bulk-item__saving">…</span>}
+                              {famDraft?.saved === 'ok' && <span className="admin-bulk-item__ok"><AppIcon name="check" size="sm" /></span>}
+                              {famDraft?.saved === 'err' && <span className="admin-bulk-item__err"><AppIcon name="x" size="sm" /></span>}
+                            </div>
+                          )}
+                        </div>
                         <div className="admin-bulk-item__actions">
                           <Button variant="ghost" size="sm" onClick={() => setItemForm({ open: true, id: item.id, categoryId: item.category_id, name: item.name, area: item.area === 'bar' ? 'bar' : 'cocina' })} title="Editar">
                             <AppIcon name="edit" size="sm" />
@@ -394,38 +426,6 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
                             <AppIcon name="trash" size="sm" />
                           </Button>
                         </div>
-                      </div>
-                      <div className="admin-bulk-item__prices">
-                        <div className="admin-price-input">
-                          <span className="admin-price-input__prefix">Bs</span>
-                          <MoneyInput
-                            variant="sm" className="form-input--mono"
-                            value={item.price ?? 0}
-                            placeholder="—"
-                            onChange={cents => handlePriceChange(item.id, cents)}
-                            onBlur={() => handlePriceBlur(item)}
-                            aria-label={`Precio de ${item.name}`}
-                          />
-                          {draft?.saving && <span className="admin-bulk-item__saving">…</span>}
-                          {draft?.saved === 'ok' && <span className="admin-bulk-item__ok"><AppIcon name="check" size="sm" /></span>}
-                          {draft?.saved === 'err' && <span className="admin-bulk-item__err"><AppIcon name="x" size="sm" /></span>}
-                        </div>
-                        {familiar && (
-                          <div className="admin-price-input admin-price-input--familiar">
-                            <span className="admin-price-input__prefix">Fam +Bs</span>
-                            <MoneyInput
-                              variant="sm" className="form-input--mono"
-                              value={familiar.price_adjustment}
-                              placeholder="0"
-                              onChange={cents => handleFamiliarChange(familiar.id, cents)}
-                              onBlur={() => handleFamiliarBlur(familiar)}
-                              aria-label={`Ajuste Familiar de ${item.name}`}
-                            />
-                            {famDraft?.saving && <span className="admin-bulk-item__saving">…</span>}
-                            {famDraft?.saved === 'ok' && <span className="admin-bulk-item__ok"><AppIcon name="check" size="sm" /></span>}
-                            {famDraft?.saved === 'err' && <span className="admin-bulk-item__err"><AppIcon name="x" size="sm" /></span>}
-                          </div>
-                        )}
                       </div>
                     </div>
                   );

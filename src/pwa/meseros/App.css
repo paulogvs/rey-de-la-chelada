@@ -1610,6 +1610,49 @@
   color: var(--text-muted);
 }
 
+/* Input monetario de pago — ANCHO COMPLETO, mono grande, táctil.
+   Hereda el sistema form-input pero sobrescribe tamaño/ancho para montos.
+   Mismo lenguaje visual que el contador de precios del admin. */
+.payment-panel__money {
+  width: 100%;
+  padding: var(--space-3);
+  min-height: var(--touch-primary-action);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  text-align: right;
+  box-sizing: border-box;
+  caret-color: var(--dorado-rey);
+  transition: border-color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out),
+              background-color var(--duration-fast) var(--ease-out);
+}
+
+.payment-panel__money:hover:not(:disabled):not(:focus) {
+  border-color: var(--border-hover);
+  background: var(--surface-hover);
+}
+
+.payment-panel__money:focus {
+  outline: none;
+  border-color: var(--dorado-rey);
+  box-shadow: var(--focus-ring);
+  background: var(--surface);
+}
+
+.payment-panel__money::placeholder {
+  color: var(--text-muted);
+}
+
+.payment-panel__money:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .payment-panel__qr-image {
   width: 120px;
   height: 120px;

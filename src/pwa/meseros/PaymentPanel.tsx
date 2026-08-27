@@ -245,13 +245,13 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
             <label className="payment-panel__method-label" htmlFor="pay-cash">
               <AppIcon name="banknote" size="sm" /> Efectivo (monto entregado)
             </label>
-            <MoneyInput id="pay-cash" value={cashGiven} onChange={cents => setCashGiven(cents)} placeholder="0" />
+            <MoneyInput id="pay-cash" className="payment-panel__money" value={cashGiven} onChange={cents => setCashGiven(cents)} placeholder="0" />
           </div>
           <div className="payment-panel__method-block">
             <label className="payment-panel__method-label" htmlFor="pay-qr">
               <AppIcon name="smartphone" size="sm" /> QR (monto)
             </label>
-            <MoneyInput id="pay-qr" value={qrGiven} onChange={cents => setQrGiven(cents)} placeholder="0" />
+            <MoneyInput id="pay-qr" className="payment-panel__money" value={qrGiven} onChange={cents => setQrGiven(cents)} placeholder="0" />
             {qrEnabled && qrImageUrl && hasQr && <img src={qrImageUrl} alt="QR de pago del restobar" className="payment-panel__qr-image" />}
             <Button variant="secondary" fullWidth disabled={qrGiven <= 0 || processing}
               onClick={() => document.getElementById('payment-proof-input')?.click()}
@@ -279,11 +279,11 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
         <div className="payment-panel__change-grid">
           <div>
             <label className="payment-panel__method-label" htmlFor="change-cash">Cambio en efectivo</label>
-            <MoneyInput id="change-cash" value={changeCash} disabled={!hasChange} onChange={cents => setChangeCash(Math.min(cents, cashGiven))} placeholder="0" />
+            <MoneyInput id="change-cash" className="payment-panel__money" value={changeCash} disabled={!hasChange} onChange={cents => setChangeCash(Math.min(cents, cashGiven))} placeholder="0" />
           </div>
           <div>
             <label className="payment-panel__method-label" htmlFor="change-qr">Cambio por QR</label>
-            <MoneyInput id="change-qr" value={changeQr} disabled={!hasChange} onChange={() => {}} placeholder="0" />
+            <MoneyInput id="change-qr" className="payment-panel__money" value={changeQr} disabled={!hasChange} onChange={() => {}} placeholder="0" />
           </div>
         </div>
         {!hasChange && <p className="payment-panel__change-hint">Ingresa más en Efectivo + QR que el total del pedido para habilitar el cambio.</p>}
