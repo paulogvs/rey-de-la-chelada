@@ -89,3 +89,75 @@ export function resolveChangeSplit(changeAvailable: number, cashGiven: number, q
   const valid = changeQr >= 0 && changeQr <= qrGiven && changeCash >= 0 && changeCash <= cashGiven;
   return { changeCash, changeQr, minChangeCash, maxChangeCash, valid };
 }
+
+/** Clamp genérico a [min, max]. */
+export function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * Rango factible del cambio en efectivo dado el cambio total y el contexto
+ * (efectivo/QR recibidos). Devuelve los límites INCLUSO si cashGiven/qrGiven
+ * no se pasan (≈ sin techo, para el caso "solo conozco el cambio total").
+ */
+export function resolveChangeBounds(changeAvailable: number, cashGiven?: number, qrGiven?: number) {
+  const available = Math.max(0, changeAvailable);
+  // max cambio en efectivo = lo que cabe en el efectivo recibido (∞ si no se dio).
+  const maxChangeCash = Number.isFinite(cashGiven) ? Math.min(available, cashGiven) : available;
+  // min cambio en efectivo = cambio que NO se puede dar por QR (∞→0 si no se dio QR).
+  const minChangeCash = Number.isFinite(qrGiven) ? Math.max(0, available - qrGiven) : 0;
+  return { available, minChangeCash, maxChangeCash };
+}
+
+/**
+ * Cambio EDIBLE (OPCIÓN A, 2026-08-27): el usuario escribe UNO de los dos
+ * (efectivo o QR) y el OTRO se deriva para que SIEMPRE sumen `changeAvailable`.
+ *
+ * `resolveChangeFromCash(changeAvailable, cashValue)` → { changeCash, changeQr }.
+ * "- Si pido efectivo=2000 y hay 2500 → efectivo=2000, QR=500.
+ *  - Si pido efectivo=3000 y hay 2500 → clamp a 2500, QR=0 (nunca excede).
+ *  - `cashGiven`/`qrGiven` opcionales: al pasarlos se respeta la regla de
+ *    negocio (cambio QR ≤ qrGiven, cambio efectivo ≤ cashGiven).
+ */
+export function resolveChangeFromCash(
+  changeAvailable: number,
+  cashValue: number,
+  cashGiven?: number,
+  qrGiven?: number
+): { changeCash: number; changeQr: number } {
+  const { available, minChangeCash, maxChangeCash } = resolveChangeBounds(changeAvailable, cashGiven, qrGiven);
+  const changeCash = clamp(cashValue, minChangeCash, maxChangeCash);
+  return { changeCash, changeQr: available - changeCash };
+}
+
+/**
+ * `resolveChangeFromQr(changeAvailable, qrValue)` → { changeCash, changeQr }.
+ * El QR deseado se clampea a su techo factible (≤ min(changeAvailable, qrGiven))
+ * y el efectivo es el complemento.
+ */
+export function resolveChangeFromQr(
+  changeAvailable: number,
+  qrValue: number,
+  cashGiven?: number,
+  qrGiven?: number
+): { changeCash: number; changeQr: number } {
+  const { available, minChangeCash } = resolveChangeBounds(changeAvailable, cashGiven, qrGiven);
+  // techo QR = cambio que puede absorber el QR = available − min cambio en efectivo.
+  const maxChangeQr = available - minChangeCash;
+  const changeQr = clamp(qrValue, 0, maxChangeQr);
+  return { changeCash: available - changeQr, changeQr };
+}
+
+/**
+ * MEJORA 4 (2026-08-27): auto-limpiar fotos cuando el medio de pago ya no aplica.
+ * - `changeQr <= 0` → no hay "cambio por QR" → las fotos del retiro QR sobran.
+ * - `qrApplied <= 0` → no hay monto QR aplicado al pedido → las fotos del pago QR sobran.
+ * Función pura testeable del efecto de React del PaymentPanel.
+ */
+export function shouldClearChangePhotos(changeQr: number): boolean {
+  return changeQr <= 0;
+}
+
+export function shouldClearProofPhotos(qrApplied: number): boolean {
+  return qrApplied <= 0;
+}

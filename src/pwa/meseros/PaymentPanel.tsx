@@ -19,7 +19,7 @@
  *   + retiro QR (transfer_out) por cambioQr (con foto)
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { Table } from '@/core/types';
 import { Button } from '@/ui/components/Button';
 import { Card } from '@/ui/components/Card';
@@ -30,7 +30,7 @@ import { MoneyInput } from '@/ui/components/MoneyInput/MoneyInput';
 import { useToast } from '@/ui/components/Toast';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { processMixedPayment, processPayment, uploadPaymentProof } from '../_shared/api/paymentsApi';
-import { buildMixedPaymentPayload, resolveChangeSplit } from '../_shared/utils/paymentAllocations';
+import { buildMixedPaymentPayload, resolveChangeSplit, resolveChangeFromCash, resolveChangeFromQr, shouldClearChangePhotos, shouldClearProofPhotos } from '../_shared/utils/paymentAllocations';
 import { fetchOrderById, type Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
@@ -141,8 +141,11 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
   const changeSplit = resolveChangeSplit(changeAvailable, cashGiven, qrGiven);
   const minChangeCash = changeSplit.minChangeCash;
   const maxChangeCash = changeSplit.maxChangeCash;
-  const changeQr = changeSplit.changeQr;
-  const changeValid = changeSplit.valid;
+  // MEJORA 3 (OPCIÓN A): el EFECTIVO es el estado editable; el QR se DERIVA
+  // para que SIEMPRE sumen changeAvailable. Ambos inputs son editables y al
+  // escribir en uno el otro se recalcula. Ninguno puede exceder changeAvailable.
+  const changeQr = hasChange ? Math.max(0, changeAvailable - changeCash) : 0;
+  const changeValid = changeQr >= 0 && changeQr <= qrGiven && changeCash >= 0 && changeCash <= cashGiven;
 
   // Montos aplicados al pedido
   const cashApplied = Math.max(0, cashGiven - changeCash);
@@ -150,16 +153,28 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
   const coversTotal = cashApplied + qrApplied === amountToCollect;
   const canPay = coversTotal && changeValid && (cashApplied > 0 || qrApplied > 0);
 
-  // Sincronizar el estado changeCash con el DEFAULT al cambiar los montos
-  // (si el usuario no lo ha editado aún). Si ya editó, se respeta y se clampea.
+  // Sincronizar changeCash con el DEFAULT de resolveChangeSplit cuando cambian los
+  // montos y el usuario AÚN no ha editado el cambio manualmente (ref changeTouched).
+  // Si ya editó, se respeta y se clampea al rango factible [minChangeCash, maxChangeCash].
+  const changeTouched = useRef(false);
   useEffect(() => {
-    if (!hasChange) { setChangeCash(0); return; }
+    if (!hasChange) { setChangeCash(0); changeTouched.current = false; return; }
     setChangeCash(prev => {
       const clamped = Math.min(maxChangeCash, Math.max(minChangeCash, prev));
-      // Si prev está en 0 (sin editar) → va al default (máx. efectivo).
-      return prev === 0 ? changeSplit.changeCash : clamped;
+      return changeTouched.current ? clamped : changeSplit.changeCash;
     });
   }, [changeAvailable, cashGiven, qrGiven, hasChange, minChangeCash, maxChangeCash]);
+
+  // MEJORA 4 (2026-08-27): auto-limpiar fotos cuando el medio de pago ya no aplica.
+  // El comprobante debe corresponder a un medio de pago que SÍ se usó:
+  //  - sin "cambio por QR" (changeQr<=0) → sobran las fotos del retiro QR.
+  //  - sin monto QR aplicado (qrApplied<=0) → sobran las fotos del pago QR.
+  useEffect(() => {
+    if (shouldClearChangePhotos(changeQr)) setChangeQrPhotos(prev => (prev.length ? [] : prev));
+  }, [changeQr]);
+  useEffect(() => {
+    if (shouldClearProofPhotos(qrApplied)) setProofPhotos(prev => (prev.length ? [] : prev));
+  }, [qrApplied]);
 
   const handleAddPhoto = useCallback(async (file: File, kind: 'qr' | 'change') => {
     if (!file) return;
@@ -179,8 +194,26 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
     else setChangeQrPhotos(prev => prev.filter((_, i) => i !== index));
   }, []);
 
+  // MEJORA 3 (OPCIÓN A): cambiar EN EFECTIVO → el QR se recalcula (suma a changeAvailable).
+  const handleChangeCashInput = useCallback((cents: number) => {
+    changeTouched.current = true;
+    setChangeCash(resolveChangeFromCash(changeAvailable, cents, cashGiven, qrGiven).changeCash);
+  }, [changeAvailable, cashGiven, qrGiven]);
+
+  // MEJORA 3: cambiar EN QR → el efectivo se recalcula (suma a changeAvailable).
+  const handleChangeQrInput = useCallback((cents: number) => {
+    changeTouched.current = true;
+    setChangeCash(resolveChangeFromQr(changeAvailable, cents, cashGiven, qrGiven).changeCash);
+  }, [changeAvailable, cashGiven, qrGiven]);
+
   const processPaymentNow = useCallback(async () => {
     if (!order) return;
+    // MEJORA 3 (refuerzo): validar SIEMPRE que lo pagado − el cambio = monto del pedido.
+    // Aunque `canPay` ya lo cubre, este guard evita un cobro fuera de equilibrio.
+    if (!coversTotal) {
+      addToast({ type: 'error', message: 'El cobro no cuadra: revisá Montos y Cambio', duration: 4000 });
+      return;
+    }
     setProcessing(true);
     try {
       // 1. Cobro del pedido con los montos APLICADOS (netos de cambio)
@@ -244,7 +277,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
       setProcessing(false);
     }
   }, [order, amountToCollect, cashApplied, qrApplied, cashGiven, changeCash, changeQr,
-    proofPhotos, changeQrPhotos, token, table.number, addToast, onPaymentComplete]);
+    coversTotal, proofPhotos, changeQrPhotos, token, table.number, addToast, onPaymentComplete]);
 
   if (loadingOrder) return <div className="payment-panel"><Loader block label="Cargando pedido…" /></div>;
   if (!order) {
@@ -338,11 +371,11 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
         <div className="payment-panel__change-grid">
           <div>
             <label className="payment-panel__method-label" htmlFor="change-cash">Cambio en efectivo</label>
-            <MoneyInput id="change-cash" className="payment-panel__money" value={changeCash} disabled={!hasChange} onChange={cents => setChangeCash(Math.min(maxChangeCash, Math.max(minChangeCash, cents)))} placeholder="0" />
+            <MoneyInput id="change-cash" className="payment-panel__money" value={changeCash} disabled={!hasChange} onChange={handleChangeCashInput} placeholder="0" />
           </div>
           <div>
             <label className="payment-panel__method-label" htmlFor="change-qr">Cambio por QR</label>
-            <MoneyInput id="change-qr" className="payment-panel__money" value={changeQr} disabled={!hasChange} onChange={() => {}} placeholder="0" />
+            <MoneyInput id="change-qr" className="payment-panel__money" value={changeQr} disabled={!hasChange} onChange={handleChangeQrInput} placeholder="0" />
           </div>
         </div>
         {!hasChange && <p className="payment-panel__change-hint">Ingresa más en Efectivo + QR que el total del pedido para habilitar el cambio.</p>}

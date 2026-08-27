@@ -516,8 +516,11 @@ router.get('/closing/current', requireAuth, requireRole('admin', 'caja'), (req, 
       WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed' AND method = 'qr'
     `).get(today);
 
+    // 2026-08-27: "transacciones" = PEDIDOS pagados distintos, no pagos.
+    // Un pedido pagado con efectivo+QR (mixto) o con retiro QR genera 2+ filas
+    // en `payments`, pero es UNA sola venta → COUNT(DISTINCT order_id).
     const txToday = db.prepare(`
-      SELECT COUNT(*) as n FROM payments
+      SELECT COUNT(DISTINCT order_id) as n FROM payments
       WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed'
     `).get(today);
 
@@ -672,8 +675,9 @@ router.put('/closing/close', requireAuth, requireRole('admin', 'caja'), (req, re
       SELECT COALESCE(SUM(amount), 0) as total FROM payments
       WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed' AND method = 'qr'
     `).get(closingDay);
+    // 2026-08-27: "transacciones" = PEDIDOS pagados distintos (ver comentario arriba).
     const txDay = db.prepare(`
-      SELECT COUNT(*) as n FROM payments
+      SELECT COUNT(DISTINCT order_id) as n FROM payments
       WHERE ${businessDayExpr('processed_at')} = ? AND status = 'completed'
     `).get(closingDay);
 

@@ -176,6 +176,45 @@ export async function fetchPaymentProof(
   return apiFetch<{ success: boolean; proof: PaymentProofMetadata }>(`/api/payments/${paymentId}/proof`, { token, fetchImpl });
 }
 
+/**
+ * Vista previa del comprobante (Caja/Admin — 2026-08-27).
+ *
+ * El contenido se sirve con auth Bearer (GET /api/payments/:id/proof/content),
+ * así que un `<img src>` simple NO puede mandar el header Authorization
+ * (y el endpoint tampoco acepta token en query — requireAuth solo lee el
+ * header Beareer). Por eso se usa fetch + blob: se descarga la imagen con el
+ * token y se devuelve el Blob (o un object URL para el lightbox).
+ */
+
+/** Descarga el Blob crudo de la imagen del comprobante (con Bearer). */
+export async function fetchProofImageBlob(
+  token: string,
+  paymentId: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<Blob> {
+  const res = await fetchImpl(`/api/payments/${paymentId}/proof/content`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error(`No se pudo cargar el comprobante (HTTP ${res.status})`);
+  }
+  return res.blob();
+}
+
+/**
+ * Carga el comprobante como object URL listo para `<img>`. El segundo
+ * parámetro opcional permite inyectar `URL.createObjectURL` para tests.
+ */
+export async function loadProofImage(
+  token: string,
+  paymentId: string,
+  fetchImpl: typeof fetch = fetch,
+  createObjectURL: (blob: Blob) => string = (b) => URL.createObjectURL(b)
+): Promise<string> {
+  const blob = await fetchProofImageBlob(token, paymentId, fetchImpl);
+  return createObjectURL(blob);
+}
+
 export interface FinancialSummary {
   date: string;
   total: number;
@@ -340,4 +379,4 @@ export async function closeClosing(
   });
 }
 
-export default { processPayment, processMixedPayment, fetchPayments, fetchPaymentProof, fetchFinancialSummary, uploadPaymentProof, fetchClosingCurrent, openClosing, closeClosing };
+export default { processPayment, processMixedPayment, fetchPayments, fetchPaymentProof, fetchFinancialSummary, uploadPaymentProof, fetchProofImageBlob, loadProofImage, fetchClosingCurrent, openClosing, closeClosing };

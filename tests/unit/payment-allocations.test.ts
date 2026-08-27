@@ -3,6 +3,10 @@ import {
   buildMixedPaymentPayload,
   previewAllocations,
   resolveChangeSplit,
+  resolveChangeFromCash,
+  resolveChangeFromQr,
+  shouldClearChangePhotos,
+  shouldClearProofPhotos,
 } from '../../src/pwa/_shared/utils/paymentAllocations';
 
 describe('payment allocation editor contract', () => {
@@ -63,5 +67,62 @@ describe('resolveChangeSplit — reparto del cambio (regresión 2026-08-27)', ()
     expect(s.minChangeCash).toBe(2500);
     expect(s.maxChangeCash).toBe(7500);
     expect(s.valid).toBe(true);
+  });
+});
+
+describe('resolveChangeFromCash / resolveChangeFromQr — cambio editable (2026-08-27)', () => {
+  it('resolveChangeFromCash: dado el cambio total y el efectivo deseado, deriva el QR', () => {
+    // changeAvailable=2500, efectivo deseado=2000 → QR = 2500-2000 = 500.
+    expect(resolveChangeFromCash(2500, 2000)).toEqual({ changeCash: 2000, changeQr: 500 });
+  });
+
+  it('Clamp: si quiero efectivo=3000 pero hay 2500 → efectivo=2500, QR=0 (sin exceder)', () => {
+    expect(resolveChangeFromCash(2500, 3000)).toEqual({ changeCash: 2500, changeQr: 0 });
+  });
+
+  it('Clamp: no permite efectivo negativo (deriva QR=changeAvailable)', () => {
+    expect(resolveChangeFromCash(2500, -200)).toEqual({ changeCash: 0, changeQr: 2500 });
+  });
+
+  it('resolveChangeFromQr: dado el cambio total y el QR deseado, deriva el efectivo', () => {
+    // changeAvailable=2500, QR deseado=500 → efectivo = 2500-500 = 2000.
+    expect(resolveChangeFromQr(2500, 500)).toEqual({ changeCash: 2000, changeQr: 500 });
+  });
+
+  it('Qr deseado > cambio total → clamp a QR=2500, efectivo=0', () => {
+    expect(resolveChangeFromQr(2500, 4000)).toEqual({ changeCash: 0, changeQr: 2500 });
+  });
+
+  it('Regla de negocio: cambio QR no puede superar lo pagado por QR (qrGiven=0 → QR=0)', () => {
+    // Escenario 150/0/125 (en centavos): cashGiven=15000, qrGiven=0, changeAvailable=2500.
+    // El usuario intenta QR=500, pero como NO pagó nada por QR, el max cambio QR es 0
+    // → clamp a changeCash=2500 (QR queda 0). El efectivo absorbe TODO el cambio.
+    expect(resolveChangeFromQr(2500, 500, 15000, 0)).toEqual({ changeCash: 2500, changeQr: 0 });
+  });
+
+  it('Siempre suma el cambio total disponible (invariante), incluso con contexto cash/qr real', () => {
+    // Cash 15000, QR 5000, pedido 12500 → changeAvailable 7500. min efectivo=2500.
+    const cases = [2000, 2500, 5000, 7500, 9000];
+    for (const cash of cases) {
+      const c = resolveChangeFromCash(7500, cash, 15000, 5000);
+      expect(c.changeCash + c.changeQr).toBe(7500);
+      expect(c.changeQr).toBeGreaterThanOrEqual(0);
+      expect(c.changeCash).toBeGreaterThanOrEqual(0);
+    }
+  });
+});
+
+describe('shouldClearChangePhotos / shouldClearProofPhotos — auto-limpiar fotos (2026-08-27)', () => {
+  it('shouldClearChangePhotos: true solo si no hay cambio por QR', () => {
+    expect(shouldClearChangePhotos(0)).toBe(true);
+    expect(shouldClearChangePhotos(-5)).toBe(true);  // defensivo: negativo = no aplica
+    expect(shouldClearChangePhotos(1)).toBe(false);
+    expect(shouldClearChangePhotos(500)).toBe(false);
+  });
+
+  it('shouldClearProofPhotos: true solo si no hay monto QR aplicado al pedido', () => {
+    expect(shouldClearProofPhotos(0)).toBe(true);
+    expect(shouldClearProofPhotos(-5)).toBe(true);   // defensivo
+    expect(shouldClearProofPhotos(100)).toBe(false);
   });
 });

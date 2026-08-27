@@ -15,6 +15,8 @@ import {
   fetchPaymentProof,
   fetchFinancialSummary,
   uploadPaymentProof,
+  fetchProofImageBlob,
+  loadProofImage,
   type PaymentPayload,
   type PaymentResult,
 } from '../../src/pwa/_shared/api/paymentsApi';
@@ -125,6 +127,43 @@ describe('fetchClosingCurrent', () => {
     expect(result.ok).toBe(true);
     expect(result.closing?.id).toBe('c1');
     expect(result.today?.total).toBe(500);
+  });
+});
+
+describe('proof image loading — vista previa del comprobante (Caja/Admin, 2026-08-27)', () => {
+  it('fetchProofImageBlob: GET content con Bearer auth y devuelve el Blob', async () => {
+    const blob = new Blob(['fake-image-bytes'], { type: 'image/png' });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(blob, { status: 200, headers: { 'Content-Type': 'image/png' } })
+    );
+    const result = await fetchProofImageBlob('tok-1', 'pay-1', fetchMock as unknown as typeof fetch);
+    expect(result.size).toBe(blob.size);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/payments/pay-1/proof/content');
+    expect(init.headers).toMatchObject({ Authorization: 'Bearer tok-1' });
+  });
+
+  it('loadProofImage: envuelve el blob en una URL (createObjectURL) y NO toca el server auth', async () => {
+    const blob = new Blob(['x'], { type: 'image/png' });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(blob, { status: 200, headers: { 'Content-Type': 'image/png' } })
+    );
+    const url = await loadProofImage(
+      'tok-1', 'pay-1',
+      fetchMock as unknown as typeof fetch,
+      (b) => 'blob:preview-' + b.size
+    );
+    expect(url).toBe('blob:preview-1');
+  });
+
+  it('loadProofImage: lanza si el comprobante no está disponible (HTTP no-ok)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ success: false }), { status: 404, headers: { 'Content-Type': 'application/json' } })
+    );
+    await expect(
+      loadProofImage('tok-1', 'pay-nope', fetchMock as unknown as typeof fetch, (b) => 'blob:x')
+    ).rejects.toThrow();
   });
 });
 
