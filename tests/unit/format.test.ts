@@ -5,7 +5,26 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { formatMoney, parseMoneyInput } from '../../src/pwa/_shared/utils/format';
+import { formatMoney, parseMoneyInput, formatTableRef } from '../../src/pwa/_shared/utils/format';
+
+describe('formatTableRef — mesa 0 es BARRA (2026-08-27)', () => {
+  it('retorna BARRA para el número 0 (nunca "Mesa 0")', () => {
+    expect(formatTableRef(0)).toBe('BARRA');
+    expect(formatTableRef('0')).toBe('BARRA');
+  });
+
+  it('retorna "Mesa N" para números > 0', () => {
+    expect(formatTableRef(1)).toBe('Mesa 1');
+    expect(formatTableRef(12)).toBe('Mesa 12');
+    expect(formatTableRef('3')).toBe('Mesa 3');
+  });
+
+  it('maneja null/undefined/NaN como BARRA (mesa de barra por defecto)', () => {
+    expect(formatTableRef(null)).toBe('BARRA');
+    expect(formatTableRef(undefined)).toBe('BARRA');
+    expect(formatTableRef(Number.NaN)).toBe('BARRA');
+  });
+});
 
 describe('formatMoney', () => {
   it('formatea con coma decimal y "Bs" sin punto', () => {

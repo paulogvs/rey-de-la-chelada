@@ -21,6 +21,7 @@ import React, { useEffect, useState } from 'react';
 import { Badge } from '../Badge/Badge';
 import { AppIcon } from '../AppIcon/AppIcon';
 import type { Order, KDSStatus } from '@/core/types';
+import { formatTableRef } from '@/pwa/_shared/utils/format';
 import './KDSOrderCard.css';
 
 export interface KDSOrderCardProps {
@@ -98,11 +99,11 @@ export function KDSOrderCard({
   };
 
   return (
-    <div className={classes} role="article" aria-label={`Mesa ${order.tableNumber} · Ronda ${round}`}>
+    <div className={classes} role="article" aria-label={`${formatTableRef(order.tableNumber)} · Ronda ${round}`}>
       {/* Header */}
       <div className="kds-order__header">
         <div className="kds-order__number" style={{ color: timerColor }}>
-          #{order.tableNumber}
+          {order.tableNumber === 0 ? 'BAR' : `#${order.tableNumber}`}
         </div>
         <div className="kds-order__meta">
           <div className="kds-order__round">

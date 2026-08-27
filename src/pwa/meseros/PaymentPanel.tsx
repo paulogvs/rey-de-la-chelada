@@ -34,7 +34,7 @@ import { buildMixedPaymentPayload, resolveChangeSplit, resolveChangeFromCash, re
 import { fetchOrderById, type Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
-import { formatMoney } from '../_shared/utils/format';
+import { formatMoney, formatTableRef } from '../_shared/utils/format';
 import { appConfig } from '@/core/config/app.config';
 
 interface PaymentPanelProps {
@@ -268,7 +268,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
       }
       if (uploadErrors > 0) addToast({ type: 'warning', message: 'Pago OK pero uno o más comprobantes no se guardaron', duration: 5000 });
 
-      addToast({ type: 'success', message: `Pago completado — ${table.number === 0 ? 'Barra' : `Mesa ${table.number}`}`, duration: 3000 });
+      addToast({ type: 'success', message: `Pago completado — ${formatTableRef(table.number)}`, duration: 3000 });
       setTimeout(onPaymentComplete, 500);
     } catch (err) {
       console.error('[PaymentPanel] process error:', err);
@@ -293,7 +293,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
       <Card className="payment-panel__summary">
         <div className="payment-panel__summary-header">
           <h3>Resumen</h3>
-          <Badge variant="info">{table.number === 0 ? 'BARRA' : `Mesa ${table.number}`}</Badge>
+          <Badge variant="info">{formatTableRef(table.number)}</Badge>
         </div>
         <div className="payment-panel__items">
           {order.items.map(item => {
@@ -430,7 +430,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
 
       <PrintReceipt open={printOpen} onClose={() => setPrintOpen(false)} kind="order"
         receipt={buildReceiptData(order)}
-        label={`${table.number === 0 ? 'BARRA' : `Mesa ${table.number}`} — Pedido ${order.id.slice(0, 8)}`} />
+        label={`${formatTableRef(table.number)} — Pedido ${order.id.slice(0, 8)}`} />
     </div>
   );
 }

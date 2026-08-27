@@ -6,7 +6,7 @@ import { EmptyState } from '@/ui/components/EmptyState';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { Modal } from '@/ui/components/Modal';
 import { useToast } from '@/ui/components/Toast';
-import { formatMoney } from '../utils/format';
+import { formatMoney, formatTableRef } from '../utils/format';
 import { localDateTimeStr } from '../utils/localDate';
 import { loadProofImage } from '../api/paymentsApi';
 import { fetchOrderHistory, type OrderHistoryRow, type OrderHistoryPayment } from '../api/reportsApi';
@@ -93,7 +93,7 @@ export function OrderHistoryView({ token, businessDay, title = 'Pedidos cobrados
               <Card key={order.id} className={`order-history__card${expanded ? ' order-history__card--expanded' : ''}`}>
                 <button className="order-history__row" onClick={() => setExpandedId(expanded ? null : order.id)} aria-expanded={expanded}>
                   <span className="order-history__main">
-                    <strong>Mesa {order.table_number ?? '—'}</strong>
+                    <strong>{formatTableRef(order.table_number)}</strong>
                     <span>{localDateTimeStr(new Date(order.created_at))}</span>
                   </span>
                   <span className="order-history__summary">

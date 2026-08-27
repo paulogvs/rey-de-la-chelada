@@ -87,3 +87,15 @@ export function parseMoneyInput(raw: string): number | null {
   if (!Number.isFinite(n)) return null;
   return Math.round(n * 100);
 }
+
+/**
+ * Referencia de mesa ESTANDARIZADA (2026-08-27): la mesa 0 es la BARRA.
+ * Devuelve "BARRA" cuando number es 0 (o falsy), si no "Mesa N".
+ * Úsalo en TODAS las vistas (meseros, caja, admin, KDS, cortes, pedidos)
+ * para que nunca aparezca "Mesa 0" — siempre "BARRA".
+ */
+export function formatTableRef(number: number | string | null | undefined): string {
+  const n = Number(number);
+  if (!Number.isFinite(n) || n === 0) return 'BARRA';
+  return `Mesa ${n}`;
+}
