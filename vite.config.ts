@@ -177,14 +177,35 @@ export default defineConfig({
         filename: `${mod.id}-sw.js`,
         workbox: {
           globPatterns: [`${mod.id}/**/*.{js,css,png,svg}`],
+          // navegación NUNCA cache-first: tras un deploy el index.html viejo
+          // (con hashes que ya no existen) dejaba al usuario atrapado en la
+          // versión vieja con token stale. Prefix con NetworkFirst para que
+          // SIEMPRE baje el bundle nuevo y solo caiga a caché/offline si
+          // no hay red (los estáticos JS/CSS sí siguen en CacheFirst).
           navigateFallback: `${mod.id}/offline.html`,
           navigateFallbackAllowlist: [new RegExp(`^/${mod.id}/`)],
+          // Limpiar caches de precache obsoletos (versiones previas del SW)
+          // → el navegador descarta los assets viejos y baja los nuevos.
+          cleanupOutdatedCaches: true,
           // Precachear shell (index.html + offline.html) con revision
           additionalManifestEntries: [
             precacheEntry(mod.id, 'index.html'),
             precacheEntry(mod.id, 'offline.html'),
           ].filter((e): e is { url: string; revision: string } => e !== null),
           runtimeCaching: [
+            // Navegación (index.html del PWA) → NetworkFirst. Crucial tras un
+            // deploy: SIEMPRE intenta la red primero → baja el bundle nuevo.
+            // Solo cae a caché si hay error de red (offline). Evita el loop
+            // de "versión vieja + token stale" que dejaba al usuario sin entrar.
+            {
+              urlPattern: ({ request }) => request.mode === 'navigate',
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: `${mod.id}-html`,
+                networkTimeoutSeconds: 4,
+                expiration: { maxEntries: 5, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              },
+            },
             // GET /api/* → NetworkFirst con expiración de 60s
             {
               urlPattern: ({ url, request }) =>

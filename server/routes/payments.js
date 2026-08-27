@@ -48,7 +48,7 @@ const __dirname = path.dirname(__filename);
 // FASE 5: comprobantes foto de pagos QR (base64 → archivo en data/payment-proofs/)
 const PROOF_DIR = path.join(__dirname, '..', '..', 'data', 'payment-proofs');
 // Ruta de subida usa un límite propio (10 MB) — el global es 1 MB (fotos base64 grandes)
-const proofJsonParser = express.json({ limit: '10mb' });
+const proofJsonParser = express.json({ limit: '20mb' });
 // ============================================================
 // Helpers
 // ============================================================

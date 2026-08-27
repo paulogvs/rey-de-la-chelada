@@ -34,7 +34,7 @@ export function shouldSkipRateLimit(method) {
  */
 export const readLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15 minutes
-  limit: Number(process.env.API_READ_RATE_LIMIT_MAX) || 2500,
+  limit: Number(process.env.API_READ_RATE_LIMIT_MAX) || 6000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -51,7 +51,7 @@ export const readLimiter = rateLimit({
  */
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15 minutes
-  limit: Number(process.env.API_WRITE_RATE_LIMIT_MAX) || 350,
+  limit: Number(process.env.API_WRITE_RATE_LIMIT_MAX) || 1500,
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => shouldSkipRateLimit(req.method),
