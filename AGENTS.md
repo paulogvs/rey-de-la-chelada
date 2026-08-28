@@ -26,7 +26,7 @@
 
 | Framework | Ubicación | Estado |
 |-----------|-----------|--------|
-| Vitest (unit + integration) | `tests/unit/`, `tests/integration/` | ✅ 675 tests — `hookTimeout`/`testTimeout` 60s + `pool: forks` (F1 2026-08-10, elimina flakiness) |
+| Vitest (unit + integration) | `tests/unit/`, `tests/integration/` | ✅ ~790 tests — `hookTimeout`/`testTimeout` 60s + `pool: forks` (F1 2026-08-10, elimina flakiness). *El conteo real lo da `npm run test`)* |
 | Playwright (e2e) | `tests/e2e/` | ⏳ **En progreso** — carpeta vacía, sin `playwright.config`. Los e2e reales hoy son scripts manuales en `scripts/e2e-*.mjs` (requieren server arriba) |
 
 ## 2b. FASE 2 — CONTRATOS DE DATOS (2026-08-06)
@@ -174,10 +174,13 @@ Protección: main requiere PR + tests pasando + 1 review
 
 | Documento | Contenido |
 |-----------|-----------|
+| `docs/ARQUITECTURA_Y_PRODUCCION.md` | **⭐ ARRANCA AQUÍ en sesión fresca** — arquitectura, deps, .env, DB, endpoints, runbook PC nueva, ciclos dev→prod |
 | `SPEC_INICIAL.md` | Especificación completa del proyecto |
 | `DESIGN.md` | Design tokens 3 capas |
 | `VALIDATION_GATES.md` | 15 gates (5 restaurant-specific) |
 | `constitution.md` | 10 artículos inmutables |
+| `docs/MANUAL_DE_INSTALACION.md` | Instalación PC nueva (`scripts\setup.bat`) |
+| `docs/MANUAL_DE_USUARIO.md` | Manual de uso (6 PWAs, PINs, flujos) |
 
 ## 8. CONTACTO
 

@@ -67,16 +67,27 @@ El sistema maneja **10 mesas**, con **2 meseros por turno**, una **cajera dedica
 
 | Category | Technology |
 |----------|------------|
-| **Frontend** | React 19 + Vite + Tailwind CSS v4 + TypeScript |
-| **Backend** | Node.js + Express 5 |
+| **Frontend** | React 19 + Vite 6 + TypeScript |
+| **Backend** | Node.js (≥22.9) + Express 5 |
 | **Database** | SQLite (better-sqlite3) |
-| **Offline** | Service Worker + Background Sync API |
-| **PWA** | vite-plugin-pwa + Workbox |
+| **Offline** | Service Worker (NetworkOnly API) + IndexedDB |
+| **PWA** | vite-plugin-pwa + Workbox (multi-PWA, 6 apps) |
 | **KDS** | WebSocket para tiempo real |
 | **QR Payments** | QR Simple / OpenBCB / Yape |
 | **Printing** | esc-pos-printer (XP-80C) |
 | **Network** | Tailscale VPN mesh |
-| **Process** | PM2 + nssm (Windows service) |
+| **Deploy** | `scripts\setup.bat` / `scripts\update.bat` (Windows self-hosted) |
+
+---
+
+## 📚 Documentación completa
+
+> **👉 [Arquitectura + Runbook de Producción](./docs/ARQUITECTURA_Y_PRODUCCION.md)** — fuente única de verdad técnica: cómo funciona el sistema a fondo, dependencias, variables de entorno, contratos de datos, endpoints y los pasos para ponerlo en producción (desarrollar + desplegar) en una **computadora nueva**. Pensado para retomar el proyecto en una **sesión fresca**.
+
+Otros documentos:
+- [`docs/MANUAL_DE_INSTALACION.md`](./docs/MANUAL_DE_INSTALACION.md) — instalación en PC nueva paso a paso (`setup.bat`)
+- [`docs/MANUAL_DE_USUARIO.md`](./docs/MANUAL_DE_USUARIO.md) — manual de uso (6 PWAs, PINs, flujos)
+- [`AGENTS.md`](./AGENTS.md) — contratos de datos (SSOT) y comandos
 
 ---
 
@@ -85,11 +96,11 @@ El sistema maneja **10 mesas**, con **2 meseros por turno**, una **cajera dedica
 ### Prerequisites
 
 ```bash
-node --version  # v18+ required
-npm --version   # v9+ required
+node --version  # v22.9+ required (necesario por --env-file-if-exists)
+npm --version   # v10+ required
 ```
 
-### Installation
+### Installation (para desarrollo)
 
 1. Clone the repo:
    ```bash
@@ -97,23 +108,26 @@ npm --version   # v9+ required
    cd rey-de-la-chelada
    ```
 
-2. Install dependencies:
+2. Install dependencies (**SIEMPRE con `--legacy-peer-deps`**):
    ```bash
-   npm install
+   npm install --legacy-peer-deps
    ```
 
 3. Set up environment variables:
    ```bash
    cp .env.example .env
-   # Edit .env with your credentials
+   # Editar .env (JWT_SECRET, DB_PATH, MENU_MANAGEMENT=seed en dev, etc.)
    ```
 
-4. Run development server:
+4. Run the servers (2 terminales):
    ```bash
-   npm run dev
+   npm run dev:server   # terminal 1: API Express en :3002 (carga .env)
+   npm run dev          # terminal 2: Vite dev server (HMR) en :3001
    ```
 
-5. Open [http://localhost:3001](http://localhost:3001) in your browser.
+5. Open [http://localhost:3002/clientes/](http://localhost:3002/clientes/) in your browser.
+
+> **En producción**, el deploy NO usa `npm run dev`. Usa `scripts\setup.bat` (PC nueva) o `scripts\update.bat` (actualizar) — ver [Runbook de producción](./docs/ARQUITECTURA_Y_PRODUCCION.md#11-runbook-pc-nueva--producción-paso-a-paso).
 
 ---
 
