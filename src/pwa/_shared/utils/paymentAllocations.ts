@@ -73,12 +73,13 @@ export function buildMixedPaymentPayload(
  * @param qrGiven         monto pagado por QR (el "techo" del cambio QR)
  * @returns { changeCash, changeQr, minChangeCash, maxChangeCash, valid }
  */
-export function resolveChangeSplit(changeAvailable: number, cashGiven: number, qrGiven: number) {
+export function resolveChangeSplit(changeAvailable: number, cashGiven: number, _qrGiven: number) {
   const available = Math.max(0, changeAvailable);
   // max cambio en efectivo = lo que cabe en el efectivo recibido.
   const maxChangeCash = Math.min(available, cashGiven);
-  // min cambio en efectivo = cambio que NO se puede dar por QR (resta el techo QR).
-  const minChangeCash = Math.max(0, available - qrGiven);
+  // min cambio en efectivo = 0: el vuelto por QR es un RETIRO del local (no
+  // requiere QR entrante), así que el efectivo puede ser 0 y todo ir por QR.
+  const minChangeCash = 0;
   // default: dar el cambio en efectivo tanto como sea posible.
   const defaultChangeCash = maxChangeCash;
   // clamp de un valor de cambio en efectivo al rango factible.
@@ -86,7 +87,7 @@ export function resolveChangeSplit(changeAvailable: number, cashGiven: number, q
     Math.min(maxChangeCash, Math.max(minChangeCash, value));
   const changeCash = clampChangeCash(defaultChangeCash);
   const changeQr = available - changeCash;
-  const valid = changeQr >= 0 && changeQr <= qrGiven && changeCash >= 0 && changeCash <= cashGiven;
+  const valid = changeQr >= 0 && changeCash >= 0 && changeCash <= cashGiven;
   return { changeCash, changeQr, minChangeCash, maxChangeCash, valid };
 }
 
@@ -100,12 +101,12 @@ export function clamp(value: number, min: number, max: number): number {
  * (efectivo/QR recibidos). Devuelve los límites INCLUSO si cashGiven/qrGiven
  * no se pasan (≈ sin techo, para el caso "solo conozco el cambio total").
  */
-export function resolveChangeBounds(changeAvailable: number, cashGiven?: number, qrGiven?: number) {
+export function resolveChangeBounds(changeAvailable: number, cashGiven?: number, _qrGiven?: number) {
   const available = Math.max(0, changeAvailable);
   // max cambio en efectivo = lo que cabe en el efectivo recibido (∞ si no se dio).
   const maxChangeCash = Number.isFinite(cashGiven) ? Math.min(available, cashGiven) : available;
-  // min cambio en efectivo = cambio que NO se puede dar por QR (∞→0 si no se dio QR).
-  const minChangeCash = Number.isFinite(qrGiven) ? Math.max(0, available - qrGiven) : 0;
+  // min cambio en efectivo = 0: el vuelto por QR es retiro del local (no requiere QR).
+  const minChangeCash = 0;
   return { available, minChangeCash, maxChangeCash };
 }
 
@@ -160,4 +161,38 @@ export function shouldClearChangePhotos(changeQr: number): boolean {
 
 export function shouldClearProofPhotos(qrApplied: number): boolean {
   return qrApplied <= 0;
+}
+
+/**
+ * REGLA SIMPLE DE COBRO (SSOT 2026-08-28):
+ *   (Efectivo entregado + QR pagado) − (Cambio efectivo + Cambio QR) = Monto del pedido.
+ *
+ * El mesero decide el reparto del vuelto; el sistema solo valida que la resta
+ * cuadre con el total del pedido. Devuelve true si el cobro es válido.
+ *
+ * Restricciones de negocio (evitan el 409 PAYMENT_CONFLICT del server):
+ *   - changeCash ≤ cashGiven  (el vuelto en efectivo sale del efectivo recibido)
+ *   - changeQr es un RETIRO del local (transferencia saliente) → NO está limitado
+ *     a qrGiven. Si el cliente pagó efectivo de más, el local le transfiere el
+ *     vuelto por QR (el local "saca" ese dinero). Por eso solo se limita a que
+ *     cash+qr − cambios = pedido, y a que el cambio no sea negativo.
+ */
+export function validateChangeRule(
+  amountToCollect: number,
+  cashGiven: number,
+  qrGiven: number,
+  changeCash: number,
+  changeQr: number
+): { ok: boolean; applied: number; valid: boolean; reason?: string } {
+  const applied = (cashGiven + qrGiven) - (changeCash + changeQr);
+  if (applied !== amountToCollect) {
+    return { ok: false, applied, valid: false, reason: 'La suma aplicada no cuadra con el pedido' };
+  }
+  if (changeCash < 0 || changeQr < 0) {
+    return { ok: false, applied, valid: false, reason: 'El cambio no puede ser negativo' };
+  }
+  if (changeCash > cashGiven) {
+    return { ok: false, applied, valid: false, reason: 'El cambio en efectivo supera lo entregado en efectivo' };
+  }
+  return { ok: true, applied, valid: true };
 }

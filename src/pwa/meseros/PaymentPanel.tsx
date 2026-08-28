@@ -135,23 +135,23 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
 
   const amountToCollect = order?.total ?? 0;
 
-  // ── Cálculos dinámicos ──
+  // ── Cálculos dinámicos (regla simple SSOT) ──
+  // (Efectivo entregado + QR pagado) − (Cambio efectivo + Cambio QR) = Monto del pedido.
+  // El mesero decide el reparto; el sistema valida que la resta cuadre.
   const hasQr = qrGiven > 0;
-  // Exceso de pago → cambio disponible (Efectivo + QR − Pedido)
+  // Exceso de pago → cambio disponible total (Efectivo + QR − Pedido)
   const changeAvailable = Math.max(0, cashGiven + qrGiven - amountToCollect);
   const hasChange = changeAvailable > 0;
-  // Rango factible del reparto (función pura testeable).
-  // maxChangeCash = lo que cabe en el efectivo recibido; minChangeCash = lo
-  // que NO puede ir por QR (cambio − techo QR). El cambio QR nunca supera
-  // lo pagado por QR (regla del server) → evita el 409 PAYMENT_CONFLICT.
+  // Rango factible del reparto:
+  //   maxChangeCash = lo que cabe en el efectivo recibido (cambio ≤ cashGiven)
+  //   minChangeCash = lo que NO puede ir por QR (cambio − techo QR), nunca negativo
   const changeSplit = resolveChangeSplit(changeAvailable, cashGiven, qrGiven);
   const minChangeCash = changeSplit.minChangeCash;
   const maxChangeCash = changeSplit.maxChangeCash;
 
-  // FIX 2026-08-28: estado dual editable. Al cambiar cashGiven/qrGiven se
-  // RESETEA el reparto al default (todo en efectivo) SOLO si el usuario aún
-  // no tocó los campos (changeTouched). Si ya editó, se clampea al rango y
-  // se re-deriva el QR para que SIEMPRE sumen changeAvailable.
+  // Estado dual editable. Al cambiar cashGiven/qrGiven se RESETEA al default
+  // (todo en efectivo) SOLO si el usuario aún no tocó los campos. Si ya editó,
+  // se clampea al rango y se re-deriva el QR para que SIEMPRE sumen changeAvailable.
   const changeTouched = useRef(false);
   useEffect(() => {
     if (!hasChange) {
@@ -166,19 +166,20 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
     setChangeQr(Math.max(0, changeAvailable - cashClamped));
   }, [changeAvailable, cashGiven, qrGiven, hasChange, minChangeCash, maxChangeCash]);
 
-  // Invariante: cambioCash + cambioQr = changeAvailable. Y cada uno dentro de
-  // lo recibido (efectivo ≤ cashGiven, QR ≤ qrGiven).
+  // REGLA SIMPLE: (cashGiven + qrGiven) − (changeCash + changeQr) === montoPedido
+  const coversTotal = (cashGiven + qrGiven) - (changeCash + changeQr) === amountToCollect;
+  // Restricción de negocio: el vuelto en efectivo sale del efectivo recibido.
+  // El vuelto por QR es un RETIRO del local (transferencia saliente) → no está
+  // limitado a qrGiven. Ambos cambios deben sumar el exceso (changeAvailable).
   const changeValid = hasChange
-    ? changeCash + changeQr === changeAvailable &&
-      changeCash >= 0 && changeCash <= cashGiven &&
-      changeQr >= 0 && changeQr <= qrGiven
+    ? changeCash >= 0 && changeQr >= 0 &&
+      changeCash <= cashGiven &&
+      changeCash + changeQr === changeAvailable
     : true;
-
-  // Montos aplicados al pedido (netos de cambio)
+  const canPay = coversTotal && changeValid && (cashGiven > 0 || qrGiven > 0);
+  // Montos netos que aportan al pedido (lo entregado − el vuelto por ese medio).
   const cashApplied = Math.max(0, cashGiven - changeCash);
   const qrApplied = Math.max(0, qrGiven - changeQr);
-  const coversTotal = cashApplied + qrApplied === amountToCollect;
-  const canPay = coversTotal && changeValid && (cashApplied > 0 || qrApplied > 0);
 
   // Auto-limpiar fotos cuando el medio de pago ya no aplica (MEJORA 4).
   useEffect(() => {
@@ -294,8 +295,8 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
     } finally {
       setProcessing(false);
     }
-  }, [order, amountToCollect, cashApplied, qrApplied, cashGiven, changeCash, changeQr,
-    coversTotal, proofPhotos, changeQrPhotos, token, table.number, addToast, onPaymentComplete]);
+  }, [order, amountToCollect, cashGiven, qrGiven, changeCash, changeQr,
+    coversTotal, changeValid, proofPhotos, changeQrPhotos, token, table.number, addToast, onPaymentComplete]);
 
   if (loadingOrder) return <div className="payment-panel"><Loader block label="Cargando pedido…" /></div>;
   if (!order) {

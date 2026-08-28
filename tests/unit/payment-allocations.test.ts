@@ -7,6 +7,7 @@ import {
   resolveChangeFromQr,
   shouldClearChangePhotos,
   shouldClearProofPhotos,
+  validateChangeRule,
 } from '../../src/pwa/_shared/utils/paymentAllocations';
 
 describe('payment allocation editor contract', () => {
@@ -38,33 +39,30 @@ describe('payment allocation editor contract', () => {
 });
 
 describe('resolveChangeSplit — reparto del cambio (regresión 2026-08-27)', () => {
-  it('QR=0: el cambio es SOLO en efectivo (no se puede devolver por QR lo que no se cobró por QR)', () => {
-    // Cash 15000, QR 0, pedido 12500 → cambio 2500. Solo efectivo.
+  it('QR=0: el cambio es SOLO en efectivo (default) si no hay exceso que repartir por QR', () => {
+    // Cash 15000, QR 0, pedido 12500 → cambio 2500. Default = max efectivo = 2500, QR 0.
     const s = resolveChangeSplit(2500, 15000, 0);
     expect(s.changeCash).toBe(2500);
     expect(s.changeQr).toBe(0);
     expect(s.valid).toBe(true);
     expect(s.maxChangeCash).toBe(2500);
-    expect(s.minChangeCash).toBe(2500);
+    expect(s.minChangeCash).toBe(0);
   });
 
-  it('bloquea el caso del bug: el usuario NO puede forzar 20/5 con QR=0 (clamp a 25/0)', () => {
-    // Simula intentar changeCash=20 con QR=0 (tendría que dar changeQr=5, imposible).
-    const s = resolveChangeSplit(2500, 15000, 0);
-    expect(s.valid).toBe(true);
-    // El clamp de changeCash a 20 al rango [2500, 2500] → vuelve a 2500.
-    const clamped = Math.min(s.maxChangeCash, Math.max(s.minChangeCash, 2000));
-    expect(clamped).toBe(2500);
-    expect(s.changeQr).toBe(0);
+  it('el usuario PUEDE mover el vuelto a QR aunque no haya pagado por QR (retiro del local)', () => {
+    // El vuelto por QR es un retiro del local → no está limitado a qrGiven.
+    // Si el mesero elige efectivo=20, el QR toma los 5 restantes.
+    const r = resolveChangeFromQr(2500, 500, 15000, 0);
+    expect(r.changeCash).toBe(2000);
+    expect(r.changeQr).toBe(500);
   });
 
-  it('con QR cubriendo el exceso, el cambio si puede ser por QR', () => {
-    // Cash 15000, QR 5000, pedido 12500 → cambio 7500. max efectivo=15000, min=7500-5000=2500.
-    // Default = max efectivo (7500), resto QR = 0.
+  it('con QR cubriendo, default es todo en efectivo; min=0 (QR puede tomar todo)', () => {
+    // Cash 15000, QR 5000, pedido 12500 → cambio 7500. Default = max efectivo (7500), QR 0.
     const s = resolveChangeSplit(7500, 15000, 5000);
     expect(s.changeCash).toBe(7500);
     expect(s.changeQr).toBe(0);
-    expect(s.minChangeCash).toBe(2500);
+    expect(s.minChangeCash).toBe(0);
     expect(s.maxChangeCash).toBe(7500);
     expect(s.valid).toBe(true);
   });
@@ -93,21 +91,15 @@ describe('resolveChangeFromCash / resolveChangeFromQr — cambio editable (2026-
     expect(resolveChangeFromQr(2500, 4000)).toEqual({ changeCash: 0, changeQr: 2500 });
   });
 
-  it('Regla de negocio: cambio QR no puede superar lo pagado por QR (qrGiven=0 → QR=0)', () => {
-    // Escenario 150/0/125 (en centavos): cashGiven=15000, qrGiven=0, changeAvailable=2500.
-    // El usuario intenta QR=500, pero como NO pagó nada por QR, el max cambio QR es 0
-    // → clamp a changeCash=2500 (QR queda 0). El efectivo absorbe TODO el cambio.
-    expect(resolveChangeFromQr(2500, 500, 15000, 0)).toEqual({ changeCash: 2500, changeQr: 0 });
-  });
-
-  it('Siempre suma el cambio total disponible (invariante), incluso con contexto cash/qr real', () => {
-    // Cash 15000, QR 5000, pedido 12500 → changeAvailable 7500. min efectivo=2500.
+  it('Siempre suma el cambio total disponible (invariante), incluso con contexto cash real', () => {
+    // Cash 15000, cambio 7500. min efectivo=0, max=7500.
     const cases = [2000, 2500, 5000, 7500, 9000];
     for (const cash of cases) {
       const c = resolveChangeFromCash(7500, cash, 15000, 5000);
       expect(c.changeCash + c.changeQr).toBe(7500);
       expect(c.changeQr).toBeGreaterThanOrEqual(0);
       expect(c.changeCash).toBeGreaterThanOrEqual(0);
+      expect(c.changeCash).toBeLessThanOrEqual(7500);
     }
   });
 });
@@ -147,9 +139,59 @@ describe('INVARIANTE del cambio (regresión 2026-08-28 — bug "cambio QR > disp
     expect(r.changeQr).toBeGreaterThanOrEqual(0);
   });
 
-  it('si no se pagó por QR (qrGiven=0), el cambio es SOLO efectivo (regla del server)', () => {
+  it('retiro QR sin pago QR previo: es válido (el local transfiere el vuelto)', () => {
+    // cashGiven=15000, qrGiven=0, cambio 2500. El mesero puede elegir QR=2500 (retiro) o efectivo.
     const r = resolveChangeFromQr(2500, 2500, 15000, 0);
-    expect(r.changeQr).toBe(0);
-    expect(r.changeCash).toBe(2500);
+    expect(r.changeCash).toBe(0);
+    expect(r.changeQr).toBe(2500);
+  });
+});
+
+describe('REGLA SIMPLE DE COBRO (SSOT 2026-08-28): (cash+qr) − (cambioCash+cambioQr) = pedido', () => {
+  it('E1: pago QR 100, pedido 60, cambio efectivo 40 (vuelto en efectivo de pago QR)', () => {
+    // QR paga de más y el vuelto se da en efectivo: cashGiven=0, qrGiven=100, changeCash=40.
+    // applied = (0+100) − (40+0) = 60 ✓; pero changeCash(40) > cashGiven(0) → NO válido (no hay efectivo recibido).
+    const r = validateChangeRule(60, 0, 100, 40, 0);
+    expect(r.ok).toBe(false); // el server no puede dar vuelto efectivo sin efectivo recibido
+  });
+
+  it('E1b: pago efectivo 100 + QR cubre, pedido 60, vuelto efectivo 40 (normal, SIN pago QR de más)', () => {
+    const r = validateChangeRule(60, 100, 0, 40, 0);
+    expect(r.ok).toBe(true);
+    expect(r.applied).toBe(60);
+  });
+
+  it('E2: efectivo 100, pedido 60, vuelto QR 40 (retiro QR — el local transfiere el vuelto)', () => {
+    const r = validateChangeRule(60, 100, 0, 0, 40);
+    expect(r.ok).toBe(true);
+    expect(r.applied).toBe(60);
+  });
+
+  it('E3: mixto QR 50 + efectivo 50, pedido 60, vuelto QR 20 + efectivo 20', () => {
+    const r = validateChangeRule(60, 50, 50, 20, 20);
+    expect(r.ok).toBe(true);
+    expect(r.applied).toBe(60);
+  });
+
+  it('E4: mixto QR 80 + efectivo 50, pedido 100, vuelto QR 10 + efectivo 20', () => {
+    const r = validateChangeRule(100, 50, 80, 20, 10);
+    expect(r.ok).toBe(true);
+    expect(r.applied).toBe(100);
+  });
+
+  it('rechaza si no cuadra con el pedido', () => {
+    expect(validateChangeRule(60, 100, 0, 20, 0).ok).toBe(false); // applied 80 ≠ 60
+    expect(validateChangeRule(60, 100, 0, 40, 10).ok).toBe(false); // applied 50 ≠ 60
+  });
+
+  it('rechaza si el cambio en efectivo supera lo entregado en efectivo', () => {
+    expect(validateChangeRule(60, 0, 100, 40, 0).ok).toBe(false); // changeCash > cashGiven
+  });
+
+  it('cambio total = exceso de pago (cash+qr − pedido)', () => {
+    const r = validateChangeRule(60, 100, 50, 40, 50);
+    // cambioCash+cambioQr = 90 = (100+50)−60 ✓
+    expect(r.ok).toBe(true);
+    expect(r.applied).toBe(60);
   });
 });
