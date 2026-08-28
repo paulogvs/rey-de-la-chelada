@@ -126,3 +126,30 @@ describe('shouldClearChangePhotos / shouldClearProofPhotos — auto-limpiar foto
     expect(shouldClearProofPhotos(100)).toBe(false);
   });
 });
+
+describe('INVARIANTE del cambio (regresión 2026-08-28 — bug "cambio QR > disponible")', () => {
+  // La captura del usuario: efectivo 100, QR 200, pedido 140 → cambio 160.
+  // El cambio QR NUNCA puede superar `changeAvailable`, y cash+qr SIEMPRE = changeAvailable.
+  it('el reparto desde QR deseado respeta el techo: qr desborda → clamp a changeAvailable y cash=0', () => {
+    // Pedido 14000, efectivo 10000, QR 20000 → changeAvailable = 16000.
+    // Usuario pide QR=198 (too high) → clamp QR a 16000 (disponible), cash=0.
+    const r = resolveChangeFromQr(16000, 19800, 10000, 20000);
+    expect(r.changeCash + r.changeQr).toBe(16000);
+    expect(r.changeQr).toBeLessThanOrEqual(16000);
+    expect(r.changeQr).toBe(16000);
+    expect(r.changeCash).toBe(0);
+  });
+
+  it('el reparto desde efectivo siempre suma changeAvailable y respeta cashGiven', () => {
+    const r = resolveChangeFromCash(16000, 5000, 10000, 20000);
+    expect(r.changeCash + r.changeQr).toBe(16000);
+    expect(r.changeCash).toBeLessThanOrEqual(10000);
+    expect(r.changeQr).toBeGreaterThanOrEqual(0);
+  });
+
+  it('si no se pagó por QR (qrGiven=0), el cambio es SOLO efectivo (regla del server)', () => {
+    const r = resolveChangeFromQr(2500, 2500, 15000, 0);
+    expect(r.changeQr).toBe(0);
+    expect(r.changeCash).toBe(2500);
+  });
+});

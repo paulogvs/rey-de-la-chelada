@@ -31,6 +31,7 @@ import { useToast } from '@/ui/components/Toast';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { processMixedPayment, processPayment, uploadPaymentProof } from '../_shared/api/paymentsApi';
 import { buildMixedPaymentPayload, resolveChangeSplit, resolveChangeFromCash, resolveChangeFromQr, shouldClearChangePhotos, shouldClearProofPhotos } from '../_shared/utils/paymentAllocations';
+import { safeId } from '../_shared/utils/safeId';
 import { fetchOrderById, type Order } from '../_shared/api/ordersApi';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
@@ -94,8 +95,11 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
   const [cashGiven, setCashGiven] = useState(0);   // efectivo entregado por el cliente
   const [qrGiven, setQrGiven] = useState(0);       // monto pagado por QR
   const [proofPhotos, setProofPhotos] = useState<string[]>([]);      // fotos de pagos QR
-  // Card CAMBIO
+  // Card CAMBIO — AMBOS estados editables (fix 2026-08-28):
+  // el usuario escribe en uno y el otro se recalcula, siempre sumando
+  // `changeAvailable`. Un solo `changeCash` derivado impedía editar ambos.
   const [changeCash, setChangeCash] = useState(0); // vuelto en efectivo
+  const [changeQr, setChangeQr] = useState(0);     // vuelto por QR (retiro)
   const [changeQrPhotos, setChangeQrPhotos] = useState<string[]>([]); // fotos del retiro QR
   const [processing, setProcessing] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
@@ -136,39 +140,47 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
   // Exceso de pago → cambio disponible (Efectivo + QR − Pedido)
   const changeAvailable = Math.max(0, cashGiven + qrGiven - amountToCollect);
   const hasChange = changeAvailable > 0;
-  // Reparto del cambio (FIX 2026-08-27): función pura testeable que respeta
-  // el rango factible (cambio QR nunca supera lo pagado por QR).
+  // Rango factible del reparto (función pura testeable).
+  // maxChangeCash = lo que cabe en el efectivo recibido; minChangeCash = lo
+  // que NO puede ir por QR (cambio − techo QR). El cambio QR nunca supera
+  // lo pagado por QR (regla del server) → evita el 409 PAYMENT_CONFLICT.
   const changeSplit = resolveChangeSplit(changeAvailable, cashGiven, qrGiven);
   const minChangeCash = changeSplit.minChangeCash;
   const maxChangeCash = changeSplit.maxChangeCash;
-  // MEJORA 3 (OPCIÓN A): el EFECTIVO es el estado editable; el QR se DERIVA
-  // para que SIEMPRE sumen changeAvailable. Ambos inputs son editables y al
-  // escribir en uno el otro se recalcula. Ninguno puede exceder changeAvailable.
-  const changeQr = hasChange ? Math.max(0, changeAvailable - changeCash) : 0;
-  const changeValid = changeQr >= 0 && changeQr <= qrGiven && changeCash >= 0 && changeCash <= cashGiven;
 
-  // Montos aplicados al pedido
+  // FIX 2026-08-28: estado dual editable. Al cambiar cashGiven/qrGiven se
+  // RESETEA el reparto al default (todo en efectivo) SOLO si el usuario aún
+  // no tocó los campos (changeTouched). Si ya editó, se clampea al rango y
+  // se re-deriva el QR para que SIEMPRE sumen changeAvailable.
+  const changeTouched = useRef(false);
+  useEffect(() => {
+    if (!hasChange) {
+      setChangeCash(0);
+      setChangeQr(0);
+      changeTouched.current = false;
+      return;
+    }
+    const desired = changeTouched.current ? changeCash : maxChangeCash;
+    const cashClamped = Math.min(maxChangeCash, Math.max(minChangeCash, desired));
+    setChangeCash(cashClamped);
+    setChangeQr(Math.max(0, changeAvailable - cashClamped));
+  }, [changeAvailable, cashGiven, qrGiven, hasChange, minChangeCash, maxChangeCash]);
+
+  // Invariante: cambioCash + cambioQr = changeAvailable. Y cada uno dentro de
+  // lo recibido (efectivo ≤ cashGiven, QR ≤ qrGiven).
+  const changeValid = hasChange
+    ? changeCash + changeQr === changeAvailable &&
+      changeCash >= 0 && changeCash <= cashGiven &&
+      changeQr >= 0 && changeQr <= qrGiven
+    : true;
+
+  // Montos aplicados al pedido (netos de cambio)
   const cashApplied = Math.max(0, cashGiven - changeCash);
   const qrApplied = Math.max(0, qrGiven - changeQr);
   const coversTotal = cashApplied + qrApplied === amountToCollect;
   const canPay = coversTotal && changeValid && (cashApplied > 0 || qrApplied > 0);
 
-  // Sincronizar changeCash con el DEFAULT de resolveChangeSplit cuando cambian los
-  // montos y el usuario AÚN no ha editado el cambio manualmente (ref changeTouched).
-  // Si ya editó, se respeta y se clampea al rango factible [minChangeCash, maxChangeCash].
-  const changeTouched = useRef(false);
-  useEffect(() => {
-    if (!hasChange) { setChangeCash(0); changeTouched.current = false; return; }
-    setChangeCash(prev => {
-      const clamped = Math.min(maxChangeCash, Math.max(minChangeCash, prev));
-      return changeTouched.current ? clamped : changeSplit.changeCash;
-    });
-  }, [changeAvailable, cashGiven, qrGiven, hasChange, minChangeCash, maxChangeCash]);
-
-  // MEJORA 4 (2026-08-27): auto-limpiar fotos cuando el medio de pago ya no aplica.
-  // El comprobante debe corresponder a un medio de pago que SÍ se usó:
-  //  - sin "cambio por QR" (changeQr<=0) → sobran las fotos del retiro QR.
-  //  - sin monto QR aplicado (qrApplied<=0) → sobran las fotos del pago QR.
+  // Auto-limpiar fotos cuando el medio de pago ya no aplica (MEJORA 4).
   useEffect(() => {
     if (shouldClearChangePhotos(changeQr)) setChangeQrPhotos(prev => (prev.length ? [] : prev));
   }, [changeQr]);
@@ -194,16 +206,22 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
     else setChangeQrPhotos(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  // MEJORA 3 (OPCIÓN A): cambiar EN EFECTIVO → el QR se recalcula (suma a changeAvailable).
+  // FIX 2026-08-28: AMBOS campos editables. Al escribir en EFECTIVO se
+  // recalcula el QR (cambioQr = changeAvailable − cambioCash), clampeando
+  // el efectivo al rango factible para no romper la regla del server.
   const handleChangeCashInput = useCallback((cents: number) => {
     changeTouched.current = true;
-    setChangeCash(resolveChangeFromCash(changeAvailable, cents, cashGiven, qrGiven).changeCash);
+    const r = resolveChangeFromCash(changeAvailable, cents, cashGiven, qrGiven);
+    setChangeCash(r.changeCash);
+    setChangeQr(Math.max(0, changeAvailable - r.changeCash));
   }, [changeAvailable, cashGiven, qrGiven]);
 
-  // MEJORA 3: cambiar EN QR → el efectivo se recalcula (suma a changeAvailable).
+  // Al escribir en QR se recalcula el EFECTIVO (cambioCash = changeAvailable − cambioQr).
   const handleChangeQrInput = useCallback((cents: number) => {
     changeTouched.current = true;
-    setChangeCash(resolveChangeFromQr(changeAvailable, cents, cashGiven, qrGiven).changeCash);
+    const r = resolveChangeFromQr(changeAvailable, cents, cashGiven, qrGiven);
+    setChangeQr(r.changeQr);
+    setChangeCash(r.changeCash);
   }, [changeAvailable, cashGiven, qrGiven]);
 
   const processPaymentNow = useCallback(async () => {
@@ -222,18 +240,18 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
         const result = await processMixedPayment(token, buildMixedPaymentPayload(order.id, [
           { method: 'cash', amount: cashApplied, received: cashGiven, change: changeCash },
           { method: 'qr', amount: qrApplied },
-        ], crypto.randomUUID()));
+        ], safeId()));
         if (!result.ok) { addToast({ type: 'error', message: result.error || 'Error al registrar el pago', duration: 5000 }); return; }
         qrPayments = result.payments?.filter(p => p.method === 'qr') ?? [];
       } else if (cashApplied > 0) {
         const result = await processPayment(token, {
           order_id: order.id, amount: cashApplied, method: 'cash',
-          received: cashGiven, change: changeCash, idempotency_key: crypto.randomUUID(),
+          received: cashGiven, change: changeCash, idempotency_key: safeId(),
         });
         if (!result.ok) { addToast({ type: 'error', message: result.error || 'Error al registrar el pago', duration: 5000 }); return; }
       } else if (qrApplied > 0) {
         const result = await processPayment(token, {
-          order_id: order.id, amount: qrApplied, method: 'qr', idempotency_key: crypto.randomUUID(),
+          order_id: order.id, amount: qrApplied, method: 'qr', idempotency_key: safeId(),
         });
         if (!result.ok) { addToast({ type: 'error', message: result.error || 'Error al registrar el pago', duration: 5000 }); return; }
         const payment = result.data?.payment;
@@ -244,7 +262,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
       let changeQrPaymentId: string | null = null;
       if (changeQr > 0) {
         const retiro = await processPayment(token, {
-          order_id: order.id, amount: changeQr, method: 'qr', transfer_out: true, idempotency_key: crypto.randomUUID(),
+          order_id: order.id, amount: changeQr, method: 'qr', transfer_out: true, idempotency_key: safeId(),
         });
         if (retiro.ok && retiro.data?.payment) changeQrPaymentId = retiro.data.payment.id;
         else addToast({ type: 'warning', message: 'Pago OK pero el retiro QR no se registró', duration: 5000 });

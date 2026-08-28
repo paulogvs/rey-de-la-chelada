@@ -15,6 +15,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { fetchPendingOrders, type Order } from '../_shared/api/ordersApi';
 import { processMixedPayment, processPayment, uploadPaymentProof } from '../_shared/api/paymentsApi';
 import { printOrderTicket } from '../_shared/api/printApi';
+import { safeId } from '../_shared/utils/safeId';
 import { Card } from '@/ui/components/Card';
 import { Button } from '@/ui/components/Button';
 import { Badge } from '@/ui/components/Badge';
@@ -127,7 +128,7 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
           addToast({ type: 'warning', message: 'El pedido ya está cubierto', duration: 3000 });
           return;
         }
-        const idempotencyKey = crypto.randomUUID();
+        const idempotencyKey = safeId();
         const allocationInputs = [
           ...(cashAmount > 0 ? [{ method: 'cash' as const, amount: cashAmount, received: received || undefined }] : []),
           ...(qrAmount > 0 ? [{ method: 'qr' as const, amount: qrAmount, reference }] : []),
