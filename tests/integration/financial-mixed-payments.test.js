@@ -26,7 +26,7 @@ describe('financial mixed payments', () => {
     expect(result.by_method).toEqual({ cash: 4000, qr: 6000 });
     expect(db.prepare('SELECT COUNT(*) count FROM payments').get().count).toBe(2);
     expect(db.prepare('SELECT status FROM orders WHERE id = \'o1\'').get().status).toBe('paid');
-    expect(SCHEMA_VERSION).toBe(13);
+    expect(SCHEMA_VERSION).toBe(14);
     db.close();
   });
 

@@ -78,7 +78,7 @@ const KDS_MODULES = { cocina: 'cocina', bar: 'bar', kds: 'all' };
  */
 
 /** Helper para armar la respuesta de un pedido con items */
-function buildOrder(db, orderId) {
+export function buildOrder(db, orderId) {
   const order = db.prepare(`
     SELECT o.*, t.number as table_number, s.display_name as waiter_name_resolved
     FROM orders o

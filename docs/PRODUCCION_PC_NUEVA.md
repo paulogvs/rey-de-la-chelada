@@ -197,19 +197,43 @@ Invoke-RestMethod -Uri "http://localhost:3002/api/auth/me" -Headers @{Authorizat
 
 | Tarea | Comando | Nota |
 |-------|---------|------|
-| **Backup automático (01:00)** | `scripts\install-backup-schedule.bat` | Una vez, como admin |
+| **Auto-arranque completo (server + watchdog + backup 01:00)** | `scripts\install-autostart.bat` | Crea los accesos en Startup con la ruta correcta + registra la tarea de backup. Requiere sesión de usuario **autologueda** en Windows (si no, usar `schtasks /sc onstart`) |
+| **Backup automático (01:00)** | lo registra `install-autostart.bat` (tarea `ReyChelada-Backup`) | Backup WAL-safe via `backup-db.mjs` — verifica integridad y mantiene 7 días |
 | **Watchdog (auto-reinicio)** | `scripts\watchdog-start.bat` | Health cada 5 min, relanza si cae |
-| **Auto-arranque al iniciar Windows** | Copiar accesos de `start.bat` y `watchdog-start.bat` a la carpeta de Inicio (`Win+R` → `shell:startup`) | Requiere sesión de usuario autologueda |
 
----
+## 🧩 FASE 7.5 — CONFIGURACIÓN DE NEGOCIO (Admin UI, sin tocar código)
+
+> Abrir `http://<IP>:3002/admin/` → **Configuración** (icono sliders).
+
+| Dato | Campo | Obligatorio |
+|------|-------|-------------|
+| **NIT del restaurante** | `NIT` | **SÍ** — sin NIT, tickets y QR SIN salen incompletos |
+| IVA % | `IVA %` (default 13) | Sí |
+| Nombre/dirección/teléfono/eslogan | campos de texto | Recomendado (salen en el ticket) |
+| **Impresora** | `Nombre en Windows` — **vacío = impresora predeterminada de Windows** | Ver paso impresora |
+| Ancho del papel | `80mm` (comanda estándar) o `58mm` | Ver paso impresora |
+
+> El Admin muestra un banner "Completa el NIT" hasta que lo guardes.
+
+### 🖨️ Impresora térmica (ESC/POS, "la delgadita")
+
+1. Conecta la impresora a la PC y configúrala **en Windows** (Panel → Dispositivos → Impresoras): instala driver, ponla como **predeterminada** (o anota su nombre exacto).
+2. En Admin → Configuración: deja `Nombre en Windows` **vacío** (usa la predeterminada) o escribe el nombre exacto.
+3. Elige el ancho: **80mm** (comanda estándar) o **58mm** (ticket delgado).
+4. Pulsa **"Probar impresión"** — debe salir el ticket de prueba con corte de papel.
+5. Solo la PWA **Caja** imprime: al cobrar una mesa genera el ticket térmico automáticamente.
+   - Si la impresión falla: revisa driver/columna en Windows y el nombre exacto de la impresora (`powershell Get-Printer | Format-Table Name`).
+   - Sin impresora física aún, el sistema **no bloquea**: avisa con un toast "no se imprimió el ticket" y sigue.
 
 ## ✅ FASE 8 — FIN / RESULTADO
 
 - Server corriendo en `:3002`, 6 PWAs OK.
 - Acceso local (`localhost`), LAN (`<IP LAN>`), remoto (`<IP tailscale>`).
 - Launchers regenerados con las IPs correctas.
-- Backup + watchdog operativos.
+- Backup + watchdog operativos, auto-arranque al login instalado.
 - Menú gestionado por Admin (los PINs: Admin `0000`, Mesero `1111`, KDS `2222`, Caja `3333`).
+- **NIT/IVA/datos cargados en Admin → Configuración** (banner pendiente resuelto).
+- **Impresora térmica probada** con ticket de prueba (80mm o 58mm).
 
 **Entregable final al humano:** un resumen con las 6 URLs (por entorno), el `JWT_SECRET` marcado como "guardar en un lugar seguro", y la nota de que el `.env` debe respaldarse (no está en git).
 
@@ -222,6 +246,9 @@ Invoke-RestMethod -Uri "http://localhost:3002/api/auth/me" -Headers @{Authorizat
 3. **Fase 3**: la cuenta/red de Tailscale que quiere usar (nueva o existente) — le das las instrucciones manuales (instalar + `tailscale up` + login) y esperas a que confirme.
 4. **Fase 3**: qué IP usar para `PUBLIC_BASE_URL` (¿Tailscale o LAN?).
 5. **Fase 5**: si tiene permisos de admin para la regla de firewall (o lo hace él).
+6. **Fase 7.5**: el **NIT** real del restaurante (obligatorio para tickets) y el **IVA** (13% default Bolivia).
+7. **Fase 7.5**: la impresora — que confirme haberla conectado/configurado en Windows y el ancho del papel (80mm o 58mm); pregúntale el nombre exacto si no la deja como predeterminada.
+8. **Fase 7**: si la PC oficial tendrá **auto-login** de Windows (recomendado para que el servicio arranque solo).
 
 > Si en cualquier momento algo falla, **NO continúes a ciegas** — pausa, reporta el error y la causa probable, y pide confirmación.
 

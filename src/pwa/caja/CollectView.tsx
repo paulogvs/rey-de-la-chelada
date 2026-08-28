@@ -14,6 +14,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { fetchPendingOrders, type Order } from '../_shared/api/ordersApi';
 import { processMixedPayment, processPayment, uploadPaymentProof } from '../_shared/api/paymentsApi';
+import { printOrderTicket } from '../_shared/api/printApi';
 import { Card } from '@/ui/components/Card';
 import { Button } from '@/ui/components/Button';
 import { Badge } from '@/ui/components/Badge';
@@ -158,6 +159,20 @@ export function CollectView({ token, refreshTick, onPaid }: CollectViewProps) {
             message: `Mesa ${order.tableNumber} cobrada`,
             duration: 3000,
           });
+          // v14: imprimir ticket térmico (server-side, impresora de Windows).
+          // No bloquea el cobro: si falla, avisamos sin romper el flujo.
+          const paymentId =
+            'payment' in result && result.payment?.id
+              ? result.payment.id
+              : ('payments' in result && Array.isArray(result.payments) && result.payments[0]?.id) || undefined;
+          const print = await printOrderTicket(token, order.id, paymentId);
+          if (!print.ok) {
+            addToast({
+              type: 'warning',
+              message: `Mesa cobrada pero no se imprimió el ticket: ${print.error || 'revisa la impresora'}`,
+              duration: 6000,
+            });
+          }
           onPaid(order.id);
           setExpandedId(null);
           setProofPhoto(null);

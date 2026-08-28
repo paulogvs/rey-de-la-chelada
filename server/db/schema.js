@@ -46,7 +46,7 @@
 //     - transactions   → nº de transacciones del día laboral
 //   El cierre viejo (v12) solo guardaba expected_cash (efectivo del día); los
 //   cierres históricos quedan con las nuevas columnas en 0 (no se pierde nada).
-const SCHEMA_VERSION = 13;
+const SCHEMA_VERSION = 14;
 
 const CREATE_TABLES = [
   // â”€â”€ Staff / Users (v5: 4 roles â€” admin, mesero, kds, caja) â”€â”€â”€â”€â”€
@@ -320,6 +320,14 @@ const CREATE_TABLES = [
 
   `CREATE INDEX IF NOT EXISTS idx_payment_operations_order ON payment_operations(order_id)`,
   `CREATE INDEX IF NOT EXISTS idx_payment_proofs_payment ON payment_proofs(payment_id)`,
+
+  // ── Settings (v14 2026-08-28) — configuración del restaurante en DB
+  // (NIT/IVA/datos/impresora). Gana sobre el SSOT app.config. Key-value.
+  `CREATE TABLE IF NOT EXISTS settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
 ];
 
 /**

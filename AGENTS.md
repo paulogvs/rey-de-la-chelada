@@ -47,6 +47,9 @@ Decisiones SSOT documentadas en código (NO romper en FASE 3):
 | **Menú (SSOT)** | `src/core/data/menu-seed.json` = **102 líneas explícitas / 18 categorías reales**: BAR 69 (63 bebidas + 6 promociones), COCINA 33 según los productos enumerados. La suma literal del catálogo es 102; el requerimiento menciona 32/101, una discrepancia que debe resolverse antes de retirar un producto explícito. Hay 1 manual (`Churrasco Italiano`), 5 pizzas con **precio base (`Mediana`) + ajuste `Familiar` en `modifier_options`** (Opción B 2026-08-25: `item.price` = Mediana, el incremento Familiar es un `price_adjustment` editable en admin por pizza — Elegida +2500, La Rey +4000, Vegetariana +3500, La Tóxica +4000, Hawaiana +3700), y todos los importes están en centavos. El bootstrap carga solo el seed y nunca aplica precios demo. |
 
 | **Gestión de menú (MENU_MANAGEMENT)** | `MENU_MANAGEMENT` en `.env` controla quién es dueño del menú. `seed` (default/DEV): el bootstrap importa el seed en cada arranque (upsert + reconciliation — el seed es la autoridad). `admin` (PROD): el seed solo se importa la PRIMERA vez (DB vacía); después el **admin UI gestiona** (crear/editar/activar/desactivar/borrar items y apartados, precios, tamaños) y los reinicios NO pisan ediciones. El admin tiene vistas `Menú` (CRUD items + botón "Importar del seed") y `Apartados` (CRUD categorías). Borrado físico solo sin pedidos (409 si tiene) / categoría vacía (409 si tiene items). `POST /api/menu/import-seed` trae SOLO items/categorías NUEVOS del seed (nunca pisa existentes). **Flujo de actualizaciones de menú dev→prod:** 1) mejorar el seed en DEV (formato fijo de `menu-seed.json`) → push → pull en PROD (baja código) → 2) en el admin de PROD: "Importar del seed" para traer items nuevos (no pisa tus precios/editados). El seed de GitHub NO se re-importa automáticamente en PROD. |
+| **Settings / Configuración (v14)** | `server/services/settings.js` + tabla `settings` (key-value, schema v14). Keys: `nit, business_name, address, phone, slogan, iva_rate, printer_name, paper_width`. **Los valores DB GANAN sobre el SSOT app.config** (fallback). Endpoints `GET/PUT /api/settings` (solo admin). Admin UI → vista `Configuración` (banner "Completa el NIT" hasta guardarlo). |
+| **Impresión térmica (v14)** | **Server-side, solo Caja.** `POST /api/print/ticket {orderId, paymentId?}` (admin/caja) y `POST /api/print/test` (admin). Genera ESC/POS en `server/services/ticket-escp.js` (80mm default / 58mm configurable, corte + QR SIN) y envía bytes RAW a la impresora **predeterminada de Windows** (o `printer_name` de settings) vía `scripts/print-raw.ps1` (P/Invoke winspool, sin deps nativas). El hook cliente `usePrinter.ts` quedó como stub legacy — la impresión real la dispara Caja al cobrar (CollectView → printOrderTicket) y no bloquea si la impresora falla (toast). |
+| **Backup DB (v1.5)** | `scripts/backup-db.mjs` — backup WAL-safe con API `backup()` de better-sqlite3 + verificación `integrity_check` + prune 7 días. `scripts/backup.bat` delega en él. NUNCA copiar el `.db` crudo en caliente (producía backups vacíos de 4KB). Tarea `ReyChelada-Backup` 01:00 (registrada por `scripts/install-autostart.bat`). |
 
 Scripts nuevos FASE 2: `scripts/cleanup-placeholder-data.mjs` (borra items placeholder del menú genérico sin uso; dry-run por defecto, `--yes` para borrar), `scripts/date-utils.mjs`.
 
@@ -71,13 +74,16 @@ rey-de-la-chelada/
 │   ├── update.bat          ← auto-update desde GitHub (pull→install→build→restart real)
 │   ├── start.bat           ← inicia el servicio (oculto)
 │   ├── stop.bat            ← detiene el servicio
-│   ├── backup.bat          ← backup diario DB
+│   ├── backup.bat          ← backup diario DB (delega en backup-db.mjs)
+│   ├── backup-db.mjs       ← backup WAL-safe (better-sqlite3 backup API + integrity + prune 7d) — v1.5
+│   ├── print-raw.ps1       ← envía bytes ESC/POS a la impresora default Windows (winspool P/Invoke) — v14
 │   ├── sync.bat            ← sync con ecosistema FORCH.iA
 │   ├── start-hidden.vbs    ← arranque oculto real del server (sin ventana)
+│   ├── startup-runner.bat  ← auto-arranque al login (creado por install-autostart.bat)
+│   ├── install-autostart.bat ← crea .lnk de Startup (server+watchdog) + tarea backup 01:00 — v14
 │   ├── watchdog.ps1        ← watchdog: /health cada 5 min, relanza si cae (3 fallos)
 │   ├── watchdog-start.bat  ← lanza watchdog en segundo plano
 │   ├── watchdog-stop.bat   ← detiene watchdog (crea watchdog.stop)
-│   ├── install-backup-schedule.bat ← agenda backup diario 01:00 (schtasks ReyChelada-Backup)
 │   ├── date-utils.mjs      ← fecha local America/La_Paz (FASE 2, Node)
 │   ├── cleanup-placeholder-data.mjs ← limpia menú placeholder genérico (FASE 2)
 │   ├── verify-pwas.mjs     ← verifica que las 6 PWAs respondan (requiere server arriba)
