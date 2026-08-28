@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildTicketEscp, buildTestTicketEscp } from '../../server/services/ticket-escp.js';
+import { buildTicketEscp, buildTestTicketEscp, buildInvoiceEscp } from '../../server/services/ticket-escp.js';
 
 const BASE = {
   business: { name: 'Rey de la Chelada', slogan: 'Slogan', address: 'Av. X', nit: '123456789' },
@@ -99,6 +99,49 @@ describe('buildTestTicketEscp', () => {
     const text = toText(buildTestTicketEscp({ business: BASE.business, paperSize: '80mm' }));
     expect(text).toContain('TEST DE IMPRESIÓN');
     expect(text).toContain('Rey de la Chelada');
+    expect(text.endsWith('\x1dVB\x00')).toBe(true);
+  });
+});
+
+describe('buildInvoiceEscp — FACTURA (v14 2026-08-28)', () => {
+  const INVOICE_ORDER = {
+    id: 'ord-factura-12345678',
+    table_number: 3,
+    created_at: '2026-08-28T12:00:00',
+    waiter_name: 'Paulo',
+    subtotal: 8700,
+    iva_amount: 1300,
+    discount: 0,
+    total: 10000,
+    items: [
+      { menu_item_name: 'Cerveza Artesanal', quantity: 2, unit_price: 4000, subtotal: 8000, modifiers_json: null, promo_label: null },
+      { menu_item_name: 'Michelada Signature', quantity: 1, unit_price: 2000, subtotal: 2000, modifiers_json: '[]', promo_label: 'Promo' },
+    ],
+  };
+
+  it('incluye FACTURA, NIT del negocio, NIT/Razón del cliente y total', () => {
+    const text = toText(buildInvoiceEscp({
+      business: BASE.business,
+      customer: { nit: '1098765432', name: 'Cliente SRL' },
+      order: INVOICE_ORDER,
+      paperSize: '80mm',
+    }));
+    expect(text).toContain('FACTURA');
+    expect(text).toContain('NIT: 123456789');       // negocio
+    expect(text).toContain('NIT/CI: 1098765432');   // cliente
+    expect(text).toContain('Razón Social: Cliente SRL');
+    expect(text).toContain('Nº Pedido: 12345678'); // slice(-8) de 'ord-factura-12345678'
+    expect(text).toContain('TOTAL:');
+    expect(text).toContain('100,00');               // total formateado (sin BS. en factura)
+    expect(text).toContain('2x Cerveza Artesanal');
+    expect(text).toContain('Michelada Signature (Promo)');
+    expect(text.endsWith('\x1dVB\x00')).toBe(true); // corte
+  });
+
+  it('termina con corte de papel y tolerante sin cliente', () => {
+    const text = toText(buildInvoiceEscp({ business: BASE.business, customer: {}, order: INVOICE_ORDER }));
+    expect(text).toContain('NIT/CI: —');
+    expect(text).toContain('Razón Social: —');
     expect(text.endsWith('\x1dVB\x00')).toBe(true);
   });
 });

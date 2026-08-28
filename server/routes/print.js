@@ -5,6 +5,7 @@
  * El cliente ya NO simula con console.log — llama a estos endpoints.
  *
  * POST /api/print/ticket  { orderId, paymentId? }  → imprime ticket del pedido
+ * POST /api/print/invoice { orderId, customerNit, customerName } → FACTURA del pedido
  * POST /api/print/test                             → ticket de prueba (Admin)
  */
 
@@ -12,7 +13,7 @@ import { Router } from 'express';
 import { getDb } from '../db/index.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { buildOrder } from './orders.js';
-import { buildTicketEscp, buildTestTicketEscp } from '../services/ticket-escp.js';
+import { buildTicketEscp, buildInvoiceEscp, buildTestTicketEscp } from '../services/ticket-escp.js';
 import { printRaw } from '../services/printer.js';
 import {
   getEffectiveBusiness,
@@ -91,6 +92,45 @@ router.post('/ticket', requireAuth, requireRole('admin', 'caja'), async (req, re
   } catch (err) {
     logger.error('[Print] Ticket error:', err.message);
     res.status(500).json({ success: false, error: 'Error al imprimir ticket', code: 'PRINT_ERROR' });
+  }
+});
+
+// POST /api/print/invoice — FACTURA del pedido (Caja/Admin). El monto e items
+// salen del pedido (server); solo se pide NIT + Razón Social del cliente.
+router.post('/invoice', requireAuth, requireRole('admin', 'caja'), async (req, res) => {
+  try {
+    const { orderId, customerNit, customerName } = req.body || {};
+    if (!orderId) {
+      return res.status(400).json({ success: false, error: 'orderId requerido', code: 'ORDER_ID_REQUIRED' });
+    }
+    if (!customerNit?.trim() || !customerName?.trim()) {
+      return res.status(400).json({ success: false, error: 'NIT y Razón Social son requeridos', code: 'CUSTOMER_REQUIRED' });
+    }
+
+    const db = getDb();
+    const order = buildOrder(db, orderId);
+    if (!order) {
+      return res.status(404).json({ success: false, error: 'Pedido no encontrado', code: 'ORDER_NOT_FOUND' });
+    }
+
+    const business = getEffectiveBusiness();
+    const paperSize = getEffectivePaperSize();
+
+    const bytes = buildInvoiceEscp({
+      business,
+      paperSize,
+      customer: { nit: customerNit.trim(), name: customerName.trim() },
+      order: toTicketOrder(order),
+    });
+
+    const result = await printRaw(bytes);
+    if (!result.ok) {
+      return res.status(500).json({ success: false, error: result.message, code: 'PRINT_FAILED' });
+    }
+    res.json({ success: true, message: result.message, orderId, bytes: bytes.length });
+  } catch (err) {
+    logger.error('[Print] Invoice error:', err.message);
+    res.status(500).json({ success: false, error: 'Error al imprimir factura', code: 'PRINT_ERROR' });
   }
 });
 

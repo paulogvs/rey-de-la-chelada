@@ -49,6 +49,11 @@ export async function printOrderTicket(token: string, orderId: string, paymentId
   return post('/print/ticket', token, { orderId, paymentId });
 }
 
+/** Imprime la FACTURA de un pedido (Caja/Admin). Pide NIT + Razón Social del cliente. */
+export async function printInvoice(token: string, orderId: string, customerNit: string, customerName: string): Promise<PrintResult> {
+  return post('/print/invoice', token, { orderId, customerNit, customerName });
+}
+
 /** Imprime un ticket de prueba (Admin — configuración de impresora). */
 export async function printTestTicket(token: string): Promise<PrintResult> {
   return post('/print/test', token);

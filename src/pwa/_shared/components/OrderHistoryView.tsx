@@ -9,6 +9,7 @@ import { useToast } from '@/ui/components/Toast';
 import { formatMoney, formatTableRef } from '../utils/format';
 import { localDateTimeStr } from '../utils/localDate';
 import { loadProofImage } from '../api/paymentsApi';
+import { InvoiceModal } from './InvoiceModal';
 import { fetchOrderHistory, type OrderHistoryRow, type OrderHistoryPayment } from '../api/reportsApi';
 import './OrderHistoryView.css';
 
@@ -31,6 +32,9 @@ export function OrderHistoryView({ token, businessDay, title = 'Pedidos cobrados
   const [previewId, setPreviewId] = useState<{ id: string; alt: string } | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+
+  // v14 (2026-08-28): factura — pedido seleccionado para emitir factura.
+  const [invoiceOrder, setInvoiceOrder] = useState<OrderHistoryRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -107,6 +111,14 @@ export function OrderHistoryView({ token, businessDay, title = 'Pedidos cobrados
                     <div className="order-history__detail-meta">
                       <Badge variant="paid">Pagado</Badge>
                       {order.waiter_name && <span>Mesero: {order.waiter_name}</span>}
+                      <button
+                        type="button"
+                        className="order-history__invoice-btn"
+                        onClick={() => setInvoiceOrder(order)}
+                        title="Emitir factura de este pedido"
+                      >
+                        <AppIcon name="receipt" size="sm" /> Emitir factura
+                      </button>
                     </div>
                     {order.items.map(item => (
                       <div className="order-history__item" key={item.id}>
@@ -157,6 +169,16 @@ export function OrderHistoryView({ token, businessDay, title = 'Pedidos cobrados
           </div>
         )}
       </Modal>
+      {/* v14: modal de factura — monto/items del pedido, solo pide NIT + Razón Social */}
+      {invoiceOrder && (
+        <InvoiceModal
+          open={!!invoiceOrder}
+          onClose={() => setInvoiceOrder(null)}
+          token={token}
+          order={invoiceOrder}
+          onToast={(type, message) => addToast({ type, message, duration: 4000 })}
+        />
+      )}
     </section>
   );
 }

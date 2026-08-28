@@ -228,4 +228,110 @@ export function buildTestTicketEscp({ business = {}, paperSize = '80mm' } = {}) 
   return new TextEncoder().encode(t);
 }
 
-export default { buildTicketEscp, buildTestTicketEscp, PAPER_SIZES };
+/**
+ * FACTURA (ESC/POS) — factura al cliente con NIT/Razón Social.
+ *
+ * v14 (2026-08-28): reemplaza el stub manual de InvoiceView. Toma el pedido
+ * real (monto + items del server) y solo añade los datos fiscales del cliente.
+ *
+ * @param {object} opts
+ * @param {object} opts.business    { name, nit, address, phone }
+ * @param {object} opts.customer    { nit, name }
+ * @param {object} order            shape de buildOrder: id, created_at,
+ *   table_number, waiter_name, subtotal, iva_amount, discount, total,
+ *   items[{ menu_item_name, quantity, subtotal, modifiers_json, promo_label }]
+ * @param {string} [opts.paperSize] '58mm' | '80mm'
+ * @returns {Uint8Array}
+ */
+export function buildInvoiceEscp(opts) {
+  const cfg = { ...DEFAULT_CONFIG, ...opts };
+  const cpl = cfg.paperSize === '58mm' ? 32 : 42;
+  const { business, customer } = cfg;
+  const order = cfg.order;
+
+  const repeat = (ch, n) => ch.repeat(Math.max(0, n));
+  const center = (text) => repeat(' ', Math.max(0, Math.floor((cpl - text.length) / 2))) + text;
+  const right = (label, value) => {
+    const content = `${label} ${value}`;
+    if (content.length >= cpl) return content;
+    return label + repeat(' ', cpl - label.length - value.length) + value;
+  };
+  const line = () => repeat('-', cpl) + '\n';
+
+  const items = Array.isArray(order.items) ? order.items : [];
+  const formatBs = (cents) => {
+    const v = (Number(cents) || 0) / 100;
+    return `${v.toFixed(2).replace('.', ',')}`;
+  };
+
+  let t = ESCPOS.INIT;
+
+  // ── Header negocio ────────────────────────────────────────
+  t += ESCPOS.ALIGN_CENTER;
+  t += ESCPOS.DOUBLE_ON;
+  t += center(business.name || 'Rey de la Chelada') + '\n';
+  t += ESCPOS.DOUBLE_OFF;
+  if (business.address) t += business.address + '\n';
+  if (business.phone) t += `Tel: ${business.phone}\n`;
+  if (business.nit) t += `NIT: ${business.nit}\n`;
+  t += line();
+
+  // ── Cabecera FACTURA ──────────────────────────────────────
+  t += ESCPOS.ALIGN_CENTER;
+  t += ESCPOS.BOLD_ON;
+  t += 'FACTURA\n';
+  t += ESCPOS.BOLD_OFF;
+  t += line();
+
+  // ── Datos del cliente ─────────────────────────────────────
+  t += ESCPOS.ALIGN_LEFT;
+  t += `NIT/CI: ${customer.nit || '—'}\n`;
+  t += `Razón Social: ${customer.name || '—'}\n`;
+  t += line();
+
+  // ── Datos del pedido ──────────────────────────────────────
+  t += `Nº Pedido: ${String(order.id || '').slice(-8)}\n`;
+  t += `Mesa: ${order.table_number ?? '-'}   Fecha: ${localDateTimeStr(order.created_at)}\n`;
+  if (order.waiter_name) t += `Mesero: ${order.waiter_name}\n`;
+  t += line();
+
+  // ── Items ─────────────────────────────────────────────────
+  for (const item of items) {
+    const name = item.promo_label ? `${item.menu_item_name} (${item.promo_label})` : item.menu_item_name;
+    t += `${item.quantity}x ${name}\n`;
+    let modifiers;
+    try {
+      modifiers = JSON.parse(item.modifiers_json || '[]');
+    } catch {
+      modifiers = [];
+    }
+    for (const mod of modifiers) {
+      t += `   + ${mod.optionName}` + (Number(mod.priceAdjustment || 0) > 0 ? ` (${formatBs(mod.priceAdjustment)})` : '') + '\n';
+    }
+    t += right('', formatBs(item.subtotal)) + '\n';
+  }
+  t += line();
+
+  // ── Totales ───────────────────────────────────────────────
+  t += right('Subtotal:', formatBs(order.subtotal)) + '\n';
+  t += right('IVA:', formatBs(order.iva_amount)) + '\n';
+  if (Number(order.discount || 0) > 0) {
+    t += right('Descuento:', `-${formatBs(order.discount)}`) + '\n';
+  }
+  t += ESCPOS.DOUBLE_ON;
+  t += right('TOTAL:', formatBs(order.total)) + '\n';
+  t += ESCPOS.DOUBLE_OFF;
+  t += line();
+
+  // ── Footer ────────────────────────────────────────────────
+  t += ESCPOS.ALIGN_CENTER;
+  t += '\n';
+  t += center('¡Gracias por su visita!') + '\n';
+  t += center('Built with FORCH.i') + '\n';
+  t += '\n';
+  t += ESCPOS.CUT;
+
+  return new TextEncoder().encode(t);
+}
+
+export default { buildTicketEscp, buildTestTicketEscp, buildInvoiceEscp, PAPER_SIZES };

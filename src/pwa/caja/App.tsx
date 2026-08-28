@@ -25,13 +25,12 @@ import { appConfig } from '@/core/config';
 import { businessDayDateStr } from '../_shared/utils/localDate';
 import { SummaryView } from './SummaryView';
 import { ClosingView } from './ClosingView';
-import { InvoiceView } from './InvoiceView';
 import { CollectView } from './CollectView';
 import { OrderHistoryView } from '../_shared/components/OrderHistoryView';
 import { ReportView } from '../_shared/components/ReportView';
 import './App.css';
 
-type ViewState = 'summary' | 'collect' | 'history' | 'close' | 'invoice' | 'reports';
+type ViewState = 'summary' | 'collect' | 'history' | 'close' | 'reports';
 
 const VIEW_OPTIONS: SegmentedOption[] = [
   { value: 'summary', label: 'Resumen' },
@@ -39,7 +38,6 @@ const VIEW_OPTIONS: SegmentedOption[] = [
   { value: 'history', label: 'Pedidos' },
   { value: 'close', label: 'Cierre' },
   { value: 'reports', label: 'Reportes' },
-  { value: 'invoice', label: 'Facturación' },
 ];
 
 function CajaApp() {
@@ -169,8 +167,6 @@ function CajaApp() {
           )}
 
           {view === 'reports' && <ReportView token={token} onToast={(type, message) => addToast({ type, message, duration: 3000 })} />}
-
-          {view === 'invoice' && <InvoiceView />}
         </main>
       </div>
     </PwaLayout>
