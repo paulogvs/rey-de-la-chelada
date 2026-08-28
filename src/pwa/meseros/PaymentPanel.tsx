@@ -393,7 +393,7 @@ export function PaymentPanel({ orderId, table, token, onPaymentComplete, onBack 
           </div>
           <div>
             <label className="payment-panel__method-label" htmlFor="change-qr">Cambio por QR</label>
-            <MoneyInput id="change-qr" className="payment-panel__money" value={changeQr} disabled={!hasChange} onChange={handleChangeQrInput} placeholder="0" />
+            <MoneyInput id="change-qr" className="payment-panel__money" value={changeQr} disabled={!hasChange || qrGiven === 0} onChange={handleChangeQrInput} placeholder="0" />
           </div>
         </div>
         {!hasChange && <p className="payment-panel__change-hint">Ingresa más en Efectivo + QR que el total del pedido para habilitar el cambio.</p>}
