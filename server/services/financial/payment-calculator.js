@@ -58,17 +58,22 @@ export function calculateMixedPayments(orderTotal, paidBefore, allocations) {
   if (previous > total) throw new Error('El saldo pagado excede el total');
   const remainingBefore = total - previous;
   const payments = allocations.map(calculatePayment);
-  const allocated = payments.reduce((sum, payment) => sum + payment.amount, 0);
-  if (allocated > remainingBefore) throw new Error('La asignación excede el saldo pendiente');
+  // Solo los montos POSITIVOS cuentan como pago del pedido. Los retiros
+  // (transferOut, amount negativo — vuelto por QR) NO cubren el pedido: son
+  // salidas del local. Antes `allocated` sumaba el retiro negativo → un pedido
+  // pagado con cash=total + retiro QR quedaba `paidAmount` menor al total y
+  // nunca pasaba a status 'paid' (bug escenario E2: vuelto por retiro QR).
+  const paidAllocated = payments.reduce((sum, payment) => sum + (payment.amount > 0 ? payment.amount : 0), 0);
+  if (paidAllocated > remainingBefore) throw new Error('La asignación excede el saldo pendiente');
   const byMethod = { cash: 0, qr: 0 };
   for (const payment of payments) byMethod[payment.method] += payment.amount;
   return {
     payments,
     orderTotal: total,
     paidBefore: previous,
-    paidAmount: previous + allocated,
-    remaining: total - previous - allocated,
-    isFullyPaid: previous + allocated === total,
+    paidAmount: previous + paidAllocated,
+    remaining: total - previous - paidAllocated,
+    isFullyPaid: previous + paidAllocated === total,
     byMethod,
   };
 }

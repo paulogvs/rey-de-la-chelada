@@ -27,4 +27,19 @@ describe('financial payment calculator', () => {
     expect(() => calculateMixedPayments(1000, 0, [{ method: 'qr', amount: 1001 }])).toThrow(/saldo/);
     expect(() => calculatePayment({ method: 'qr', amount: 100, received: 100 })).toThrow(/received/);
   });
+
+  it('retiro QR (negativo) NO descuenta el pago del pedido (regresión escenario E2)', () => {
+    // Pedido 4000, paga cash 4000 (cubre) + retiro QR -5000 (vuelto por QR).
+    // El retiro NO debe bajar paidAmount: debe quedar 4000 y fullyPaid=true.
+    const r = calculateMixedPayments(4000, 0, [
+      { method: 'cash', amount: 4000, received: 9000, change: 5000 },
+      { method: 'qr', amount: 5000, transferOut: true, reference: 'RETIRO QR' },
+    ]);
+    expect(r.paidAmount).toBe(4000);
+    expect(r.isFullyPaid).toBe(true);
+    expect(r.remaining).toBe(0);
+    // el retiro QR sigue siendo amount negativo en los payments
+    const retiro = r.payments.find(p => p.transferOut);
+    expect(retiro.amount).toBe(-5000);
+  });
 });
