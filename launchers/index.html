@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rey de la Chelada — Acceso</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh; padding: 40px 20px;
+    background: radial-gradient(circle at 50% 20%, #2b2b2b, #121212 70%);
+    color: #f5e6c8; text-align: center;
+  }
+  h1 { font-size: 30px; font-weight: 800; color: #f5e6c8; margin-bottom: 4px; }
+  .sub { color: #c9a227; font-size: 14px; margin-bottom: 30px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; max-width: 960px; margin: 0 auto; }
+  .env {
+    background: rgba(40, 38, 34, 0.9); border: 1px solid #5a4a2e; border-radius: 16px;
+    padding: 24px; text-align: left;
+  }
+  .env h2 { font-size: 18px; color: #f5e6c8; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .env .base { font-size: 12px; color: #8a7a5e; word-break: break-all; margin-bottom: 16px; }
+  .env ul { list-style: none; }
+  .env li { margin-bottom: 6px; }
+  .env a { color: #c9a227; text-decoration: none; font-size: 15px; }
+  .env a:hover { text-decoration: underline; }
+  .env .muted { font-size: 12px; color: #8a7a5e; }
+</style>
+</head>
+<body>
+  <h1>👑 Rey de la Chelada</h1>
+  <p class="sub">Elige cómo vas a abrir las apps</p>
+  <div class="grid">
+    <div class="env">
+      <h2>Local (esta PC)</h2>
+      <div class="base">http://localhost:3002</div>
+      <ul>
+        <li><a href="http://localhost:3002/clientes/">🍺 Menú Digital</a></li>
+        <li><a href="http://localhost:3002/cocina/">🍳 Cocina (KDS)</a></li>
+        <li><a href="http://localhost:3002/bar/">🍹 Bar (KDS)</a></li>
+        <li><a href="http://localhost:3002/meseros/">🍽️ Meseros</a></li>
+        <li><a href="http://localhost:3002/caja/">💰 Caja</a></li>
+        <li><a href="http://localhost:3002/admin/">⚙️ Admin</a></li>
+      </ul>
+    </div>
+    <div class="env">
+      <h2>Red WiFi (LAN)</h2>
+      <div class="base">http://192.168.1.2:3002</div>
+      <ul>
+        <li><a href="http://192.168.1.2:3002/clientes/">🍺 Menú Digital</a></li>
+        <li><a href="http://192.168.1.2:3002/cocina/">🍳 Cocina (KDS)</a></li>
+        <li><a href="http://192.168.1.2:3002/bar/">🍹 Bar (KDS)</a></li>
+        <li><a href="http://192.168.1.2:3002/meseros/">🍽️ Meseros</a></li>
+        <li><a href="http://192.168.1.2:3002/caja/">💰 Caja</a></li>
+        <li><a href="http://192.168.1.2:3002/admin/">⚙️ Admin</a></li>
+      </ul>
+    </div>
+    <div class="env">
+      <h2>Tailscale (remoto)</h2>
+      <div class="base">http://100.107.134.122:3002</div>
+      <ul>
+        <li><a href="http://100.107.134.122:3002/clientes/">🍺 Menú Digital</a></li>
+        <li><a href="http://100.107.134.122:3002/cocina/">🍳 Cocina (KDS)</a></li>
+        <li><a href="http://100.107.134.122:3002/bar/">🍹 Bar (KDS)</a></li>
+        <li><a href="http://100.107.134.122:3002/meseros/">🍽️ Meseros</a></li>
+        <li><a href="http://100.107.134.122:3002/caja/">💰 Caja</a></li>
+        <li><a href="http://100.107.134.122:3002/admin/">⚙️ Admin</a></li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

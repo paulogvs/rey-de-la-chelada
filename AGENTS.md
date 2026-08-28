@@ -175,12 +175,20 @@ Protección: main requiere PR + tests pasando + 1 review
 | Documento | Contenido |
 |-----------|-----------|
 | `docs/ARQUITECTURA_Y_PRODUCCION.md` | **⭐ ARRANCA AQUÍ en sesión fresca** — arquitectura, deps, .env, DB, endpoints, runbook PC nueva, ciclos dev→prod |
+| `docs/PRODUCCION_PC_NUEVA.md` | **🎯 RUNBOOK RESUMIBLE POR OPENCODE** — si el usuario pide "instala este proyecto para llevarlo a producción", sigue ESTE documento de principio a fin |
+| `docs/LAUNCHERS.md` | Accesos HTML de las PWAs (doble clic) — cómo usarlos y regenerarlos si cambia la IP |
 | `SPEC_INICIAL.md` | Especificación completa del proyecto |
 | `DESIGN.md` | Design tokens 3 capas |
 | `VALIDATION_GATES.md` | 15 gates (5 restaurant-specific) |
 | `constitution.md` | 10 artículos inmutables |
 | `docs/MANUAL_DE_INSTALACION.md` | Instalación PC nueva (`scripts\setup.bat`) |
 | `docs/MANUAL_DE_USUARIO.md` | Manual de uso (6 PWAs, PINs, flujos) |
+
+### ⚠️ INSTRUCCIÓN PARA OPENCODE (leer automáticamente)
+
+> **Si el usuario dice "instala este proyecto para llevarlo a producción", "ponerlo en produccion", "desplegar en la PC nueva", "lleva esto a produccion", "tutorial de produccion" o similar →**
+> **ABRE Y SIGUE `docs/PRODUCCION_PC_NUEVA.md` ENTERO.**
+> Ese documento es el runbook paso a paso con las fases, los comandos exactos y los puntos en los que DEBES preguntar al humano (marcados ⚠️). No improvises: usa ese runbook.
 
 ## 8. CONTACTO
 
