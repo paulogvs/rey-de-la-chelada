@@ -10,17 +10,23 @@
 import rateLimit from 'express-rate-limit';
 
 // ============================================================
-// Rate Limiting — diseño por método (F1 2026-08-10)
+// Rate Limiting — diseño por método (F1 2026-08-10, v2 2026-08-28)
 //
 //  El polling multi-PWA (6 PWAs en una IP) quemaba el presupuesto
 //  global de 100 req/15min → 429 "Demasiadas solicitudes". Solución:
 //
-//   GET/HEAD/OPTIONS  → readLimiter  (techo ALTO: 2500/15min ≈ 167 req/min)
-//   POST/PUT/PATCH/DELETE → apiLimiter (estricto: 350/15min ≈ 23 mut/min)
-//   POST /api/auth    → authLimiter  (20/min, anti brute-force PIN)
+//   GET/HEAD/OPTIONS  → readLimiter  (techo ALTO: 10000/15min ≈ 667 req/min)
+//   POST/PUT/PATCH/DELETE → apiLimiter (2500/15min ≈ 167 mut/min)
+//   POST /api/auth    → authLimiter  (60/min, anti brute-force PIN)
 //
-//  De esta forma el polling legítimo nunca se bloquea y el abuso de
-//  escritura (client-orders, waiter-calls, pagos) sigue protegido.
+//  v2 (2026-08-28, audit de capacidad 19 dispositivos):
+//   1 cocina + 1 bar + 1 caja + 4 meseros + 1 admin + 11 clientes =
+//   ~180-230 req/min de polling legítimo (pico ~3500/15min). El techo
+//   6000 daba margen 1.3-1.7x → se sube a 10000 para respirar en picos
+//   (2 teléfonos por mesa). El abuso real se controla en apiLimiter.
+//   authLimiter: TODOS los dispositivos salen de la MISMA IP (LAN) —
+//   20/min se agotaba con 8 logins de inicio de turno + reintentos →
+//   60/min sigue siendo seguro contra fuerza bruta (PIN 4 dígitos + bcrypt).
 // ============================================================
 
 /** ¿La request es de LECTURA? (GET/HEAD/OPTIONS — polling legítimo) */
@@ -34,7 +40,7 @@ export function shouldSkipRateLimit(method) {
  */
 export const readLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15 minutes
-  limit: Number(process.env.API_READ_RATE_LIMIT_MAX) || 6000,
+  limit: Number(process.env.API_READ_RATE_LIMIT_MAX) || 10000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -51,7 +57,7 @@ export const readLimiter = rateLimit({
  */
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15 minutes
-  limit: Number(process.env.API_WRITE_RATE_LIMIT_MAX) || 1500,
+  limit: Number(process.env.API_WRITE_RATE_LIMIT_MAX) || 2500,
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => shouldSkipRateLimit(req.method),
@@ -64,11 +70,11 @@ export const apiLimiter = rateLimit({
 
 /**
  * Stricter limiter for auth endpoints
- * 20 attempts per minute per IP (override vía env)
+ * 60 attempts per minute per IP (override vía env)
  */
 export const authLimiter = rateLimit({
   windowMs: 60 * 1000,  // 1 minute
-  limit: Number(process.env.AUTH_RATE_LIMIT_MAX) || 20,
+  limit: Number(process.env.AUTH_RATE_LIMIT_MAX) || 60,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
