@@ -39,6 +39,7 @@ pm2-*.json
 *.db-journal
 *.sqlite
 /data/
+/backups/
 
 # Windows-specific
 *.exe
