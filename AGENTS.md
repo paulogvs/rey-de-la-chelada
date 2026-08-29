@@ -197,6 +197,7 @@ Protección: main requiere PR + tests pasando + 1 review
 > **Si el usuario dice "instala este proyecto para llevarlo a producción", "ponerlo en produccion", "desplegar en la PC nueva", "lleva esto a produccion", "tutorial de produccion" o similar →**
 > **ABRE Y SIGUE `docs/PRODUCCION_PC_NUEVA.md` ENTERO.**
 > Ese documento es el runbook paso a paso con las fases, los comandos exactos y los puntos en los que DEBES preguntar al humano (marcados ⚠️). No improvises: usa ese runbook.
+> Al inicio, **pregunta al humano cómo llegó el código** (¿`git clone` o zip/.rar desde pendrive?) — afecta si `scripts\update.bat` funcionará después (ver "NOTA — Formato de despliegue" del runbook).
 
 ## 8. CONTACTO
 

@@ -254,4 +254,26 @@ Invoke-RestMethod -Uri "http://localhost:3002/api/auth/me" -Headers @{Authorizat
 
 ---
 
+## 📦 NOTA — Formato de despliegue (zip/.rar vs git clone)
+
+> **¿Cómo llega el código a esta PC?**
+> - **Opción A (recomendada si quieres actualizar fácil):** `git clone https://github.com/paulogvs/rey-de-la-chelada.git` — así `scripts/update.bat` funcionará para bajar mejoras futuras.
+> - **Opción B (pendrive con `.rar`/zip desde GitHub):** descargas el ZIP/`.rar` del repo. ⚠️ **NO incluye `.git`**, así que `scripts\update.bat` (que usa `git pull`) **NO funcionará**. Sirve para instalar, pero para actualizar habría que volver a bajar el zip o clonar.
+>
+> **opencode:** si el código llegó por zip, **avisa al humano** que las futuras actualizaciones requerirán clonar el repo (o re-descargar el zip). Si llegó por `git clone`, las actualizaciones son `scripts\update.bat`.
+
+---
+
+## 🔄 ACTUALIZACIONES FUTURAS (después de producción)
+
+Cuando el dueño haga mejoras en su PC de desarrollo y las suba a GitHub:
+```
+scripts\update.bat        # pull → npm install --legacy-peer-deps → build → restart
+```
+- **No pierde datos:** la DB (`data/`) y el `.env` NO se tocan (están fuera de git). Las migraciones de schema son aditivas (añaden columnas, nunca borran).
+- **Menú:** en PROD `MENU_MANAGEMENT=admin` → el Admin UI es dueño del menú; `update.bat` NO pisa items/precios editados. Para traer items nuevos del seed: **Admin → Menú → "Importar del seed"**.
+- **Siempre** `--legacy-peer-deps` en `npm install`.
+
+---
+
 *Rey de la Chelada — FORCH.i by Paulo Velasco · Built with FORCH.i by Paulo Velasco · https://forch-i-a-hub.vercel.app/*
