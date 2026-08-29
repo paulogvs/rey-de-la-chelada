@@ -8,14 +8,21 @@
  *   - "," y "." son SIEMPRE decimal (teclado numérico o teclado físico).
  *   - CONTRATO DE CENTAVOS: el valor guardado (`value`/`onChange`) es un
  *     ENTERO en CENTAVOS (ej. 1050 = Bs 10.50). El input muestra Bs decimal
- *     con coma ("10,5") y parsea la entrada a centavos vía parseMoneyInput.
+ *     con coma ("10,50") y parsea la entrada a centavos vía parseMoneyInput.
+ *
+ * FIX 2026-08-28 (decimales): este input es CONTROLADO por `value` (centavos),
+ * por lo que al escribir un punto/comma, el re-render formateaba el valor y
+ * "se comía" el carácter decimal → no se podía pagar 70.50. Solución: se
+ * mantiene un TEXTO interno (string) mientras el usuario edita (así el punto
+ * /comma se conserva en pantalla) y se sincroniza a centavos hacia arriba.
+ * Al perder el foco, se re-formatea a "10,50" (2 decimales).
  *
  * Drop-in para los `type="number" step={0.01}` existentes:
  *   - FormField → <MoneyInput variant="lg" className="form-input--mono" />
  *   - input crudo → <MoneyInput className="mi-clase" />
  */
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { parseMoneyInput } from '@/pwa/_shared/utils/format';
 import { buildFormInputClass } from '../FormField/FormField';
 
@@ -29,18 +36,49 @@ export interface MoneyInputProps
   variant?: 'default' | 'lg' | 'mono' | 'sm' | 'constrained';
 }
 
-export function MoneyInput({ value, onChange, variant, className = '', placeholder, ...rest }: MoneyInputProps) {
+/** Centavos → texto editable con coma y SIEMPRE 2 decimales ("1050" → "10,50"). */
+function centsToText(cents: number): string {
+  if (!cents) return '';
+  const v = cents / 100;
+  return v.toFixed(2).replace('.', ',');
+}
+
+export function MoneyInput({ value, onChange, variant, className = '', placeholder, onFocus, onBlur, ...rest }: MoneyInputProps) {
+  const [text, setText] = useState<string>(() => centsToText(value));
+  const focusedRef = useRef(false);
+
+  // Sincronizar cuando el valor EXTERNO cambia (ej. el padre resetea),
+  // pero NO mientras el usuario está escribiendo (para no pisar el punto).
+  useEffect(() => {
+    if (!focusedRef.current) {
+      setText(centsToText(value));
+    }
+  }, [value]);
+
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    focusedRef.current = true;
+    if (onFocus) onFocus(e);
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    focusedRef.current = false;
+    // Al salir, re-formatear limpio y emitir el valor final
+    const parsed = parseMoneyInput(text);
+    setText(centsToText(parsed ?? 0));
+    if (parsed !== null && parsed !== value) onChange(parsed);
+    if (onBlur) onBlur(e);
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const parsed = parseMoneyInput(e.target.value);
+    const raw = e.target.value;
+    // Permitir punto/comma y dígitos; limpiar múltiples separadores.
+    // Mientras se edita, conservamos el texto tal cual para que el punto
+    // decimal no desaparezca → ahora se puede escribir "70.50" / "70,50".
+    setText(raw);
+    const parsed = parseMoneyInput(raw);
     onChange(parsed ?? 0);
   };
 
-  // Display editable con coma decimal ("10,5"); vacío cuando es 0 para mostrar placeholder.
-  const display = value === 0 ? '' : String(value / 100).replace('.', ',');
-
-  // SIEMPRE usar buildFormInputClass → con variant/className vacíos produce
-  // la clase base `form-input` (estilo oscuro unificado). Estandariza todos
-  // los MoneyInput de la app sin depender de CSS local por call site.
   const cls = buildFormInputClass(variant, className);
 
   return (
@@ -48,8 +86,10 @@ export function MoneyInput({ value, onChange, variant, className = '', placehold
       type="text"
       inputMode="decimal"
       className={cls}
-      value={display}
+      value={text}
       onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
       placeholder={placeholder}
       {...rest}
     />
