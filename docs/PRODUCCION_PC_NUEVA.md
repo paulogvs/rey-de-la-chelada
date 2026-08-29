@@ -73,9 +73,9 @@ Luego edita el `.env` (⚠️ **pregunta al humano** por los valores que no pued
 | `MENU_MANAGEMENT` | `admin` | auto | El Admin UI gestiona el menú (no pisar ediciones) |
 | `JWT_SECRET` | `<secreto>` | ⚠️ **humano** | Mínimo 32 chars. Generar: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 | `PUBLIC_BASE_URL` | `http://<IP tailscale o LAN>:3002` | ⚠️ **humano** | URL de los QR de mesas. Se detecta en Fase 4 |
-| `API_READ_RATE_LIMIT_MAX` | `6000` | auto | Lecturas/15min |
-| `API_WRITE_RATE_LIMIT_MAX` | `1500` | auto | Escrituras/15min |
-| `AUTH_RATE_LIMIT_MAX` | `20` | auto | Login/min |
+| `API_READ_RATE_LIMIT_MAX` | `10000` | auto | Lecturas/15min (19 dispositivos) |
+| `API_WRITE_RATE_LIMIT_MAX` | `2500` | auto | Escrituras/15min |
+| `AUTH_RATE_LIMIT_MAX` | `60` | auto | Login/min (staff simultáneo) |
 | `JWT_EXPIRES_IN` | `24h` | auto | |
 | `GITHUB_REPO` / `GITHUB_BRANCH` | `paulogvs/rey-de-la-chelada` / `main` | auto | Repo público |
 
