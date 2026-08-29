@@ -77,6 +77,11 @@ interface OrderPanelProps {
   /** FIX 2026-08-27: señal del WS (App.tsx) — al cambiar, re-consulta el
    *  pedido abierto para reflejar items "EN PROCESO" → "LISTO" en vivo. */
   wsRefresh?: number;
+  /** v14 (2026-08-28): offline sync — estado de conexión y encolado. */
+  isOnline?: boolean;
+  pendingCount?: number;
+  /** Encola un pedido cuando NO hay red (create_order). */
+  onOfflineQueue?: (payload: Record<string, unknown>) => Promise<unknown>;
 }
 
 export interface CartItem {
@@ -126,7 +131,7 @@ interface DetailGroup {
   options: DetailModifier[];
 }
 
-export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, onBack, onRequestPayment, wsRefresh = 0 }: OrderPanelProps) {
+export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, onBack, onRequestPayment, wsRefresh = 0, isOnline = true, pendingCount = 0, onOfflineQueue }: OrderPanelProps) {
   const { addToast } = useToast();
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -464,9 +469,13 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
     setSubmitting(true);
     try {
       const payload = {
+        id: (self.crypto as Crypto).randomUUID?.() || `off-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         table_id: table.id,
+        table_number: table.number,
         guest_count: table.capacity,
+        status: 'confirmed',
         items: cart.map(ci => ({
+          id: (self.crypto as Crypto).randomUUID?.() || `oi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           menu_item_id: ci.menuItem.id,
           quantity: ci.quantity,
           notes: ci.notes || undefined,
@@ -480,6 +489,25 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
           })),
         })),
       };
+
+      // v14 (2026-08-28): OFFLINE → encolar (create_order) en vez de POST.
+      // El SyncEngine lo enviará al reconectar (sync/push). El pedido queda
+      // "pendiente" y se ve en el banner de conexión.
+      if (!isOnline && onOfflineQueue) {
+        const queued = await onOfflineQueue(payload);
+        if (!queued) {
+          addToast({ type: 'error', message: 'No se pudo guardar el pedido offline', duration: 5000 });
+          return;
+        }
+        addToast({
+          type: 'warning',
+          message: `Sin conexión — pedido guardado (${pendingCount + 1} en cola). Se enviará al reconectar.`,
+          duration: 5000,
+        });
+        setIsCartModalOpen(false);
+        setCart([]);
+        return;
+      }
 
       const created = await createOrder(token, payload);
       if (!created.ok || !created.order) {
@@ -496,7 +524,7 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
     } finally {
       setSubmitting(false);
     }
-  }, [cart, table, token, detailGroups, addToast, onOrderPlaced]);
+  }, [cart, table, token, detailGroups, addToast, onOrderPlaced, isOnline, onOfflineQueue, pendingCount]);
 
   // FASE 4B: rondas del pedido activo (items agrupados por round)
   const rounds = activeOrder

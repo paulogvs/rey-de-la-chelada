@@ -293,7 +293,7 @@ export class SyncEngine {
   // ── Internos ─────────────────────────────────────────────
 
   /** Pull + flush (usado en startup y al reconectar) */
-  private async syncNow(): Promise<void> {
+  async syncNow(): Promise<void> {
     try {
       await this.pull();
     } catch {

@@ -31,6 +31,7 @@ import { TablesView } from './TablesView';
 import { OrderPanel } from './OrderPanel';
 import { PaymentPanel } from './PaymentPanel';
 import { WaiterCallsBoard } from './WaiterCallsBoard';
+import { useOfflineSync } from '../_shared/hooks/useOfflineSync';
 import './App.css';
 
 type ViewState = 'tables' | 'order-panel' | 'payment-panel' | 'waiter-calls';
@@ -49,6 +50,10 @@ function MeserosApp() {
 
   // Tables — real API with WS refresh + polling
   const tables = useTables({ token, pollMs: 15000 });
+
+  // v14 (2026-08-28): offline sync — encola pedidos cuando no hay red y los
+  // envía al volver. ADITIVO: el flujo online es idéntico a antes.
+  const { isOnline, pendingCount, syncing, enqueueOrder } = useOfflineSync({ token, moduleId: 'meseros', enabled: !!token });
 
   // Waiter calls — real API board (F1: 30s en vez de 10s — el board no es
   // crítico en tiempo real y reduce ~40% del polling de meseros)
@@ -224,6 +229,28 @@ function MeserosApp() {
           </div>
         </header>
 
+        {/* v14: banner de conexión — offline: los pedidos se guardan en cola y
+            se envían al volver la red. Muestra cuántos pendientes hay. */}
+        {!isOnline && (
+          <div className="meseros-offline-banner" role="status">
+            <AppIcon name="alert" size="sm" />
+            <span>
+              Sin conexión — los pedidos se guardan y se envían al reconectar
+              {pendingCount > 0 && ` (${pendingCount} pendiente${pendingCount !== 1 ? 's' : ''})`}
+              {syncing && ' · Sincronizando…'}
+            </span>
+          </div>
+        )}
+        {isOnline && pendingCount > 0 && (
+          <div className="meseros-offline-banner meseros-offline-banner--info" role="status">
+            <AppIcon name="layers" size="sm" />
+            <span>
+              Enviando {pendingCount} pedido{pendingCount !== 1 ? 's' : ''} pendiente{pendingCount !== 1 ? 's' : ''}
+              {syncing ? '…' : ' al reconectar'}
+            </span>
+          </div>
+        )}
+
         {/* Main Content */}
         <main className="meseros-main">
           {view === 'tables' && (
@@ -248,6 +275,9 @@ function MeserosApp() {
               onBack={handleBackToTables}
               onRequestPayment={handleRequestPayment}
               wsRefresh={orderRefreshTick}
+              isOnline={isOnline}
+              pendingCount={pendingCount}
+              onOfflineQueue={enqueueOrder}
             />
           )}
 

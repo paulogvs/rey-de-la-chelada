@@ -2480,3 +2480,21 @@
     padding: var(--space-2);
   }
 }
+
+/* ============ Offline sync banner (v14 2026-08-28) ============ */
+.meseros-offline-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  margin: 0 16px 8px;
+  border-radius: 10px;
+  background: #3a2a12;
+  border: 1px solid #c9a227;
+  color: #f5e6c8;
+  font-size: 13px;
+}
+.meseros-offline-banner--info {
+  background: #14243a;
+  border-color: #3b82f6;
+}
