@@ -23,6 +23,8 @@ import { Loader } from '@/ui/components/Loader';
 import { FormField } from '@/ui/components/FormField';
 import { MoneyInput } from '@/ui/components/MoneyInput/MoneyInput';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
+import { Modal } from '@/ui/components/Modal';
+import { formatMoney } from '../../_shared/utils/format';
 import {
   fetchAdminMenuItems,
   createMenuItem,
@@ -41,6 +43,13 @@ import {
   type MenuCategoryRow,
   type ModifierOptionRow,
 } from '../../_shared/api/adminApi';
+import {
+  fetchCategoryExtras,
+  createExtra as createExtraApi,
+  updateExtra as updateExtraApi,
+  deleteExtra as deleteExtraApi,
+  type Extra,
+} from '../../_shared/api/promosApi';
 
 interface MenuPanelProps {
   token: string;
@@ -68,6 +77,11 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
   const [itemForm, setItemForm] = useState<{
     open: boolean; id: string | null; categoryId: string; name: string; area: 'bar' | 'cocina';
   }>({ open: false, id: null, categoryId: '', name: '', area: 'cocina' });
+  // v15 (2026-08-29): extras por categoría — cargados bajo demanda + mini-form
+  const [extrasByCat, setExtrasByCat] = useState<Record<string, Extra[]>>({});
+  const [extraForm, setExtraForm] = useState<{ open: boolean; categoryId: string; name: string; price: number }>({
+    open: false, categoryId: '', name: '', price: 0,
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -86,6 +100,41 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
+
+  // ── v15: extras por categoría ──────────────────────────────────────────
+  const loadExtras = useCallback(async (categoryId: string) => {
+    const r = await fetchCategoryExtras(token, categoryId);
+    if (r.ok) setExtrasByCat(prev => ({ ...prev, [categoryId]: r.data?.extras ?? [] }));
+  }, [token]);
+
+  const handleSaveExtra = useCallback(async () => {
+    if (!extraForm.categoryId || !extraForm.name.trim()) { onToast('warning', 'Pon el nombre del extra'); return; }
+    const r = await createExtraApi(token, extraForm.categoryId, { name: extraForm.name.trim(), price: extraForm.price });
+    if (r.ok) {
+      onToast('success', 'Extra agregado');
+      setExtraForm({ open: false, categoryId: '', name: '', price: 0 });
+      loadExtras(extraForm.categoryId);
+    } else onToast('error', r.error || 'Error al crear extra');
+  }, [token, extraForm, onToast, loadExtras]);
+
+  const handleToggleExtra = useCallback(async (catId: string, extra: Extra) => {
+    const r = await updateExtraApi(token, extra.id, { ...extra, active: extra.active === 1 ? 0 : 1 });
+    if (r.ok) loadExtras(catId);
+    else onToast('error', r.error || 'Error');
+  }, [token, loadExtras, onToast]);
+
+  const handleDeleteExtra = useCallback(async (catId: string, extra: Extra) => {
+    if (!window.confirm(`¿Eliminar el extra "${extra.name}"?`)) return;
+    const r = await deleteExtraApi(token, extra.id);
+    if (r.ok) loadExtras(catId);
+    else onToast('error', r.error || 'Error');
+  }, [token, loadExtras, onToast]);
+
+  // Cargar extras de todas las categorías al montar (subgrupo visible sin pulsar botón)
+  useEffect(() => {
+    if (categories.length === 0) return;
+    for (const c of categories) void loadExtras(c.id);
+  }, [categories.length]);
 
   // Mapa: item_id → opción "Familiar" (pizzas con tamaño)
   const familiarByItem = useMemo(() => {
@@ -369,6 +418,11 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
                   <Button variant="secondary" size="sm" onClick={() => setItemForm({ open: true, id: null, categoryId: cat?.id ?? '', name: '', area: 'cocina' })}>
                     <AppIcon name="plus" size="sm" /> Agregar item
                   </Button>
+                  {cat && (
+                    <Button variant="secondary" size="sm" onClick={() => { setExtraForm({ open: true, categoryId: cat.id, name: '', price: 0 }); loadExtras(cat.id); }}>
+                      <AppIcon name="plus" size="sm" /> Agregar extra
+                    </Button>
+                  )}
                 </div>
               </div>
               <div className="admin-bulk-grid">
@@ -431,9 +485,53 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
                   );
                 })}
               </div>
+
+              {/* v15: subgrupo de EXTRAS de la categoría (debajo, separado) */}
+              {cat && (extrasByCat[cat.id] || []).length > 0 && (
+                <div className="admin-menu-extras">
+                  <div className="admin-menu-extras__divider" />
+                  <div className="admin-menu-extras__header">
+                    <span className="admin-menu-extras__title">Extras del grupo</span>
+                    <Badge variant="info">{(extrasByCat[cat.id] || []).length}</Badge>
+                  </div>
+                  <div className="admin-menu-extras__list">
+                    {(extrasByCat[cat.id] || []).map(extra => (
+                      <div key={extra.id} className={`admin-menu-extra ${extra.active === 1 ? '' : 'admin-menu-row--inactive'}`}>
+                        <span className="admin-menu-extra__name">{extra.name}</span>
+                        <span className="admin-menu-extra__price">+{formatMoney(extra.price)}</span>
+                        <div className="admin-menu-extra__actions">
+                          <Button variant="ghost" size="sm" onClick={() => handleToggleExtra(cat.id, extra)} title={extra.active === 1 ? 'Desactivar' : 'Activar'}>
+                            <AppIcon name="check" size="sm" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteExtra(cat.id, extra)} title="Eliminar">
+                            <AppIcon name="trash" size="sm" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </Card>
           );
         })
+      )}
+
+      {/* v15: mini-modal para agregar extra a la categoría */}
+      {extraForm.open && (
+        <Modal open={extraForm.open} onClose={() => setExtraForm({ open: false, categoryId: '', name: '', price: 0 })} title="Agregar extra al grupo">
+          <div className="admin-extra-form">
+            <FormField label="Nombre del extra" value={extraForm.name} onChange={e => setExtraForm(prev => ({ ...prev, name: e.target.value }))} placeholder="Ej: Extra queso" />
+            <label className="form-field">
+              <span className="form-field__label">Precio (Bs)</span>
+              <MoneyInput value={extraForm.price} onChange={cents => setExtraForm(prev => ({ ...prev, price: cents }))} variant="lg" placeholder="0,00" />
+            </label>
+            <div className="admin-promo-actions">
+              <Button variant="ghost" size="sm" onClick={() => setExtraForm({ open: false, categoryId: '', name: '', price: 0 })}>Cancelar</Button>
+              <Button variant="primary" size="sm" onClick={handleSaveExtra}>Agregar extra</Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

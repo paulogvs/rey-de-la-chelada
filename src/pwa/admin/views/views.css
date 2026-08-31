@@ -631,7 +631,17 @@
 .admin-promo-line { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
 .admin-promo-line button { background: none; border: none; color: var(--text-muted); cursor: pointer; }
 .admin-promo-picker { display: flex; gap: 8px; flex-wrap: wrap; }
-.admin-promo-picker select { flex: 1; min-width: 180px; }
+.admin-promo-picker select {
+  flex: 1; min-width: 180px; appearance: none;
+  background: var(--surface); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 38px 12px 14px;
+  font-size: 14px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23c9a227' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center;
+}
+.admin-promo-picker select:hover { border-color: var(--dorado-rey); }
+.admin-promo-picker select:focus { outline: none; border-color: var(--dorado-rey); box-shadow: var(--focus-ring); }
 .admin-promo-schedule { display: flex; flex-direction: column; gap: 10px; }
 .admin-promo-dows { display: flex; gap: 6px; flex-wrap: wrap; }
 .admin-promo-dow { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); cursor: pointer; font-size: 13px; }
@@ -641,3 +651,18 @@
 .admin-extras-group { margin-bottom: 16px; }
 .admin-extras-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
 .admin-extras-create { display: grid; grid-template-columns: 1fr 160px auto; gap: 12px; align-items: end; border-top: 1px solid var(--border); padding-top: 16px; }
+
+/* ============ Extras en Menú (v15 2026-08-29) ============ */
+.admin-menu-extras { margin-top: 14px; }
+.admin-menu-extras__divider { border-top: 2px dashed var(--border); margin-bottom: 10px; }
+.admin-menu-extras__header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--dorado-rey); font-weight: 600; font-size: 13px; }
+.admin-menu-extras__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.admin-menu-extra {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border: 1px dashed var(--border);
+  border-radius: 8px; background: rgba(201,162,39,0.04);
+}
+.admin-menu-extra__name { flex: 1; }
+.admin-menu-extra__price { color: var(--dorado-rey); font-weight: 600; font-size: 13px; }
+.admin-menu-extra__actions { display: flex; gap: 4px; }
+.admin-extra-form { display: flex; flex-direction: column; gap: 14px; }
