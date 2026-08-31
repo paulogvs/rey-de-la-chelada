@@ -381,6 +381,26 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
           })),
         })));
       }
+      // v15: extras del GRUPO — se añaden como un modifier_group "Extras"
+      // (multi-select) para que el mesero los marque junto a los modificadores.
+      const extras = detail.category_extras;
+      if (Array.isArray(extras) && extras.length > 0) {
+        setDetailGroups(prev => [
+          ...prev,
+          {
+            id: `group-extras-${item.id}`,
+            name: 'Extras',
+            type: 'multi',
+            required: false,
+            options: extras.map(e => ({
+              option_id: e.extra_id,
+              option_name: e.extra_name,
+              option_price: e.extra_price,
+              option_default: 0,
+            })),
+          },
+        ]);
+      }
     } catch (err) {
       console.error('[OrderPanel] modifiers error:', err);
     }

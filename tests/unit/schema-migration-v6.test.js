@@ -57,7 +57,7 @@ function seedMiniWorld(db) {
 
 describe('MigraciÃ³n v6 â€” sin propina, solo cash|qr, received/change', () => {
   it('SCHEMA_VERSION ahora es 13 (motor financiero)', () => {
-    expect(SCHEMA_VERSION).toBe(14);
+    expect(SCHEMA_VERSION).toBe(15);
   });
 
   it('DB nueva: payments SIN columna tip, CON received/change y CHECK cash|qr', () => {
@@ -67,7 +67,7 @@ describe('MigraciÃ³n v6 â€” sin propina, solo cash|qr, received/change', 
     expect(hasColumn(db, 'payments', 'received')).toBe(true);
     expect(hasColumn(db, 'payments', 'change')).toBe(true);
     expect(hasColumn(db, 'payments', 'proof_photo')).toBe(true);
-    expect(currentVersion(db)).toBe(14);
+    expect(currentVersion(db)).toBe(15);
     // El CHECK solo acepta cash|qr
     const ddl = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='payments'").get().sql;
     expect(ddl).toMatch(/method\s+TEXT NOT NULL CHECK\(method IN \('cash','qr'\)\)/);
@@ -111,7 +111,7 @@ describe('MigraciÃ³n v6 â€” sin propina, solo cash|qr, received/change', 
     applySchema(db);
 
     expect(hasColumn(db, 'payments', 'tip')).toBe(false);
-    expect(currentVersion(db)).toBe(14);
+    expect(currentVersion(db)).toBe(15);
     // MÃ©todos consolidados â†’ qr; amount absorbe el tip (70+2=72)
     const qr = db.prepare('SELECT * FROM payments WHERE id = ?').get('legacy-qr');
     expect(qr.method).toBe('qr');
@@ -138,7 +138,7 @@ describe('MigraciÃ³n v6 â€” sin propina, solo cash|qr, received/change', 
     expect(p.method).toBe('cash');
     expect(p.received).toBe(5000);
     expect(p.change).toBe(1550);
-    expect(currentVersion(db)).toBe(14);
+    expect(currentVersion(db)).toBe(15);
     db.close();
   });
 
@@ -174,7 +174,7 @@ describe('MigraciÃ³n v6 â€” sin propina, solo cash|qr, received/change', 
     applySchema(db);
 
     expect(hasColumn(db, 'order_items', 'round')).toBe(true);
-    expect(currentVersion(db)).toBe(14);
+    expect(currentVersion(db)).toBe(15);
     // El item existente queda en ronda 1 (no destructivo)
     const item = db.prepare('SELECT * FROM order_items WHERE id = ?').get('it1');
     expect(item.round).toBe(1);
@@ -217,7 +217,7 @@ describe('MigraciÃ³n v6 â€” sin propina, solo cash|qr, received/change', 
     applySchema(db);
 
     expect(hasColumn(db, 'payments', 'proof_photo')).toBe(true);
-    expect(currentVersion(db)).toBe(14);
+    expect(currentVersion(db)).toBe(15);
     // El pago existente queda con proof_photo '' (no destructivo)
     const p = db.prepare('SELECT * FROM payments WHERE id = ?').get('p-v7');
     expect(p.proof_photo).toBe('');

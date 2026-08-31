@@ -184,7 +184,15 @@ router.get('/items/:id', (req, res) => {
       ORDER BY mg.sort_order, mo.sort_order
     `).all(item.id);
 
-    res.json({ success: true, item, modifiers });
+    // v15: extras del GRUPO (categoría) del item — aparecen como "Extras"
+    // en el detalle del item para que el mesero los marque.
+    const categoryExtras = db.prepare(`
+      SELECT id as extra_id, name as extra_name, price as extra_price
+      FROM category_extras WHERE category_id = ? AND active = 1
+      ORDER BY sort_order, name
+    `).all(item.category_id);
+
+    res.json({ success: true, item, modifiers, category_extras: categoryExtras });
   } catch (err) {
     console.error('[Menu] Item detail error:', err.message);
     res.status(500).json({ success: false, error: 'Error al obtener item', code: 'ITEM_DETAIL_ERROR' });

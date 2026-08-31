@@ -46,7 +46,7 @@
 //     - transactions   → nº de transacciones del día laboral
 //   El cierre viejo (v12) solo guardaba expected_cash (efectivo del día); los
 //   cierres históricos quedan con las nuevas columnas en 0 (no se pierde nada).
-const SCHEMA_VERSION = 14;
+const SCHEMA_VERSION = 15;
 
 const CREATE_TABLES = [
   // â”€â”€ Staff / Users (v5: 4 roles â€” admin, mesero, kds, caja) â”€â”€â”€â”€â”€
@@ -328,6 +328,61 @@ const CREATE_TABLES = [
     value      TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
+
+  // ── v15 (2026-08-29): EXTRAS por grupo + PROMOS data-driven (panel Admin) ──
+  // Los extras de un GRUPO del menú aplican a todos los items de ese grupo.
+  // El módulo KDS se hereda del grupo (pizzas→cocina, micheladas→bar).
+  `CREATE TABLE IF NOT EXISTS category_extras (
+    id          TEXT PRIMARY KEY,
+    category_id TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    price       INTEGER NOT NULL DEFAULT 0, -- centavos
+    active      INTEGER NOT NULL DEFAULT 1,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (category_id) REFERENCES menu_categories(id) ON DELETE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_category_extras_category ON category_extras(category_id)`,
+
+  // Promos: modelo único "set de líneas (items/grupos + extras) + precio total".
+  `CREATE TABLE IF NOT EXISTS promos (
+    id            TEXT PRIMARY KEY,
+    name          TEXT NOT NULL,
+    label         TEXT NOT NULL,
+    description   TEXT NOT NULL DEFAULT '',
+    price_total   INTEGER NOT NULL DEFAULT 0, -- centavos (precio que pone Admin)
+    max_per_order INTEGER NOT NULL DEFAULT 1,
+    active        INTEGER NOT NULL DEFAULT 1, -- toggle global
+    created_by    TEXT,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE TABLE IF NOT EXISTS promo_lines (
+    id          TEXT PRIMARY KEY,
+    promo_id    TEXT NOT NULL,
+    item_id     TEXT,            -- item específico O grupo (category_id) — uno de los dos
+    group_id    TEXT,
+    quantity    INTEGER NOT NULL DEFAULT 1,
+    extra_id    TEXT,            -- extra incluido (opcional)
+    extra_price INTEGER,         -- precio del extra DENTRO de la promo (0 = gratis)
+    FOREIGN KEY (promo_id) REFERENCES promos(id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id) REFERENCES menu_items(id) ON DELETE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES menu_categories(id) ON DELETE CASCADE,
+    FOREIGN KEY (extra_id) REFERENCES category_extras(id) ON DELETE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_promo_lines_promo ON promo_lines(promo_id)`,
+
+  // Programador de días: día de la semana y/o rango de fechas.
+  `CREATE TABLE IF NOT EXISTS promo_schedule (
+    id           TEXT PRIMARY KEY,
+    promo_id     TEXT NOT NULL,
+    day_of_week  INTEGER,        -- 0=domingo..6=sábado (NULL = todos)
+    start_date   TEXT,           -- 'YYYY-MM-DD' día laboral (NULL = sin inicio)
+    end_date     TEXT,           -- 'YYYY-MM-DD' día laboral (NULL = sin fin)
+    FOREIGN KEY (promo_id) REFERENCES promos(id) ON DELETE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_promo_schedule_promo ON promo_schedule(promo_id)`,
 ];
 
 /**

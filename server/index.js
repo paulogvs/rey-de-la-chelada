@@ -267,6 +267,8 @@ import clientSessionsRoutes from './routes/client-sessions.js';
 import promotionsRoutes from './routes/promotions.js'; // Sprint Promos 2026-08-19
 import settingsRoutes from './routes/settings.js';     // v14: configuración restaurante (Admin)
 import printRoutes from './routes/print.js';           // v14: impresión térmica server-side
+import promosAdminRoutes from './routes/promos-admin.js'; // v15: promos data-driven (Admin)
+import extrasAdminRoutes from './routes/extras-admin.js'; // v15: extras por grupo (Admin)
 
 // ── Route registration ────────────────────────────────────
 app.use('/api/auth', authLimiter, authRoutes);
@@ -286,6 +288,8 @@ app.use('/api/client-sessions', clientSessionsRoutes); // POST admin + GET valid
 app.use('/api/promotions', promotionsRoutes);          // PUBLIC — promos del día laboral
 app.use('/api/settings', settingsRoutes);              // Admin — configuración (NIT/impresora)
 app.use('/api/print', printRoutes);                    // Admin/Caja — impresión térmica
+app.use('/api/promotions', promosAdminRoutes);         // v15 — promos data-driven (admin) + públicas
+app.use('/api/extras', extrasAdminRoutes);             // v15 — extras por grupo (admin)
 
 // ============================================================
 // WebSocket — KDS Real-Time (delegated to broadcaster SSOT)

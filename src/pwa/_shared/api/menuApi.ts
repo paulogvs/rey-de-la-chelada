@@ -64,9 +64,16 @@ export interface ItemsResult extends ApiResult<{ items?: MenuItem[] }> {
   items: MenuItem[];
 }
 
-export interface ItemDetailResult extends ApiResult<{ item?: MenuItem; modifiers?: unknown[] }> {
+export interface CategoryExtra {
+  extra_id: string;
+  extra_name: string;
+  extra_price: number;
+}
+
+export interface ItemDetailResult extends ApiResult<{ item?: MenuItem; modifiers?: unknown[]; category_extras?: CategoryExtra[] }> {
   item: MenuItem | null;
   modifiers: ModifierGroup[];
+  category_extras: CategoryExtra[];
 }
 
 export interface CreateItemPayload {
@@ -115,10 +122,11 @@ export async function fetchMenuItemDetail(
     success: boolean;
     item?: MenuItem;
     modifiers?: Array<Record<string, unknown>>;
+    category_extras?: CategoryExtra[];
   }>(`/api/menu/items/${itemId}`, { fetchImpl });
 
   if (!result.ok || !result.data?.item) {
-    return { ...result, data: null, item: null, modifiers: [] } as ItemDetailResult;
+    return { ...result, data: null, item: null, modifiers: [], category_extras: [] } as ItemDetailResult;
   }
 
   // Group flat modifier rows by group
@@ -150,6 +158,7 @@ export async function fetchMenuItemDetail(
     ...result,
     item: result.data.item,
     modifiers: Array.from(groups.values()),
+    category_extras: result.data.category_extras ?? [],
   };
 }
 
