@@ -24,6 +24,15 @@ function resolveCartUnitPrice(
   return null;
 }
 
+/** v15 FASE 3: precio de línea con promo (SSOT espejo server | DB → promoUnitPrice). */
+function cartItemPromoUnitPrice(ci: CartItem, businessDay: string): number | null {
+  if (!ci.promoType) return null;
+  if (PROMOTIONS_BY_ID[ci.promoType]) {
+    return resolveCartPromoUnitPrice(ci as PromoCartItem, businessDay);
+  }
+  return ci.promoUnitPrice ?? null;
+}
+
 export interface CartModalProps {
   open: boolean;
   onClose: () => void;
@@ -93,10 +102,12 @@ export function CartModal({
               cart.map((ci, index) => {
               const modAdj = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
               const unit = ci.promoType
-                ? (resolveCartPromoUnitPrice(ci as PromoCartItem, businessDay) ?? 0)
+                ? (cartItemPromoUnitPrice(ci, businessDay) ?? 0)
                 : (resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdj) ?? 0);
               const lineTotal = unit * ci.quantity;
-              const promoLabel = ci.promoType ? PROMOTIONS_BY_ID[ci.promoType]?.label : null;
+              const promoLabel = ci.promoType
+                ? (PROMOTIONS_BY_ID[ci.promoType]?.label ?? activePromos.find(p => p.id === ci.promoType)?.label ?? null)
+                : null;
               return (
                 <Card key={index} padded={false} className="order-panel__cart-item cart-modal__item">
                   <div className="order-panel__cart-item-line">

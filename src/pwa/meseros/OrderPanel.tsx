@@ -35,10 +35,11 @@ import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
 import { computeTotals } from '@/core/config/iva';
 import { summarizeOrderReview } from './orderReview';
-import { businessDayDateStr } from '@/core/config/local-date';
-import { activePromotionsForDay, PROMOTIONS_BY_ID, businessDayName } from '@/core/config/promotions.js';
-import { canApplyPromo, applyPromoToCart, clearPromoFromCart, resolveCartPromoUnitPrice, cartSavings, type PromoCartItem } from './promoCart';
+import { PROMOTIONS_BY_ID } from '@/core/config/promotions.js';
+import { canApplyPromo, applyPromoToCart, resolveCartPromoUnitPrice, cartSavings, type PromoCartItem } from './promoCart';
+import { matchesPromoLine, dbPromoUnitPrice } from './promosData';
 import { useKDSWebSocket } from '../_shared/hooks/useKDSWebSocket';
+import { useActivePromos, type ActivePromo } from '../_shared/hooks/useActivePromos';
 
 /** Badge de estado del pedido (S2-B) */
 const ORDER_STATUS_BADGE: Record<string, { variant: 'pending' | 'preparing' | 'ready' | 'paid' | 'cancelled' | 'info'; label: string }> = {
@@ -95,8 +96,12 @@ export interface CartItem {
   /** Sprint 1 (E): aplicar promo manual */
   applyPromo?: boolean;
   /** Sprint Promos (2026-08-19): promo por día laboral aplicada a la línea
-   *  ('2x1' | 'barra' | 'combo' | 'primera-visita'). El server la re-valida. */
+   *  ('2x1' | 'barra' | 'combo' | 'primera-visita'). El server la re-valida.
+   *  v15 FASE 3: también puede ser el id (UUID) de una promo data-driven
+   *  creada en el panel Admin (promoUnitPrice = precio de display). */
   promoType?: string;
+  /** v15 FASE 3: precio unitario de display para promos data-driven (DB). */
+  promoUnitPrice?: number;
 }
 
 /**
@@ -115,6 +120,28 @@ function resolveCartUnitPrice(
   if (manualPrice != null && manualPrice > 0) return manualPrice + modAdjustment;
   if (modAdjustment > 0) return modAdjustment;
   return null;
+}
+
+/**
+ * v15 FASE 3: precio unitario de una línea del carrito con promo.
+ *   - promo SSOT → espejo del server (promoCart.resolveCartPromoUnitPrice)
+ *   - promo data-driven (DB) → promoUnitPrice guardado al aplicar (reparto
+ *     proporcional del price_total, MISMA regla que el server)
+ */
+function cartItemPromoUnitPrice(ci: CartItem, businessDay: string): number | null {
+  if (!ci.promoType) return null;
+  if (PROMOTIONS_BY_ID[ci.promoType]) {
+    return resolveCartPromoUnitPrice(ci as PromoCartItem, businessDay);
+  }
+  return ci.promoUnitPrice ?? null;
+}
+
+/** Label de la promo para el badge del carrito (SSOT o data-driven). */
+function cartPromoLabel(ci: CartItem, activePromos: ActivePromo[]): string | null {
+  if (!ci.promoType) return null;
+  return PROMOTIONS_BY_ID[ci.promoType]?.label
+    ?? activePromos.find(p => p.id === ci.promoType)?.label
+    ?? null;
 }
 
 interface DetailModifier {
@@ -165,25 +192,56 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
   // FASE 4A: modo edición del pedido activo (agregar items → nueva ronda)
   const [editMode, setEditMode] = useState(false);
 
-  // ── Sprint Promos (2026-08-19): día laboral + promos activas ──
-  const businessDay = useMemo(() => businessDayDateStr(), []);
-  const activePromos = useMemo(() => activePromotionsForDay(businessDay), [businessDay]);
-  const businessDayNameLabel = businessDayName(businessDay);
+  // ── Sprint Promos (2026-08-19) + FASE 3 (v15): día laboral + promos
+  //    activas del panel (data-driven) fusionadas con el SSOT. El hook
+  //    carga GET /api/promotions (fallback al SSOT si la API falla) y
+  //    expone reload() para refetchear al recibir menu_changed.
+  const { promos: activePromos, businessDay, businessDayNameLabel, reload: reloadPromos } = useActivePromos();
 
   /** Aplica una promo al carrito (botones del panel "Promos de hoy") */
   const handleApplyPromo = useCallback((promoId: string) => {
-    const check = canApplyPromo(cart, promoId, businessDay);
-    if (!check.ok) {
-      addToast({ type: 'warning', message: check.reason || 'No se puede aplicar esta promo', duration: 3500 });
+    // Promos fijas del SSOT → flujo histórico (promoCart espejo del server)
+    const ssotPromo = PROMOTIONS_BY_ID[promoId];
+    if (ssotPromo) {
+      const check = canApplyPromo(cart, promoId, businessDay);
+      if (!check.ok) {
+        addToast({ type: 'warning', message: check.reason || 'No se puede aplicar esta promo', duration: 3500 });
+        return;
+      }
+      setCart(prev => applyPromoToCart(prev, promoId, businessDay));
+      addToast({ type: 'success', message: `Promo aplicada: ${ssotPromo.label || promoId}`, duration: 2500 });
       return;
     }
-    setCart(prev => applyPromoToCart(prev, promoId, businessDay));
-    addToast({ type: 'success', message: `Promo aplicada: ${PROMOTIONS_BY_ID[promoId]?.label || promoId}`, duration: 2500 });
-  }, [cart, businessDay, addToast]);
 
-  /** Quita una promo del carrito */
+    // v15 FASE 3: promo data-driven del panel (id = UUID de la tabla promos).
+    // Marca la PRIMERA línea del carrito que matchee una línea de la promo
+    // (item_id directo o group_id = categoría) con promoType = promo.id y
+    // promoUnitPrice = reparto proporcional (display). El server re-valida
+    // contra la DB al facturar (order-pricing.js).
+    const dbPromo = activePromos.find(p => p.id === promoId);
+    if (!dbPromo || !dbPromo.lines || dbPromo.lines.length === 0) {
+      addToast({ type: 'warning', message: 'Esta promo no está disponible', duration: 3500 });
+      return;
+    }
+    const targetIdx = cart.findIndex(ci =>
+      !ci.promoType && dbPromo.lines!.some(line => matchesPromoLine(ci.menuItem, line))
+    );
+    if (targetIdx === -1) {
+      addToast({ type: 'warning', message: `Agrega ${dbPromo.label} al carrito para aplicar la promo`, duration: 3500 });
+      return;
+    }
+    const unit = dbPromoUnitPrice(dbPromo, cart[targetIdx].menuItem);
+    setCart(prev => prev.map((ci, i) =>
+      i === targetIdx ? { ...ci, promoType: promoId, promoUnitPrice: unit ?? undefined } : ci
+    ));
+    addToast({ type: 'success', message: `Promo aplicada: ${dbPromo.label}`, duration: 2500 });
+  }, [cart, businessDay, activePromos, addToast]);
+
+  /** Quita una promo del carrito (también limpia el precio de display DB) */
   const handleClearPromo = useCallback((promoId: string) => {
-    setCart(prev => clearPromoFromCart(prev, promoId));
+    setCart(prev => prev.map(ci =>
+      ci.promoType === promoId ? { ...ci, promoType: undefined, promoUnitPrice: undefined } : ci
+    ));
   }, []);
 
   /** Preview de ahorro del carrito (promos ya marcadas) */
@@ -333,12 +391,15 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
     return () => { disposed = true; };
   }, [loadMenu]);
 
-  // v14: refrescar el menú en vivo cuando Admin lo edita (evento menu_changed)
+  // v14: refrescar el menú en vivo cuando Admin lo edita (evento menu_changed).
+  // v15 FASE 3: también refetchea las promos activas (el panel Admin las
+  // edita con el mismo broadcast, ahora con debounce de 1s).
   useKDSWebSocket({
     module: 'meseros',
     enabled: !!token,
     onMenuChanged: () => {
       void loadMenu();
+      void reloadPromos();
     },
   });
 
@@ -416,10 +477,11 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
   }, []);
 
 // Cart totals (Sprint 1 B/E: promo/manual resueltos como el server;
-// Sprint Promos: líneas con promoType se resuelven con la config SSOT)
+// Sprint Promos: líneas con promoType se resuelven con la config SSOT;
+// v15 FASE 3: promos data-driven usan promoUnitPrice del carrito)
 const cartTotal = cart.reduce((sum, ci) => {
   if (ci.promoType) {
-    const unit = resolveCartPromoUnitPrice(ci as PromoCartItem, businessDay);
+    const unit = cartItemPromoUnitPrice(ci, businessDay);
     return sum + (unit ?? 0) * ci.quantity;
   }
   const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
@@ -430,7 +492,7 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
   if (ci.promoType) {
     return {
       quantity: ci.quantity,
-      unitPrice: resolveCartPromoUnitPrice(ci as PromoCartItem, businessDay) ?? 0,
+      unitPrice: cartItemPromoUnitPrice(ci, businessDay) ?? 0,
     };
   }
   const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
@@ -885,10 +947,10 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
           {cart.map((ci, index) => {
             const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
             const unit = ci.promoType
-              ? (resolveCartPromoUnitPrice(ci as PromoCartItem, businessDay) ?? 0)
+              ? (cartItemPromoUnitPrice(ci, businessDay) ?? 0)
               : (resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdjustment) ?? 0);
             const lineTotal = unit * ci.quantity;
-            const promoLabel = ci.promoType ? PROMOTIONS_BY_ID[ci.promoType]?.label : null;
+            const promoLabel = cartPromoLabel(ci, activePromos);
 
             return (
               <Card key={index} padded={false} className="order-panel__cart-item">

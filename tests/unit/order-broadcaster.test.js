@@ -22,7 +22,7 @@ vi.mock('../../server/services/websocket-broadcaster.js', () => ({
     broadcastToModule: (...args) => broadcastToModuleMock(...args),
   },
   buildKDSEvent: (type, fields) => ({ type, timestamp: '2026-08-01T00:00:00.000Z', ...fields }),
-  KDSEventType: { NEW_ORDER: 'new_order', STATUS_CHANGE: 'status_change', ITEM_READY: 'item_ready', ORDER_COMPLETE: 'order_complete', MODULE_READY: 'module_ready' },
+  KDSEventType: { NEW_ORDER: 'new_order', STATUS_CHANGE: 'status_change', ITEM_READY: 'item_ready', ORDER_COMPLETE: 'order_complete', MODULE_READY: 'module_ready', MENU_CHANGED: 'menu_changed' },
 }));
 
 describe('Order Broadcaster — broadcastOrderCreated', () => {

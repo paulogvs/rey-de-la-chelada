@@ -24,7 +24,8 @@ import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { computeTotals, round2 } from '../../src/core/config/iva.js';
-import { resolveModifierAdjustment, resolveItemUnitPrice } from '../services/order-pricing.js';
+import { resolveModifierAdjustment, resolveItemUnitPrice, resolvePromoUnitPrice } from '../services/order-pricing.js';
+import { businessDayDateStr } from '../utils/date-utils.js';
 import { recordPayment } from '../services/financial/payment-service.js';
 
 const router = Router();
@@ -247,11 +248,13 @@ router.post('/push', requireAuth, (req, res) => {
             if (!Number.isFinite(quantity) || quantity < 1) {
               throw new Error(`Cantidad inválida: ${item.quantity}`);
             }
-            const pricing = resolveItemUnitPrice(db, menuItem, {
-              manualPrice: item.manual_price,
-              applyPromo: item.apply_promo === true,
-              modifiers: item.modifiers,
-            });
+            const pricing = item.promo_type
+              ? resolvePromoUnitPrice(db, menuItem, item.promo_type, { businessDay: businessDayDateStr() })
+              : resolveItemUnitPrice(db, menuItem, {
+                  manualPrice: item.manual_price,
+                  applyPromo: item.apply_promo === true,
+                  modifiers: item.modifiers,
+                });
             if (pricing.error) {
               const err = new Error(`${pricing.error.message} (${menuItem.name})`);
               err.code = pricing.error.code;
@@ -272,6 +275,7 @@ router.post('/push', requireAuth, (req, res) => {
               status: ITEM_STATUS_MAP[item.status] || 'pending',
               preparation_notes: item.preparation_notes || item.notes || '',
               promo_label: pricing.promoLabel,
+              promo_type: item.promo_type || null,
             });
           }
 
@@ -306,14 +310,14 @@ router.post('/push', requireAuth, (req, res) => {
           if (orderItems.length > 0) {
             const insertItem = db.prepare(`
               INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
-                                       unit_price, modifiers_json, subtotal, status, preparation_notes, promo_label)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                       unit_price, modifiers_json, subtotal, status, preparation_notes, promo_label, promo_type)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
             for (const oi of orderItems) {
               insertItem.run(
                 oi.id, orderId, oi.menu_item_id, oi.menu_item_name, oi.quantity,
                 oi.unit_price, oi.modifiers_json, oi.subtotal, oi.status, oi.preparation_notes,
-                oi.promo_label
+                oi.promo_label, oi.promo_type
               );
             }
           }

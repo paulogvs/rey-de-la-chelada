@@ -368,6 +368,7 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
         promo_label: pricing.promoLabel,
         promo_type: item.promo_type || null,
         promo_category: categoryNameOf(db, menuItem),
+        menu_item_category_id: menuItem.category_id, // v15 FASE 3: contexto promos DB
         modifiers_json: summary.length > 0 ? JSON.stringify(summary) : null,
         preparation_notes: item.notes || '',
         status: 'pending',
@@ -380,7 +381,13 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
     const promoTypes = [...new Set(orderItems.map(oi => oi.promo_type).filter(Boolean))];
     for (const promoType of promoTypes) {
       const ctx = validatePromoContext(
-        orderItems.map(oi => ({ categoryName: oi.promo_category, promoType: oi.promo_type, quantity: oi.quantity })),
+        orderItems.map(oi => ({
+          categoryName: oi.promo_category,
+          promoType: oi.promo_type,
+          quantity: oi.quantity,
+          itemId: oi.menu_item_id,
+          categoryId: oi.menu_item_category_id,
+        })),
         promoType,
         promoBusinessDay(req.body)
       );
@@ -603,7 +610,8 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
           // primera visita, par combo) contra el estado REAL post-cambios.
           // Si falla → throw → rollback de la transacción completa.
           const promoLines = db.prepare(`
-            SELECT oi.promo_type, oi.quantity, mc.name as categoryName
+            SELECT oi.promo_type, oi.quantity, mc.name as categoryName,
+                   oi.menu_item_id as itemId, mi.category_id as categoryId
             FROM order_items oi
             LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
             LEFT JOIN menu_categories mc ON mi.category_id = mc.id
@@ -612,7 +620,7 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
           const promoTypes = [...new Set(promoLines.map(l => l.promo_type).filter(Boolean))];
           for (const promoType of promoTypes) {
             const ctx = validatePromoContext(
-              promoLines.map(l => ({ categoryName: l.categoryName, promoType: l.promo_type, quantity: l.quantity })),
+              promoLines.map(l => ({ categoryName: l.categoryName, promoType: l.promo_type, quantity: l.quantity, itemId: l.itemId, categoryId: l.categoryId })),
               promoType,
               promoBusinessDay(req.body)
             );
@@ -883,15 +891,19 @@ router.post('/:id/items', requireAuth, requireRole('admin', 'mesero'), (req, res
     // par combo) contra el estado REAL del pedido + el item nuevo.
     if (promoType) {
       const promoLines = db.prepare(`
-        SELECT oi.promo_type, oi.quantity, mc.name as categoryName
+        SELECT oi.promo_type, oi.quantity, mc.name as categoryName,
+               oi.menu_item_id as itemId, mi.category_id as categoryId
         FROM order_items oi
         LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
         LEFT JOIN menu_categories mc ON mi.category_id = mc.id
         WHERE oi.order_id = ?
       `).all(req.params.id);
-      promoLines.push({ promo_type: promoType, quantity: qty, categoryName: pricing.promoCategory });
+      promoLines.push({
+        promo_type: promoType, quantity: qty, categoryName: pricing.promoCategory,
+        itemId: menuItem.id, categoryId: menuItem.category_id,
+      });
       const ctx = validatePromoContext(
-        promoLines.map(l => ({ categoryName: l.categoryName, promoType: l.promo_type, quantity: l.quantity })),
+        promoLines.map(l => ({ categoryName: l.categoryName, promoType: l.promo_type, quantity: l.quantity, itemId: l.itemId, categoryId: l.categoryId })),
         promoType,
         businessDay
       );

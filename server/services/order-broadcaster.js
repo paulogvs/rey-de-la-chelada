@@ -141,10 +141,38 @@ export function broadcastModuleReady(order, module) {
  * Emit a `menu_changed` event to ALL staff modules (meseros, cocina, bar,
  * caja) so they refetch the menu in real time when Admin edits it.
  * v14 (2026-08-29): sin orderId — es un evento global de catálogo.
+ *
+ * v15 FASE 3 (2026-08-31): DEBOUNCE ~1000ms. Si el dueño activa/desactiva
+ * varios toggles de promos/extras rápido, cada mutador llamaba esta función
+ * y los PWAs refetcheaban N veces. Ahora los cambios se acumulan y se emite
+ * UN solo evento tras 1000ms de inactividad (el timer se reinicia en cada
+ * llamada). La firma exportada no cambia.
  */
-export function broadcastMenuChanged() {
+const MENU_CHANGED_DEBOUNCE_MS = 1000;
+let menuChangedTimer = null;
+
+function emitMenuChangedNow() {
   broadcaster.broadcastToModules(['meseros', 'cocina', 'bar', 'caja'], {
     type: KDSEventType.MENU_CHANGED,
     timestamp: new Date().toISOString(),
   });
+}
+
+export function broadcastMenuChanged() {
+  if (menuChangedTimer) clearTimeout(menuChangedTimer);
+  menuChangedTimer = setTimeout(() => {
+    menuChangedTimer = null;
+    emitMenuChangedNow();
+  }, MENU_CHANGED_DEBOUNCE_MS);
+}
+
+/**
+ * Flush inmediato del debounce (tests / cierre de sesión): emite YA el
+ * evento si hay un cambio pendiente; si no hay nada pendiente, no-op.
+ */
+export function flushMenuChanged() {
+  if (!menuChangedTimer) return;
+  clearTimeout(menuChangedTimer);
+  menuChangedTimer = null;
+  emitMenuChangedNow();
 }

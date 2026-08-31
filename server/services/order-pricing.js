@@ -26,6 +26,7 @@ import {
   SIGNATURE_CATEGORY,
   ARTESANAL_CATEGORY,
 } from '../../src/core/config/promotions.js';
+import { activePromosForBusinessDay } from './promos-service.js'; // v15 FASE 3: promos data-driven (DB)
 
 /**
  * Resolve modifier adjustments for an order item from the DB.
@@ -180,25 +181,81 @@ export function categoryNameOf(db, menuItem) {
 }
 
 /**
+ * ── Promos data-driven (DB) — v15 FASE 3 (2026-08-31) ────────────────────
+ *
+ * Las promos creadas en el panel Admin (tabla promos) llegan como
+ * promo_type = promo.id (UUID). El SSOT (promotions.js) no las conoce, así
+ * que el server las resuelve desde promos-service:
+ *   - deben estar ACTIVAS en el businessDay (activePromosForBusinessDay)
+ *   - el menu_item debe matchear una línea de la promo (item_id directo o
+ *     group_id = categoría del item)
+ *   - precio: reparto proporcional del price_total entre TODAS las unidades
+ *     del pack (unitPrice = price_total / totalUnits) — el pack completo
+ *     siempre suma price_total (2x1, combos, packs).
+ */
+
+function dbPromoForItem(promoType, businessDay, menuItem) {
+  if (!businessDay || !promoType) return null;
+  let active;
+  try {
+    active = activePromosForBusinessDay(businessDay);
+  } catch {
+    return null; // DB sin schema v15 → no hay promos data-driven
+  }
+  const promo = (active || []).find(p => p.id === promoType);
+  if (!promo) return null;
+  const line = (promo.lines || []).find(l =>
+    (l.item_id && l.item_id === menuItem.id) ||
+    (l.group_id && l.group_id === menuItem.category_id)
+  );
+  return { promo, line }; // line puede ser undefined (item no elegible)
+}
+
+/**
  * Resuelve el unit_price de una línea con PROMO (Sprint Promos 2026-08-19).
  *
  * Contrato (aprobado con el dueño):
  *   - La línea con `promo_type` se factura con el precio de la promo
  *     (2x1 → 0, Miércoles de Barra → 12, Primera Visita → 25,
  *     Combo → 30 Signature / 15 Cerveza). NUNCA acepta precios del cliente.
+ *   - v15 FASE 3: promo_type también puede ser el id de una promo
+ *     data-driven de la DB (panel Admin) — se valida activa en el día +
+ *     líneas presentes (item_id/group_id) y se reparte el price_total.
  *   - Valida: tipo conocido → día laboral activo → categoría elegible.
  *   - Las reglas de CONTEXTO (par 2x1, una vez primera visita, par combo)
  *     las valida validatePromoContext() en el route (necesitan el pedido).
  *
  * @param {object} db — better-sqlite3
  * @param {object} menuItem — { id, category_id }
- * @param {string} promoType — '2x1' | 'barra' | 'combo' | 'primera-visita'
+ * @param {string} promoType — '2x1' | 'barra' | 'combo' | 'primera-visita' | <promo-id DB>
  * @param {{ businessDay?: string }} opts — 'YYYY-MM-DD' del día laboral
  * @returns {{ unitPrice: number|null, promoLabel: string|null, error: { code: string, message: string }|null }}
  */
 export function resolvePromoUnitPrice(db, menuItem, promoType, { businessDay } = {}) {
   const promo = promoById(promoType);
   if (!promo) {
+    // v15 FASE 3: ¿promo data-driven de la DB?
+    const dbMatch = dbPromoForItem(promoType, businessDay, menuItem);
+    if (dbMatch) {
+      if (!dbMatch.line) {
+        return {
+          unitPrice: null,
+          promoLabel: null,
+          error: {
+            code: 'PROMO_ITEM_NOT_ELIGIBLE',
+            message: `${dbMatch.promo.label || dbMatch.promo.name} no aplica a este item`,
+          },
+        };
+      }
+      const totalUnits = Math.max(1, dbMatch.promo.lines.reduce((s, l) => s + (l.quantity || 1), 0));
+      const unitPrice = round2((dbMatch.promo.price_total || 0) / totalUnits);
+      return {
+        unitPrice,
+        promoLabel: dbMatch.promo.label || dbMatch.promo.name,
+        promoCategory: categoryNameOf(db, menuItem),
+        error: null,
+      };
+    }
     return { unitPrice: null, promoLabel: null, error: { code: 'INVALID_PROMO_TYPE', message: `Tipo de promo inválido: ${promoType}` } };
   }
   if (promo.promoType === 'MODIFIER') {
@@ -222,26 +279,83 @@ export function resolvePromoUnitPrice(db, menuItem, promoType, { businessDay } =
 }
 
 /**
+ * Reglas de contexto para promos data-driven (DB, v15 FASE 3).
+ * allLines puede incluir `itemId`/`categoryId` (los routes los enriquecen)
+ * para validar que las líneas del pack estén presentes en el pedido.
+ */
+function validateDbPromoContext(allLines, promoType, businessDay) {
+  if (!businessDay) return { valid: true };
+  let active;
+  try {
+    active = activePromosForBusinessDay(businessDay);
+  } catch {
+    return { valid: true }; // DB sin schema v15 → el route ya lo rechazó
+  }
+  const promo = (active || []).find(p => p.id === promoType);
+  if (!promo) return { valid: true }; // promo no activa hoy → el route la rechazó
+
+  const lines = (Array.isArray(allLines) ? allLines : []).filter(l => l && l.promoType === promoType);
+  if (lines.length === 0) return { valid: true };
+
+  const totalUnits = Math.max(1, (promo.lines || []).reduce((s, l) => s + (l.quantity || 1), 0));
+  const promoUnits = lines.reduce((s, l) => s + (l.quantity || 1), 0);
+
+  // 1) max_per_order: packs completos de la promo por pedido
+  const maxPacks = promo.max_per_order || 1;
+  if (promoUnits / totalUnits > maxPacks + 0.0001) {
+    return {
+      valid: false,
+      code: 'PROMO_CONTEXT_VIOLATION',
+      message: `${promo.label || promo.name} se aplica hasta ${maxPacks} vez/veces por pedido`,
+    };
+  }
+
+  // 2) líneas del pack presentes en el pedido (item_id directo o group_id
+  //    = categoría del item). Sin itemId/categoryId en las líneas (rutas
+  //    legacy) esta validación se omite — max_per_order ya protege.
+  for (const line of promo.lines || []) {
+    const need = line.quantity || 1;
+    const have = (Array.isArray(allLines) ? allLines : []).reduce((s, l) => {
+      if (!l) return s;
+      const matches = (line.item_id && l.itemId === line.item_id) ||
+                      (line.group_id && l.categoryId === line.group_id);
+      return matches ? s + (l.quantity || 1) : s;
+    }, 0);
+    if (have < need) {
+      return {
+        valid: false,
+        code: 'PROMO_CONTEXT_VIOLATION',
+        message: `${promo.label || promo.name} requiere ${need} unidad(es) de cada producto del pack`,
+      };
+    }
+  }
+  return { valid: true };
+}
+
+/**
  * Valida las reglas de CONTEXTO de una promo contra TODAS las líneas del
  * pedido (existentes + nuevas). Se llama UNA vez por tipo de promo en el
  * route, después de pre-validar cada línea con resolvePromoUnitPrice.
  *
  * Líneas: [{ categoryName, promoType, quantity }] (sin importar db).
+ * v15 FASE 3: `itemId`/`categoryId` opcionales para promos data-driven.
  *
  * Reglas (SSOT):
  *   - BOGO (2x1): unidades gratis ≤ unidades pagadas de la categoría.
  *   - PRICE_OVERRIDE con oncePerOrder (Primera Visita): máx 1 unidad.
  *   - COMBO: pares Signature/Cerveza balanceados (misma cantidad, ≥1).
+ *   - Promos DB: max_per_order (packs) + líneas del pack presentes.
  *
- * @param {Array<{categoryName?: string|null, promoType?: string|null, quantity?: number}>} allLines
+ * @param {Array<{categoryName?: string|null, promoType?: string|null, quantity?: number, itemId?: string|null, categoryId?: string|null}>} allLines
  * @param {string} promoType
  * @param {string} businessDay — 'YYYY-MM-DD' del día laboral
  * @returns {{ valid: boolean, code?: string, message?: string }}
  */
 export function validatePromoContext(allLines, promoType, businessDay) {
   const promo = promoById(promoType);
-  // Tipo desconocido o sin reglas de contexto → el route ya lo rechazó/no aplica.
-  if (!promo) return { valid: true };
+  // Tipo desconocido: si es una promo de la DB, validar contexto DB;
+  // si no existe ni SSOT ni DB, el route ya lo rechazó (no opina).
+  if (!promo) return validateDbPromoContext(allLines, promoType, businessDay);
   const lines = (Array.isArray(allLines) ? allLines : []).filter(l => l && l.promoType === promoType);
   if (lines.length === 0) return { valid: true };
   // Si la promo no está activa hoy, el route lo rechaza antes (resolvePromoUnitPrice).

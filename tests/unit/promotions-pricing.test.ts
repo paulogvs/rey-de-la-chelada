@@ -9,8 +9,15 @@
  *     reglas de contexto (par 2x1, una vez primera visita, par combo).
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { resolvePromoUnitPrice, validatePromoContext } from '../../server/services/order-pricing.js';
+
+// Aísla la rama data-driven (DB): estos tests cubren SOLO el flujo SSOT.
+// Sin este mock, la rama DB abriría la DB real (getDb) en el caso
+// "promo desconocida".
+vi.mock('../../server/services/promos-service.js', () => ({
+  activePromosForBusinessDay: () => [],
+}));
 
 /** db mock: solo resuelve el nombre de categoría por id */
 function mockDb(categoryName) {
