@@ -620,3 +620,24 @@
 .admin-stats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .admin-stats-table th { text-align: left; color: var(--text-muted); padding: 6px 8px; border-bottom: 1px solid var(--border); }
 .admin-stats-table td { padding: 7px 8px; border-bottom: 1px solid var(--border-subtle, var(--border)); }
+
+/* ============ Promos + Extras (v15 2026-08-29) ============ */
+.admin-promos-list { display: flex; flex-direction: column; gap: 8px; }
+.admin-promo-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; }
+.admin-promo-row__info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.admin-promo-row__actions { display: flex; gap: 6px; }
+.admin-promo-form { display: flex; flex-direction: column; gap: 14px; }
+.admin-promo-lines { display: flex; flex-direction: column; gap: 8px; }
+.admin-promo-line { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.admin-promo-line button { background: none; border: none; color: var(--text-muted); cursor: pointer; }
+.admin-promo-picker { display: flex; gap: 8px; flex-wrap: wrap; }
+.admin-promo-picker select { flex: 1; min-width: 180px; }
+.admin-promo-schedule { display: flex; flex-direction: column; gap: 10px; }
+.admin-promo-dows { display: flex; gap: 6px; flex-wrap: wrap; }
+.admin-promo-dow { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); cursor: pointer; font-size: 13px; }
+.admin-promo-dow.active { background: var(--dorado-rey); color: #121212; border-color: var(--dorado-rey); font-weight: 700; }
+.admin-promo-range { display: flex; gap: 10px; flex-wrap: wrap; }
+.admin-promo-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.admin-extras-group { margin-bottom: 16px; }
+.admin-extras-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.admin-extras-create { display: grid; grid-template-columns: 1fr 160px auto; gap: 12px; align-items: end; border-top: 1px solid var(--border); padding-top: 16px; }

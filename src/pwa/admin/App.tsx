@@ -29,6 +29,8 @@ import { TablesView } from './views/TablesView';
 import { ClosingsView } from './views/ClosingsView';
 import { PaymentsView } from './views/PaymentsView';
 import { StatsView } from './views/StatsView';
+import { PromosView } from './views/PromosView';
+import { ExtrasView } from './views/ExtrasView';
 import { OrderHistoryView } from '../_shared/components/OrderHistoryView';
 import { ReportView } from '../_shared/components/ReportView';
 import { SettingsView } from './views/SettingsView';
@@ -47,6 +49,8 @@ type AdminView =
   | 'payments'
   | 'orders'
   | 'stats'
+  | 'promos'
+  | 'extras'
   | 'settings';
 
 const NAV_ITEMS: { id: AdminView; label: string; icon: AppIconName }[] = [
@@ -59,6 +63,8 @@ const NAV_ITEMS: { id: AdminView; label: string; icon: AppIconName }[] = [
   { id: 'payments', label: 'Pagos', icon: 'cash' },
   { id: 'orders', label: 'Pedidos', icon: 'receipt' },
   { id: 'stats', label: 'Estadísticas', icon: 'chart' },
+  { id: 'promos', label: 'Promos', icon: 'tag' },
+  { id: 'extras', label: 'Extras', icon: 'plus' },
   { id: 'settings', label: 'Configuración', icon: 'sliders' },
 ];
 
@@ -171,6 +177,8 @@ function AdminApp() {
           {view === 'payments' && <PaymentsView token={token} onToast={handleToast} businessDay={selectedDay} />}
           {view === 'orders' && <OrderHistoryView token={token} businessDay={selectedDay} title="Historial de pedidos" />}
           {view === 'stats' && <StatsView token={token} onToast={handleToast} />}
+          {view === 'promos' && <PromosView token={token} onToast={handleToast} />}
+          {view === 'extras' && <ExtrasView token={token} onToast={handleToast} />}
           {view === 'settings' && <SettingsView token={token} onToast={handleToast} />}
         </main>
       </div>
