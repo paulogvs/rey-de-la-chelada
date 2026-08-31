@@ -24,7 +24,7 @@ import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { computeTotals, round2 } from '../../src/core/config/iva.js';
-import { resolveModifierAdjustment, resolveItemUnitPrice, resolvePromoUnitPrice } from '../services/order-pricing.js';
+import { resolveModifierAdjustment, resolveItemUnitPrice, resolvePromoUnitPrice, validatePromoContext } from '../services/order-pricing.js';
 import { businessDayDateStr } from '../utils/date-utils.js';
 import { recordPayment } from '../services/financial/payment-service.js';
 
@@ -236,7 +236,7 @@ router.post('/push', requireAuth, (req, res) => {
           let grossSubtotal = 0;
           const orderItems = [];
           const findMenuItem = db.prepare(
-            'SELECT id, name, price, price_variable, promo_price, area FROM menu_items WHERE id = ? AND is_active = 1'
+            'SELECT id, name, price, price_variable, promo_price, area, category_id FROM menu_items WHERE id = ? AND is_active = 1'
           );
           const rawItems = Array.isArray(order.items) ? order.items : [];
           for (const item of rawItems) {
@@ -276,7 +276,31 @@ router.post('/push', requireAuth, (req, res) => {
               preparation_notes: item.preparation_notes || item.notes || '',
               promo_label: pricing.promoLabel,
               promo_type: item.promo_type || null,
+              promo_category: pricing.promoCategory || null,
+              menu_item_category_id: menuItem.category_id || null,
             });
+          }
+
+          // v15 (2026-08-29): validar CONTEXTO de promos sobre el pedido offline
+          // (mismo patrón que POST /api/orders): max_per_order y líneas del pack
+          // presentes. Si una promo DB ya no está activa o el pack está incompleto,
+          // el item falla → SYNC_PARTIAL_ERRORS (no rompe el resto del push).
+          const promoTypes = [...new Set(orderItems.map(oi => oi.promo_type).filter(Boolean))];
+          for (const promoType of promoTypes) {
+            const ctx = validatePromoContext(
+              orderItems.map(oi => ({
+                categoryName: oi.promo_category,
+                promoType: oi.promo_type,
+                quantity: oi.quantity,
+                itemId: oi.menu_item_id,
+                categoryId: oi.menu_item_category_id,
+              })),
+              promoType,
+              businessDayDateStr()
+            );
+            if (!ctx.valid) {
+              throw new Error(`${ctx.message} (promo: ${promoType})`);
+            }
           }
 
           // Modelo SSOT EXTRACTIVO (iva.js): total = gross (suma de precios
