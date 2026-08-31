@@ -24,6 +24,8 @@ import { PromotionsToday } from '../../_shared/components/PromotionsToday';
 interface DashboardViewProps {
   token: string;
   onToast: (type: 'success' | 'error' | 'warning', message: string) => void;
+  /** v14 (2026-08-29): día laboral visible (permite ver días anteriores). */
+  businessDay?: string;
 }
 
 interface Stats {
@@ -48,7 +50,7 @@ function emptyStats(): Stats {
   };
 }
 
-export function DashboardView({ token, onToast }: DashboardViewProps) {
+export function DashboardView({ token, onToast, businessDay }: DashboardViewProps) {
   const [stats, setStats] = useState<Stats>(emptyStats());
   const [loading, setLoading] = useState(true);
   const [today, setToday] = useState('');
@@ -56,7 +58,7 @@ export function DashboardView({ token, onToast }: DashboardViewProps) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const day = businessDayDateStr();
+      const day = businessDay ?? businessDayDateStr();
       setToday(day);
 
       const [items, tables, closings, daily, popular] = await Promise.all([
@@ -92,13 +94,13 @@ export function DashboardView({ token, onToast }: DashboardViewProps) {
     } finally {
       setLoading(false);
     }
-  }, [token, onToast]);
+  }, [token, onToast, businessDay]);
 
   useEffect(() => {
     load();
     const interval = setInterval(load, 60000);
     return () => clearInterval(interval);
-  }, [load]);
+  }, [load, businessDay]);
 
   const pctPriced = stats.itemCount > 0
     ? Math.round(((stats.itemCount - stats.nullPriceCount) / stats.itemCount) * 100)

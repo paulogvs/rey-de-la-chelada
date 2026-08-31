@@ -464,7 +464,14 @@ router.get('/:id/proof', requireAuth, requireRole('admin', 'mesero', 'caja'), (r
 });
 
 router.get('/:id/proof/content', requireAuth, requireRole('admin', 'mesero', 'caja'), (req, res) => {
-  const proof = getDb().prepare('SELECT storage_key, mime FROM payment_proofs WHERE payment_id = ? ORDER BY created_at DESC LIMIT 1').get(req.params.id);
+  // v14 (2026-08-29): permitir servir UN comprobante específico (?proof_id=).
+  // Sin proof_id, se mantiene el comportamiento previo (el más reciente).
+  let proof;
+  if (req.query.proof_id) {
+    proof = getDb().prepare('SELECT storage_key, mime FROM payment_proofs WHERE id = ? AND payment_id = ?').get(req.query.proof_id, req.params.id);
+  } else {
+    proof = getDb().prepare('SELECT storage_key, mime FROM payment_proofs WHERE payment_id = ? ORDER BY created_at DESC LIMIT 1').get(req.params.id);
+  }
   if (!proof || !/^[0-9a-f-]+\.(png|jpg|webp)$/.test(proof.storage_key)) return res.status(404).json({ success: false, error: 'Comprobante no encontrado', code: 'PROOF_NOT_FOUND' });
   const file = path.join(PROOF_DIR, proof.storage_key);
   if (!fs.existsSync(file)) return res.status(404).json({ success: false, error: 'Archivo no encontrado', code: 'PROOF_FILE_NOT_FOUND' });

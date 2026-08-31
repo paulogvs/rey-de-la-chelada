@@ -172,8 +172,8 @@ export async function fetchPaymentProof(
   token: string,
   paymentId: string,
   fetchImpl: typeof fetch = fetch
-): Promise<ApiResult<{ success: boolean; proof: PaymentProofMetadata }>> {
-  return apiFetch<{ success: boolean; proof: PaymentProofMetadata }>(`/api/payments/${paymentId}/proof`, { token, fetchImpl });
+): Promise<ApiResult<{ success: boolean; proof: PaymentProofMetadata; proofs?: PaymentProofMetadata[]; count?: number }>> {
+  return apiFetch<{ success: boolean; proof: PaymentProofMetadata; proofs?: PaymentProofMetadata[]; count?: number }>(`/api/payments/${paymentId}/proof`, { token, fetchImpl });
 }
 
 /**
@@ -186,13 +186,17 @@ export async function fetchPaymentProof(
  * token y se devuelve el Blob (o un object URL para el lightbox).
  */
 
-/** Descarga el Blob crudo de la imagen del comprobante (con Bearer). */
+/** Descarga el Blob crudo de la imagen del comprobante (con Bearer).
+ *  v14 (2026-08-29): `proofId` opcional (4º arg) — sirve UN comprobante
+ *  específico. `fetchImpl` se mantiene como 3º arg (retrocompatible). */
 export async function fetchProofImageBlob(
   token: string,
   paymentId: string,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  proofId?: string
 ): Promise<Blob> {
-  const res = await fetchImpl(`/api/payments/${paymentId}/proof/content`, {
+  const qs = proofId ? `?proof_id=${encodeURIComponent(proofId)}` : '';
+  const res = await fetchImpl(`/api/payments/${paymentId}/proof/content${qs}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
@@ -209,9 +213,10 @@ export async function loadProofImage(
   token: string,
   paymentId: string,
   fetchImpl: typeof fetch = fetch,
-  createObjectURL: (blob: Blob) => string = (b) => URL.createObjectURL(b)
+  createObjectURL: (blob: Blob) => string = (b) => URL.createObjectURL(b),
+  proofId?: string
 ): Promise<string> {
-  const blob = await fetchProofImageBlob(token, paymentId, fetchImpl);
+  const blob = await fetchProofImageBlob(token, paymentId, fetchImpl, proofId);
   return createObjectURL(blob);
 }
 

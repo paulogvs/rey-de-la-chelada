@@ -39,12 +39,14 @@ export const KDS_EVENT_TYPES = new Set([
   'item_ready',
   'order_complete',
   'module_ready',
+  'menu_changed', // v14 (2026-08-29): el menú cambió en Admin → refetch
 ]);
 
 /**
  * Parse a raw WebSocket message into a normalized KDSIncomingEvent.
  * Returns null for malformed JSON, non-object payloads, unknown types,
- * or order events without an orderId.
+ * or order events without an orderId. `menu_changed` es un evento GLOBAL
+ * (sin orderId) — se acepta aparte.
  */
 export function parseKDSMessage(raw: string): KDSIncomingEvent | null {
   if (!raw) return null;
@@ -60,6 +62,12 @@ export function parseKDSMessage(raw: string): KDSIncomingEvent | null {
 
   const msg = parsed as Record<string, unknown>;
   if (typeof msg.type !== 'string' || !KDS_EVENT_TYPES.has(msg.type)) return null;
+  // menu_changed no tiene orderId (evento global de catálogo)
+  if (msg.type === 'menu_changed') {
+    const ev: KDSIncomingEvent = { type: 'menu_changed', orderId: '' };
+    if (typeof msg.timestamp === 'string') ev.timestamp = msg.timestamp;
+    return ev;
+  }
   if (typeof msg.orderId !== 'string' || msg.orderId === '') return null;
 
   const event: KDSIncomingEvent = {
@@ -188,6 +196,8 @@ export interface UseKDSWebSocketOptions {
   onEvent?: (event: KDSIncomingEvent) => void;
   /** Called when the connection falls back to polling */
   onFallback?: () => void;
+  /** v14 (2026-08-29): se llama cuando el MENÚ cambió en Admin (refetch). */
+  onMenuChanged?: () => void;
 }
 
 export interface UseKDSWebSocketResult {
@@ -215,6 +225,7 @@ export function useKDSWebSocket(options: UseKDSWebSocketOptions = {}): UseKDSWeb
     enabled = true,
     onEvent,
     onFallback,
+    onMenuChanged,
   } = options;
 
   const [isConnected, setIsConnected] = useState(false);
@@ -226,6 +237,7 @@ export function useKDSWebSocket(options: UseKDSWebSocketOptions = {}): UseKDSWeb
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onEventRef = useRef(onEvent);
   const onFallbackRef = useRef(onFallback);
+  const onMenuChangedRef = useRef(onMenuChanged);
 
   // Latest-ref pattern: actualizar los refs en un effect (no durante el
   // render) — fix react-doctor no-ref-current-in-render. Sin deps para
@@ -233,6 +245,7 @@ export function useKDSWebSocket(options: UseKDSWebSocketOptions = {}): UseKDSWeb
   useEffect(() => {
     onEventRef.current = onEvent;
     onFallbackRef.current = onFallback;
+    onMenuChangedRef.current = onMenuChanged;
   });
 
   const reconnect = useCallback(() => {
@@ -256,6 +269,11 @@ export function useKDSWebSocket(options: UseKDSWebSocketOptions = {}): UseKDSWeb
     };
 
     const dispatch = (event: KDSIncomingEvent) => {
+      if (event.type === 'menu_changed') {
+        // v14: evento global de catálogo — no toca el orderEngine.
+        onMenuChangedRef.current?.();
+        return;
+      }
       orderEngine.applyKDSEvent(event);
       onEventRef.current?.(event);
     };

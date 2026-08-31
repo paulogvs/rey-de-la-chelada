@@ -31,6 +31,7 @@ export const KDSEventType = Object.freeze({
   ITEM_READY: 'item_ready',
   ORDER_COMPLETE: 'order_complete',
   MODULE_READY: 'module_ready',
+  MENU_CHANGED: 'menu_changed', // v14 (2026-08-29): el menú cambió en Admin → refetch
 });
 
 /** WebSocket readyState.OPEN === 1 */

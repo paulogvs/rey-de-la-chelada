@@ -266,7 +266,7 @@ export interface KDSEvent {
  * Items are already normalized to client shape by the parsing layer.
  */
 export interface KDSIncomingEvent {
-  type: 'new_order' | 'status_change' | 'item_ready' | 'order_complete' | 'module_ready';
+  type: 'new_order' | 'status_change' | 'item_ready' | 'order_complete' | 'module_ready' | 'menu_changed';
   orderId: string;
   tableNumber?: number;
   tableId?: string;

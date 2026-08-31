@@ -206,7 +206,7 @@ router.get('/sales/range', requireAuth, requireRole('admin', 'caja'), (req, res)
 
 router.get('/items/popular', requireAuth, requireRole('admin', 'caja'), (req, res) => {
   try {
-    const { from, to, limit } = req.query;
+    const { from, to, limit, order_by, group_by } = req.query;
     const db = getDb();
 
     let dateFilter = '';
@@ -219,9 +219,14 @@ router.get('/items/popular', requireAuth, requireRole('admin', 'caja'), (req, re
 
     params.push(parseInt(limit, 10) || 20);
 
+    // v14 (2026-08-29): order_by=quantity|revenue (default quantity);
+    // group_by=category agrupa por categoría en vez de por item.
+    const orderBy = order_by === 'revenue' ? 'total_revenue' : 'total_quantity';
+    const groupCol = group_by === 'category' ? 'mc.id' : 'mi.id';
+
     const items = db.prepare(`
       SELECT
-        mi.id, mi.name as item_name, mc.name as category_name,
+        ${group_by === 'category' ? 'mc.id AS cat_id, mc.name AS category_name' : 'mi.id, mi.name as item_name, mc.name as category_name'},
         COUNT(*) as times_ordered,
         SUM(oi.quantity) as total_quantity,
         SUM(oi.subtotal) as total_revenue
@@ -230,8 +235,8 @@ router.get('/items/popular', requireAuth, requireRole('admin', 'caja'), (req, re
       LEFT JOIN menu_categories mc ON mi.category_id = mc.id
       JOIN orders o ON oi.order_id = o.id
       WHERE o.status = 'paid'${dateFilter}
-      GROUP BY mi.id
-      ORDER BY total_quantity DESC
+      GROUP BY ${groupCol}
+      ORDER BY ${orderBy} DESC
       LIMIT ?
     `).all(...params);
 

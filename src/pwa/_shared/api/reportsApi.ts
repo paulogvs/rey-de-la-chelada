@@ -163,10 +163,44 @@ export async function fetchPopularItems(
   token: string,
   businessDay: string,
   limit = 5,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  opts: { from?: string; to?: string; orderBy?: 'quantity' | 'revenue'; groupBy?: 'item' | 'category' } = {}
 ): Promise<ApiResult<{ items: PopularItem[] }>> {
-  const query = new URLSearchParams({ from: businessDay, to: businessDay, limit: String(limit) });
+  const from = opts.from ?? businessDay;
+  const to = opts.to ?? businessDay;
+  const query = new URLSearchParams({
+    from,
+    to,
+    limit: String(limit),
+    ...(opts.orderBy ? { order_by: opts.orderBy } : {}),
+    ...(opts.groupBy && opts.groupBy !== 'item' ? { group_by: opts.groupBy } : {}),
+  });
   return apiFetch<{ success: boolean; items?: PopularItem[] }>(`/api/reports/items/popular?${query.toString()}`, { token, fetchImpl }) as Promise<ApiResult<{ items: PopularItem[] }>>;
 }
 
-export default { fetchDailySales, fetchOrderHistory, fetchPopularItems, fetchClosingCurrent, openClosing, closeClosing };
+export interface SalesRangeResult extends ApiResult<{ daily?: unknown[]; totals?: { total_orders: number; total_revenue: number; avg_order: number } }> {
+  daily: unknown[];
+  totals: { total_orders: number; total_revenue: number; avg_order: number } | null;
+}
+
+/** GET /api/reports/sales/range?from&to — ventas por rango (días laborales). */
+export async function fetchSalesRange(
+  token: string,
+  from: string,
+  to: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<SalesRangeResult> {
+  const query = new URLSearchParams({ from, to });
+  const result = await apiFetch<{ success: boolean; daily?: unknown[]; totals?: { total_orders: number; total_revenue: number; avg_order: number } }>(
+    `/api/reports/sales/range?${query.toString()}`,
+    { token, fetchImpl }
+  );
+  return {
+    ...result,
+    data: result.data ?? null,
+    daily: result.data?.daily ?? [],
+    totals: result.data?.totals ?? null,
+  } as SalesRangeResult;
+}
+
+export default { fetchDailySales, fetchOrderHistory, fetchPopularItems, fetchSalesRange, fetchClosingCurrent, openClosing, closeClosing };

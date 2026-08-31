@@ -8,7 +8,7 @@ import { Modal } from '@/ui/components/Modal';
 import { useToast } from '@/ui/components/Toast';
 import { formatMoney, formatTableRef } from '../utils/format';
 import { localDateTimeStr } from '../utils/localDate';
-import { loadProofImage } from '../api/paymentsApi';
+import { loadProofImage, fetchPaymentProof } from '../api/paymentsApi';
 import { InvoiceModal } from './InvoiceModal';
 import { fetchOrderHistory, type OrderHistoryRow, type OrderHistoryPayment } from '../api/reportsApi';
 import './OrderHistoryView.css';
@@ -27,10 +27,11 @@ export function OrderHistoryView({ token, businessDay, title = 'Pedidos cobrados
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // MEJORA 2 (2026-08-27): vista previa del comprobante — lightbox modal.
-  // Se abre al hacer clic en "Ver comprobante" de un pago QR con `proof_photo`.
+  // MEJORA 2 (2026-08-27) + v14 (2026-08-29): vista previa de comprobantes.
+  // Ahora soporta VARIOS comprobantes por pago QR (lightbox con navegación).
   const [previewId, setPreviewId] = useState<{ id: string; alt: string } | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [previewIndex, setPreviewIndex] = useState(0);
   const [previewLoading, setPreviewLoading] = useState(false);
 
   // v14 (2026-08-28): factura — pedido seleccionado para emitir factura.
@@ -50,27 +51,40 @@ export function OrderHistoryView({ token, businessDay, title = 'Pedidos cobrados
 
   useEffect(() => { load(); }, [load, refreshTick]);
 
-  // Carga la imagen del comprobante (auth Bearer → fetch + blob + object URL)
-  // y la muestra en el lightbox. No hay `<img src>` directo porque el endpoint
-  // requiere el header Authorization (no token en query).
+  // Carga TODOS los comprobantes del pago QR (auth Bearer → fetch + blob) y
+  // los muestra en un lightbox con navegación ‹ ›.
   const openProof = useCallback(async (payment: OrderHistoryPayment) => {
     const alt = `Comprobante del pago QR por ${formatMoney(payment.amount)}`;
     setPreviewId({ id: payment.id, alt });
-    setPreviewUrl(null);
+    setPreviewIndex(0);
     setPreviewLoading(true);
     try {
-      const url = await loadProofImage(token, payment.id);
-      setPreviewUrl(url);
+      const result = await fetchPaymentProof(token, payment.id);
+      const proofList = result.ok && Array.isArray(result.data?.proofs) && result.data.proofs.length > 0
+        ? result.data.proofs
+        : (result.ok && result.data?.proof ? [result.data.proof] : []);
+      const urls: string[] = [];
+      for (const proof of proofList) {
+        try {
+          const url = await loadProofImage(token, payment.id, undefined, undefined, proof.id);
+          urls.push(url);
+        } catch { /* saltar los que no carguen */ }
+      }
+      if (urls.length === 0) {
+        addToast({ type: 'error', message: 'No se pudo cargar ningún comprobante', duration: 4000 });
+      }
+      setPreviewUrls(urls);
     } catch {
-      addToast({ type: 'error', message: 'No se pudo cargar el comprobante', duration: 4000 });
+      addToast({ type: 'error', message: 'No se pudieron cargar los comprobantes', duration: 4000 });
     } finally {
       setPreviewLoading(false);
     }
   }, [token, addToast]);
 
   const closePreview = useCallback(() => {
-    setPreviewUrl(u => { if (u) URL.revokeObjectURL(u); return null; });
+    setPreviewUrls(prev => { prev.forEach(u => URL.revokeObjectURL(u)); return []; });
     setPreviewId(null);
+    setPreviewIndex(0);
     setPreviewLoading(false);
   }, []);
 
@@ -140,9 +154,9 @@ export function OrderHistoryView({ token, businessDay, title = 'Pedidos cobrados
                           {payment.method === 'qr' && payment.proof_photo && (
                             <button type="button" className="order-history__proof-btn"
                               onClick={() => openProof(payment)}
-                              aria-label={`Ver comprobante del pago QR ${formatMoney(payment.amount)}`}>
+                              aria-label={`Ver comprobantes del pago QR ${formatMoney(payment.amount)}`}>
                               <AppIcon name="camera" size="sm" />
-                              <span>Ver comprobante</span>
+                              <span>Ver comprobantes</span>
                             </button>
                           )}
                         </div>
@@ -156,16 +170,33 @@ export function OrderHistoryView({ token, businessDay, title = 'Pedidos cobrados
         </div>
       )}
 
-      {/* MEJORA 2: lightbox del comprobante — imagen GRANDE para comparar con la transacción */}
-      <Modal open={!!previewId} onClose={closePreview} title="Comprobante de pago">
-        {previewUrl ? (
-          <div className="order-history__proof-modal">
-            <img src={previewUrl} alt={previewId?.alt ?? 'Comprobante de pago'} className="order-history__proof-image" />
-            {previewId?.alt && <p className="order-history__proof-alt">{previewId.alt}</p>}
-          </div>
+      {/* MEJORA 2 + v14: lightbox de comprobantes — navegación entre TODOS */}
+      <Modal open={!!previewId} onClose={closePreview} title="Comprobantes de pago QR">
+        {previewLoading ? (
+          <div className="order-history__proof-loading">Cargando comprobantes…</div>
+        ) : previewUrls.length === 0 ? (
+          <div className="order-history__proof-loading">El comprobante no está disponible</div>
         ) : (
-          <div className="order-history__proof-loading">
-            {previewLoading ? 'Cargando comprobante…' : 'El comprobante no está disponible'}
+          <div className="order-history__proof-modal">
+            <img src={previewUrls[previewIndex] ?? ''} alt={previewId?.alt ?? 'Comprobante de pago'} className="order-history__proof-image" />
+            {previewId?.alt && <p className="order-history__proof-alt">{previewId.alt}</p>}
+            {previewUrls.length > 1 && (
+              <div className="order-history__proof-nav">
+                <button type="button" className="order-history__proof-nav-btn"
+                  onClick={() => setPreviewIndex(i => (i - 1 + previewUrls.length) % previewUrls.length)}
+                  aria-label="Comprobante anterior">
+                  ‹ Anterior
+                </button>
+                <span className="order-history__proof-counter">
+                  {previewIndex + 1} de {previewUrls.length}
+                </span>
+                <button type="button" className="order-history__proof-nav-btn"
+                  onClick={() => setPreviewIndex(i => (i + 1) % previewUrls.length)}
+                  aria-label="Comprobante siguiente">
+                  Siguiente ›
+                </button>
+              </div>
+            )}
           </div>
         )}
       </Modal>

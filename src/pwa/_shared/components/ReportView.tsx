@@ -24,12 +24,14 @@ import { formatMoney } from '../utils/format';
 interface ReportViewProps {
   token: string;
   onToast: (type: 'success' | 'error' | 'warning', message: string) => void;
+  /** v14 (2026-08-29): día laboral inicial (desde el picker global del Admin). */
+  initialDate?: string;
 }
 
-export function ReportView({ token, onToast }: ReportViewProps) {
+export function ReportView({ token, onToast, initialDate }: ReportViewProps) {
   const [closings, setClosings] = useState<ClosingRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(initialDate ?? '');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,6 +48,11 @@ export function ReportView({ token, onToast }: ReportViewProps) {
       setLoading(false);
     }
   }, [token, onToast, date]);
+
+  // v14: sincronizar con el picker global del Admin
+  useEffect(() => {
+    if (initialDate) setDate(initialDate);
+  }, [initialDate]);
 
   useEffect(() => { load(); }, [load]);
 

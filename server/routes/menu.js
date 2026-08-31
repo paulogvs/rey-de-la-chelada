@@ -690,4 +690,20 @@ router.post('/import-seed', requireAuth, requireRole('admin'), (req, res) => {
   }
 });
 
+// v14 (2026-08-29): avisar a los staff PWAs (meseros/cocina/bar/caja) que el
+// menú cambió → refetch en vivo. Solo mutadores (POST/PUT/PATCH/DELETE) y
+// solo respuestas exitosas (2xx). GET no dispara.
+import { broadcastMenuChanged } from '../services/order-broadcaster.js';
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+router.use((req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = (body) => {
+    if (MUTATING_METHODS.has(req.method) && res.statusCode >= 200 && res.statusCode < 300) {
+      broadcastMenuChanged();
+    }
+    return originalJson(body);
+  };
+  next();
+});
+
 export default router;

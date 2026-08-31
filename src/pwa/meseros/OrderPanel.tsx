@@ -38,6 +38,7 @@ import { summarizeOrderReview } from './orderReview';
 import { businessDayDateStr } from '@/core/config/local-date';
 import { activePromotionsForDay, PROMOTIONS_BY_ID, businessDayName } from '@/core/config/promotions.js';
 import { canApplyPromo, applyPromoToCart, clearPromoFromCart, resolveCartPromoUnitPrice, cartSavings, type PromoCartItem } from './promoCart';
+import { useKDSWebSocket } from '../_shared/hooks/useKDSWebSocket';
 
 /** Badge de estado del pedido (S2-B) */
 const ORDER_STATUS_BADGE: Record<string, { variant: 'pending' | 'preparing' | 'ready' | 'paid' | 'cancelled' | 'info'; label: string }> = {
@@ -313,19 +314,33 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
     }
   }, [activeOrder, cart, token, table.number, detailGroups, addToast]);
 
-  // Load menu (public endpoints)
+  // v14 (2026-08-29): carga del menú reutilizable — se llama al montar y
+  // cuando el WS avisa que el menú cambió en Admin (menu_changed).
+  const loadMenu = useCallback(async () => {
+    const [cats, its] = await Promise.all([fetchMenuCategories(), fetchMenuItems()]);
+    if (cats.ok) setCategories(cats.categories.map(c => ({ id: c.id, name: c.name })));
+    if (its.ok) setItems(its.items.filter(i => i.is_active === 1 && i.is_available === 1));
+  }, []);
+
+  // Load menu (public endpoints) — una vez al montar
   useEffect(() => {
     let disposed = false;
     (async () => {
       setLoadingMenu(true);
-      const [cats, its] = await Promise.all([fetchMenuCategories(), fetchMenuItems()]);
-      if (disposed) return;
-      if (cats.ok) setCategories(cats.categories.map(c => ({ id: c.id, name: c.name })));
-      if (its.ok) setItems(its.items.filter(i => i.is_active === 1 && i.is_available === 1));
-      setLoadingMenu(false);
+      await loadMenu();
+      if (!disposed) setLoadingMenu(false);
     })();
     return () => { disposed = true; };
-  }, []);
+  }, [loadMenu]);
+
+  // v14: refrescar el menú en vivo cuando Admin lo edita (evento menu_changed)
+  useKDSWebSocket({
+    module: 'meseros',
+    enabled: !!token,
+    onMenuChanged: () => {
+      void loadMenu();
+    },
+  });
 
   // S2-Tabs: categorías del área activa (Barra | Cocina | Promos).
   // El área se infiere del primer item de cada categoría (menu_categories

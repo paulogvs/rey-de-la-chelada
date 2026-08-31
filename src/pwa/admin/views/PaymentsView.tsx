@@ -6,7 +6,7 @@ import { Loader } from '@/ui/components/Loader';
 import { fetchPaymentProof, fetchPayments, type PaymentProofMetadata, type ServerPayment } from '../../_shared/api/paymentsApi';
 import { formatMoney } from '../../_shared/utils/format';
 
-export function PaymentsView({ token, onToast }: { token: string; onToast: (type: 'success' | 'error' | 'warning', message: string) => void }) {
+export function PaymentsView({ token, onToast, businessDay }: { token: string; onToast: (type: 'success' | 'error' | 'warning', message: string) => void; businessDay?: string }) {
   const [payments, setPayments] = useState<ServerPayment[]>([]);
   const [proofs, setProofs] = useState<Record<string, PaymentProofMetadata | null>>({});
   const [loading, setLoading] = useState(true);
@@ -14,13 +14,16 @@ export function PaymentsView({ token, onToast }: { token: string; onToast: (type
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await fetchPayments(token);
+      // Día laboral (businessDay YYYY-MM-DD) → filtro por fecha de procesamiento.
+      const result = businessDay
+        ? await fetchPayments(token, { dateFrom: `${businessDay}T00:00:00`, dateTo: `${businessDay}T23:59:59` })
+        : await fetchPayments(token);
       if (!result.ok) onToast('error', result.error || 'No se pudieron cargar los pagos');
       setPayments(result.payments);
     } finally {
       setLoading(false);
     }
-  }, [token, onToast]);
+  }, [token, onToast, businessDay]);
 
   useEffect(() => { load(); }, [load]);
 

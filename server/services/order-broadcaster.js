@@ -136,3 +136,15 @@ export function broadcastModuleReady(order, module) {
     status: order.status || 'confirmed',
   }));
 }
+
+/**
+ * Emit a `menu_changed` event to ALL staff modules (meseros, cocina, bar,
+ * caja) so they refetch the menu in real time when Admin edits it.
+ * v14 (2026-08-29): sin orderId — es un evento global de catálogo.
+ */
+export function broadcastMenuChanged() {
+  broadcaster.broadcastToModules(['meseros', 'cocina', 'bar', 'caja'], {
+    type: KDSEventType.MENU_CHANGED,
+    timestamp: new Date().toISOString(),
+  });
+}

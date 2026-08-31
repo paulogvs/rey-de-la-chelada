@@ -28,9 +28,11 @@ import { StaffView } from './views/StaffView';
 import { TablesView } from './views/TablesView';
 import { ClosingsView } from './views/ClosingsView';
 import { PaymentsView } from './views/PaymentsView';
+import { StatsView } from './views/StatsView';
 import { OrderHistoryView } from '../_shared/components/OrderHistoryView';
 import { ReportView } from '../_shared/components/ReportView';
 import { SettingsView } from './views/SettingsView';
+import { BusinessDayPicker } from '../_shared/components/BusinessDayPicker';
 import { businessDayDateStr } from '../_shared/utils/localDate';
 import './App.css';
 import './views/views.css';
@@ -44,6 +46,7 @@ type AdminView =
   | 'reports'
   | 'payments'
   | 'orders'
+  | 'stats'
   | 'settings';
 
 const NAV_ITEMS: { id: AdminView; label: string; icon: AppIconName }[] = [
@@ -55,6 +58,7 @@ const NAV_ITEMS: { id: AdminView; label: string; icon: AppIconName }[] = [
   { id: 'reports', label: 'Reportes', icon: 'chart' },
   { id: 'payments', label: 'Pagos', icon: 'cash' },
   { id: 'orders', label: 'Pedidos', icon: 'receipt' },
+  { id: 'stats', label: 'Estadísticas', icon: 'chart' },
   { id: 'settings', label: 'Configuración', icon: 'sliders' },
 ];
 
@@ -62,6 +66,9 @@ function AdminApp() {
   const { addToast } = useToast();
   const { isAuthenticated, token, user, login, logout, restoring, sessionExpired } = useStaffAuth('admin', ['admin']);
   const [view, setView] = useState<AdminView>('dashboard');
+  // v14 (2026-08-29): día laboral seleccionado — permite ver días ANTERIORES
+  // (pedidos, pagos, reportes históricos). Default: hoy.
+  const [selectedDay, setSelectedDay] = useState<string>(() => businessDayDateStr());
 
   const restricted = isAuthenticated && user && user.role !== 'admin';
 
@@ -143,6 +150,9 @@ function AdminApp() {
           <header className="admin-topbar">
             <h1>{NAV_ITEMS.find(i => i.id === view)?.label}</h1>
             <div className="admin-topbar__actions">
+              {['orders', 'payments', 'reports', 'closings', 'dashboard'].includes(view) && (
+                <BusinessDayPicker value={selectedDay} onChange={setSelectedDay} />
+              )}
               <Badge variant="info">Admin</Badge>
               {user && (
                 <button className="admin-topbar__logout" onClick={handleLogout} title="Cerrar sesión">
@@ -152,14 +162,15 @@ function AdminApp() {
             </div>
           </header>
 
-          {view === 'dashboard' && <DashboardView token={token} onToast={handleToast} />}
+          {view === 'dashboard' && <DashboardView token={token} onToast={handleToast} businessDay={selectedDay} />}
           {view === 'menu' && <MenuPanel token={token} onToast={handleToast} />}
           {view === 'staff' && <StaffView token={token} onToast={handleToast} />}
           {view === 'tables' && <TablesView token={token} onToast={handleToast} />}
           {view === 'closings' && <ClosingsView token={token} onToast={handleToast} />}
-          {view === 'reports' && <ReportView token={token} onToast={handleToast} />}
-          {view === 'payments' && <PaymentsView token={token} onToast={handleToast} />}
-          {view === 'orders' && <OrderHistoryView token={token} businessDay={businessDayDateStr()} title="Historial de pedidos" />}
+          {view === 'reports' && <ReportView token={token} onToast={handleToast} initialDate={selectedDay} />}
+          {view === 'payments' && <PaymentsView token={token} onToast={handleToast} businessDay={selectedDay} />}
+          {view === 'orders' && <OrderHistoryView token={token} businessDay={selectedDay} title="Historial de pedidos" />}
+          {view === 'stats' && <StatsView token={token} onToast={handleToast} />}
           {view === 'settings' && <SettingsView token={token} onToast={handleToast} />}
         </main>
       </div>
