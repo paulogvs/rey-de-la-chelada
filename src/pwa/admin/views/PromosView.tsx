@@ -16,17 +16,16 @@ import { MoneyInput } from '@/ui/components/MoneyInput/MoneyInput';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { formatMoney } from '../../_shared/utils/format';
 import { fetchAdminMenuItems } from '../../_shared/api/adminApi';
+import { fetchMenuCategories } from '../../_shared/api/menuApi';
 import {
   fetchAdminPromos, createAdminPromo, updateAdminPromo, toggleAdminPromo, deleteAdminPromo,
-  type Promo, type PromoLine, type PromoSchedule,
+  type Promo, type PromoLine,
 } from '../../_shared/api/promosApi';
 
 interface PromosViewProps {
   token: string;
   onToast: (type: 'success' | 'error' | 'warning', message: string) => void;
 }
-
-const DOW_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 interface MenuEntry { id: string; name: string; category_name?: string; }
 
@@ -44,9 +43,6 @@ export function PromosView({ token, onToast }: PromosViewProps) {
   const [name, setName] = useState('');
   const [price, setPrice] = useState(0);
   const [lines, setLines] = useState<DraftLine[]>([]);
-  const [dows, setDows] = useState<number[]>([]);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,14 +54,12 @@ export function PromosView({ token, onToast }: PromosViewProps) {
           id: i.id, name: i.name, category_name: i.category_name,
         }));
         setItems(entries);
-        // categorías únicas para el armador por grupo
-        const cats: MenuEntry[] = [];
-        const seen = new Set<string>();
-        for (const i of entries) {
-          const cn = i.category_name || '';
-          if (cn && !seen.has(cn)) { seen.add(cn); cats.push({ id: cn, name: cn }); }
-        }
-        setCategories(cats);
+      }
+      // Categorías REALES (id UUID de menu_categories) para el armador de grupos.
+      const catsRes = await fetchMenuCategories();
+      if (catsRes.ok) {
+        const realCats: MenuEntry[] = (catsRes.categories ?? []).map(c => ({ id: c.id, name: c.name }));
+        setCategories(realCats);
       }
     } finally {
       setLoading(false);
@@ -75,7 +69,7 @@ export function PromosView({ token, onToast }: PromosViewProps) {
   useEffect(() => { load(); }, [load]);
 
   const resetDraft = useCallback(() => {
-    setName(''); setPrice(0); setLines([]); setDows([]); setStartDate(''); setEndDate('');
+    setName(''); setPrice(0); setLines([]);
   }, []);
 
   const startEdit = useCallback((promo: Promo) => {
@@ -85,13 +79,9 @@ export function PromosView({ token, onToast }: PromosViewProps) {
     setLines((promo.lines || []).map((l, i) => ({
       ...l,
       key: i,
-      _label: l.item_id ? (items.find(x => x.id === l.item_id)?.name || 'Item') : (l.group_id || 'Grupo'),
+      _label: l.item_id ? (items.find(x => x.id === l.item_id)?.name || 'Item') : ((categories.find(c => c.id === l.group_id)?.name) || 'Grupo'),
     })));
-    setDows((promo.schedule || []).filter(s => s.day_of_week != null).map(s => s.day_of_week as number));
-    const range = (promo.schedule || []).find(s => s.start_date || s.end_date);
-    setStartDate(range?.start_date || '');
-    setEndDate(range?.end_date || '');
-  }, [items]);
+  }, [items, categories]);
 
   const addLine = useCallback((kind: 'item' | 'group', id: string, label: string) => {
     setLines(prev => [...prev, {
@@ -106,26 +96,19 @@ export function PromosView({ token, onToast }: PromosViewProps) {
     setLines(prev => prev.filter(l => l.key !== key));
   }, []);
 
-  const toggleDow = useCallback((d: number) => {
-    setDows(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
-  }, []);
-
   const handleSave = useCallback(async () => {
     if (!name.trim()) { onToast('warning', 'Pon un nombre a la promo'); return; }
     if (lines.length === 0) { onToast('warning', 'Agrega al menos un item/grupo a la promo'); return; }
     if (price <= 0) { onToast('warning', 'Pon el precio de la promo'); return; }
     setSaving(true);
     try {
-      const schedule: PromoSchedule[] = [
-        ...dows.map(d => ({ day_of_week: d })),
-        ...(startDate || endDate ? [{ start_date: startDate || null, end_date: endDate || null }] : []),
-      ];
       const data = {
         name: name.trim(),
         label: name.trim(),
         price_total: price,
+        // v15: sin programador de días — el dueño activa/desactiva a mano.
+        schedule: [],
         lines: lines.map(({ item_id, group_id, quantity, extra_id, extra_price }) => ({ item_id, group_id, quantity, extra_id, extra_price })),
-        schedule,
       };
       const result = editing
         ? await updateAdminPromo(token, editing.id, data)
@@ -139,7 +122,7 @@ export function PromosView({ token, onToast }: PromosViewProps) {
     } finally {
       setSaving(false);
     }
-  }, [name, lines, price, dows, startDate, endDate, editing, token, onToast, resetDraft, load]);
+  }, [name, lines, price, editing, token, onToast, resetDraft, load]);
 
   const handleToggle = useCallback(async (promo: Promo) => {
     const r = await toggleAdminPromo(token, promo.id, promo.active !== 1);
@@ -225,21 +208,10 @@ export function PromosView({ token, onToast }: PromosViewProps) {
                 </div>
               </div>
 
-              {/* Programador de días */}
-              <div className="admin-promo-schedule">
-                <span className="form-field__label">Días de la semana</span>
-                <div className="admin-promo-dows">
-                  {DOW_LABELS.map((d, idx) => (
-                    <button key={idx} type="button"
-                      className={`admin-promo-dow ${dows.includes(idx) ? 'active' : ''}`}
-                      onClick={() => toggleDow(idx)}>{d}</button>
-                  ))}
-                </div>
-                <div className="admin-promo-range">
-                  <FormField type="date" variant="sm" label="Desde" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                  <FormField type="date" variant="sm" label="Hasta" value={endDate} onChange={e => setEndDate(e.target.value)} />
-                </div>
-              </div>
+              {/* v15: sin programador de días — la promo se activa/desactiva en la lista */}
+              <p className="admin-muted" style={{ fontSize: 13 }}>
+                💡 Actívala/desactívala con el toggle en la lista, según el día que la necesites.
+              </p>
 
               <div className="admin-promo-actions">
                 <Button variant="secondary" onClick={() => { resetDraft(); setEditing(null); }} disabled={saving}>Cancelar</Button>

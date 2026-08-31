@@ -23,6 +23,7 @@ import { randomUUID } from 'node:crypto';
 import { ensureStaff, ensureTables } from './seed.js';
 import { loadMenuFromSeed } from '../scripts/load-menu.js';
 import { applyPizzaSizeAdjustments } from '../scripts/demo-prices.js';
+import { seedDefaultPromos } from '../services/promos-service.js';
 
 /**
  * Ensure the DB is bootstrapped (staff + tables + menu + prices).
@@ -108,6 +109,15 @@ export function ensureBootstrap(db, { log = console.log } = {}) {
       log(`[Bootstrap] Error en ajustes de tamaño: ${sizeErr.message}`);
       steps.push('size-adjustments:error');
     }
+  }
+
+  // ── 4. Promos y extras por defecto (migración SSOT → DB, idempotente) ──
+  // v15 (2026-08-31): las promos que antes vivían en código se siembran en la
+  // tabla promos (una vez) para que el Admin las edite/active/desactive.
+  try {
+    seedDefaultPromos(db);
+  } catch (promoErr) {
+    log(`[Bootstrap] Error sembrando promos: ${promoErr.message}`);
   }
 
   const seeded = staffCount === 0;
