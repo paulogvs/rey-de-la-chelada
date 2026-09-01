@@ -64,13 +64,18 @@ export function ReportView({ token, onToast, initialDate }: ReportViewProps) {
   return (
     <div className="admin-view">
       <div className="admin-toolbar">
-        <FormField
-          type="date"
-          variant="constrained" className="form-input--mono"
-          value={date}
-          onChange={e => setDate(e.target.value)}
-          aria-label="Día del cierre"
-        />
+        {/* v14: el datepicker interno solo se muestra cuando NO hay un picker
+            global (Caja no tiene topbar de fecha; Admin sí → usa el global de
+            arriba a la derecha, y aquí no se duplica). */}
+        {!initialDate && (
+          <FormField
+            type="date"
+            variant="constrained" className="form-input--mono"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            aria-label="Día del cierre"
+          />
+        )}
         <Badge variant="info">{closings.length} cierre(s)</Badge>
         <Button variant="secondary" size="sm" onClick={load} loading={loading}>
           <AppIcon name="refresh" size="sm" /> Refrescar
