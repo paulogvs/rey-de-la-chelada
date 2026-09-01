@@ -680,3 +680,18 @@
 }
 .admin-switch input:checked + .admin-switch__slider { background: var(--dorado-rey); }
 .admin-switch input:checked + .admin-switch__slider::before { transform: translateX(20px); }
+
+/* ============ Armador de Promos v16 (diseño app) ============ */
+.admin-promo-line { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.admin-promo-line__label { font-weight: 600; }
+.admin-promo-line__qty { display: inline-flex; align-items: center; gap: 4px; }
+.admin-promo-line__qty-input {
+  width: 52px; padding: 6px 8px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary);
+  font-size: 14px; text-align: center;
+}
+.admin-promo-line__qty-input:focus { outline: none; border-color: var(--dorado-rey); box-shadow: var(--focus-ring); }
+.admin-promo-line__extra { flex: 0 0 auto; max-width: 220px; min-width: 150px; appearance: none;
+  padding: 8px 30px 8px 12px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23c9a227' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+}

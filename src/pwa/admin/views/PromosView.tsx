@@ -250,38 +250,34 @@ export function PromosView({ token, onToast }: PromosViewProps) {
                   const catExtras = line.group_id ? (extrasByCat[line.group_id] || []) : [];
                   return (
                     <div key={line.key} className="admin-promo-line">
-                      <span>{line._label} ×
+                      <span className="admin-promo-line__label">{line._label}</span>
+                      <span className="admin-promo-line__qty">
+                        ×
                         <input
                           type="number"
                           min={1}
                           value={line.quantity || 1}
-                          style={{ width: 48, marginInline: 4 }}
+                          className="admin-promo-line__qty-input"
                           onChange={e => updateLineQuantity(line.key, Math.max(1, Number(e.target.value) || 1))}
                           aria-label="Cantidad"
                         />
                       </span>
-                      {/* v16: extra opcional de la línea */}
+                      {/* v16: extra opcional de la línea (controlado) */}
                       {line.group_id && (
                         <select
-                          defaultValue=""
+                          className="form-input admin-promo-line__extra"
+                          value={line.extra_id || ''}
                           onChange={e => {
                             const ex = catExtras.find(x => x.id === e.target.value);
                             setLineExtra(line.key, ex ? ex.id : '', ex ? ex.price : 0);
-                            e.target.value = '';
                           }}
                           title="Agregar extra (0 = gratis)"
                         >
-                          <option value="">+ Extra…</option>
+                          <option value="">+ Extra… (gratis si aplica)</option>
                           {catExtras.map(ex => (
                             <option key={ex.id} value={ex.id}>{ex.name} ({ex.price ? formatMoney(ex.price) : 'gratis'})</option>
                           ))}
                         </select>
-                      )}
-                      {line.extra_id && (
-                        <span className="admin-muted" style={{ fontSize: 12 }}>
-                          → {catExtras.find(x => x.id === line.extra_id)?.name || 'Extra'} (+{formatMoney(line.extra_price ?? 0)})
-                          <button type="button" onClick={() => setLineExtra(line.key, '', 0)} aria-label="Quitar extra"><AppIcon name="x" size="sm" /></button>
-                        </span>
                       )}
                       <button type="button" onClick={() => removeLine(line.key)} aria-label="Quitar línea"><AppIcon name="x" size="sm" /></button>
                     </div>
@@ -297,7 +293,7 @@ export function PromosView({ token, onToast }: PromosViewProps) {
                   </select>
                   <select defaultValue="" onChange={e => {
                     const v = e.target.value;
-                    if (v) { addLine('group', v, v); e.target.value = ''; }
+                    if (v) { const c = categories.find(x => x.id === v); if (c) addLine('group', v, c.name); e.target.value = ''; }
                   }}>
                     <option value="">+ Agregar grupo…</option>
                     {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
