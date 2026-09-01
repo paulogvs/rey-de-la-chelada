@@ -80,6 +80,18 @@ describe('clasificación grupo vs item', () => {
     const promo = { id: 'p', label: 'Shot', price_mode: 'MENU_PLUS', price_value: 0, lines: [{ group_id: 'micheladas', quantity: 1, extra_id: 'e1', extra_price: 0 }] };
     expect(promoExtraFor(michelada, promo)?.extra_id).toBe('e1');
   });
+
+  it('promo MIXTA (líneas de grupo + item) → se trata como GRUPO (modal selector)', () => {
+    const promo = {
+      id: 'p', label: 'Mixta', price_mode: 'FIXED', price_value: 5000,
+      lines: [{ group_id: 'micheladas', quantity: 1 }, { item_id: 'q1', quantity: 1 }],
+    };
+    // El modal selector se abre porque hay una línea de grupo (elige item).
+    expect(isGroupPromo(promo)).toBe(true);
+    expect(isItemPromo(promo)).toBe(false);
+    expect(promoGroupIds(promo)).toEqual(['micheladas']);
+    expect(promoItemIds(promo)).toEqual(['q1']);
+  });
 });
 
 describe('normalizePromosForCollapsible — forma { id, label, description }', () => {

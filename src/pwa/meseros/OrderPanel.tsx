@@ -30,7 +30,6 @@ import { fetchMenuCategories, fetchMenuItems, fetchMenuItemDetail, type MenuItem
 import { createOrder, fetchOrderById, deliverOrder, addOrderItem, removeOrderItem, type Order } from '../_shared/api/ordersApi';
 import { BottomCartBar } from './components/BottomCartBar';
 import { CartModal } from './components/CartModal';
-import { PromosCollapsible } from './components/PromosCollapsible';
 import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
 import { computeTotals } from '@/core/config/iva';
@@ -158,7 +157,7 @@ interface DetailGroup {
 
 export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, onBack, onRequestPayment, wsRefresh = 0, isOnline = true, pendingCount = 0, onOfflineQueue }: OrderPanelProps) {
   const { addToast } = useToast();
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string; area?: 'bar' | 'cocina' | null }[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   // S2-Tabs: área activa (Barra | Cocina | Promos), default 'barra'
@@ -404,7 +403,9 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
   // cuando el WS avisa que el menú cambió en Admin (menu_changed).
   const loadMenu = useCallback(async () => {
     const [cats, its] = await Promise.all([fetchMenuCategories(), fetchMenuItems()]);
-    if (cats.ok) setCategories(cats.categories.map(c => ({ id: c.id, name: c.name })));
+    // v17: propagar `area` de la categoría (autoridad del grupo) — el panel usa
+    // category.area con fallback al primer item (menuAreas).
+    if (cats.ok) setCategories(cats.categories.map(c => ({ id: c.id, name: c.name, area: c.area ?? null })));
     if (its.ok) setItems(its.items.filter(i => i.is_active === 1 && i.is_available === 1));
   }, []);
 
@@ -877,6 +878,39 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
         ))}
       </div>
 
+      {/* v3 (2026-09-01): tab PROMOS → listado de promos ACTIVAS de la DB.
+          Ya NO es la categoría "Promociones" del menú; solo desde esta tab
+          se agregan promos al pedido (el PromosCollapsible del carrito se quitó). */}
+      {activeArea === 'promos' ? (
+        <div className="order-panel__promos">
+          <h3 className="order-panel__promos-title">Promos del turno · {businessDayNameLabel}</h3>
+          {activePromos.length === 0 ? (
+            <EmptyState compact icon={<AppIcon name="tag" size="lg" />} message="No hay promos activas en este momento" />
+          ) : (
+            <div className="order-panel__promos-list">
+              {activePromos.map(promo => {
+                const applied = cart.some(ci => ci.promoType === promo.id);
+                return (
+                  <button
+                    key={promo.id}
+                    className={`order-panel__promo-btn${applied ? ' order-panel__promo-btn--applied' : ''}`}
+                    onClick={() => handleApplyPromo(promo.id)}
+                    title={promo.description}
+                    type="button"
+                  >
+                    <span className="order-panel__promo-btn-name">{promo.label}</span>
+                    <span className="order-panel__promo-btn-desc">{promo.description}</span>
+                    <span className="order-panel__promo-btn-action">
+                      {applied ? 'Añadida ✓' : isGroupPromo(promo) ? 'Elegir' : 'Aplicar'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+      <>
       {/* Category bar (nivel 2) */}
       <nav className="order-panel__categories">
         <button
@@ -936,6 +970,8 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
             </button>
           ))}
           </div>
+      </>
+      )}
         </div>
 
         {/* Cart */}
@@ -963,8 +999,8 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
             <span>Confirma los productos con el cliente</span>
           </div>
 
-          {/* ── Sprint Promos: se renderizan al final del body (PromosCollapsible)
-                 para no empujar los items del pedido — rediseño 2026-08-21 ── */}
+          {/* v3 (2026-09-01): las promos se agregan SOLO desde la tab Promos;
+              se quitó el PromosCollapsible del carrito para evitar doble vía. */}
 
           {cart.length === 0 && (
             <p className="order-panel__cart-empty">
@@ -1046,19 +1082,7 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
             );
           })}
 
-          {/* ── Promos del turno laboral: colapsable al final, no empuja items ── */}
-          {activePromos.length > 0 && (
-            <PromosCollapsible
-              businessDayNameLabel={businessDayNameLabel}
-              promos={activePromos}
-              appliedIds={cart.filter(ci => ci.promoType).map(ci => ci.promoType as string)}
-              onToggle={id => {
-                const applied = cart.some(ci => ci.promoType === id);
-                if (applied) handleClearPromo(id); else handleApplyPromo(id);
-              }}
-              savings={savings.savings}
-            />
-          )}
+          {/* ── v3: PromosCollapsible eliminado del carrito — solo desde la tab Promos ── */}
 
           {cart.length > 0 && (
             <div className="order-panel__cart-total">

@@ -52,7 +52,11 @@
 //   - price_value INTEGER NOT NULL DEFAULT 0     → para FIXED = total del pack;
 //     para MENU_PLUS = ajuste (+centavos). ADD COLUMN aditivo; las promos
 //     existentes quedan con FIXED y price_value=0 (el seed v16 las rellena).
-const SCHEMA_VERSION = 16;
+// v17 (2026-09-01): AREA DEL GRUPO. `menu_categories.area` ('bar'|'cocina') —
+// el área ahora se define en el GRUPO (Barra/Cocina) y se HEREDA a los items
+// ("FORZAR TODO"). ADD COLUMN aditivo: las categorías existentes infieren el
+// área de su primer item (o 'cocina' si está vacía) y se fuerzan sus items.
+const SCHEMA_VERSION = 17;
 
 const CREATE_TABLES = [
   // â”€â”€ Staff / Users (v5: 4 roles â€” admin, mesero, kds, caja) â”€â”€â”€â”€â”€
@@ -544,11 +548,38 @@ function applySchema(db) {
          db.exec(`ALTER TABLE promos ADD COLUMN price_mode TEXT NOT NULL DEFAULT 'FIXED'`);
          console.log('[DB] Migration v16: promos.price_mode (modelo A/B)');
        }
-       if (!hasColumn(db, 'promos', 'price_value')) {
-         db.exec(`ALTER TABLE promos ADD COLUMN price_value INTEGER NOT NULL DEFAULT 0`);
-         console.log('[DB] Migration v16: promos.price_value');
-       }
-       // Record schema version
+        if (!hasColumn(db, 'promos', 'price_value')) {
+          db.exec(`ALTER TABLE promos ADD COLUMN price_value INTEGER NOT NULL DEFAULT 0`);
+          console.log('[DB] Migration v16: promos.price_value');
+        }
+        // v17 (2026-09-01): menu_categories.area — el área ahora vive en el
+        // GRUPO (Barra/Cocina) y se HEREDA a los items ("FORZAR TODO").
+        // ADD COLUMN aditivo, no destructivo:
+        //   - Si la categoría tiene items → area = área del PRIMER item (infiere).
+        //   - Si la categoría está vacía → default 'cocina'.
+        //   - Luego se FORZAN todos los items del grupo a esa área (el KDS
+        //     lee menu_items.area → baja al KDS del grupo correcto al instante).
+        // Solo corre cuando la columna no existe (una vez; DB v16 → v17).
+        if (!hasColumn(db, 'menu_categories', 'area')) {
+          db.exec(`ALTER TABLE menu_categories ADD COLUMN area TEXT NOT NULL DEFAULT 'cocina'`);
+          db.exec(`
+            UPDATE menu_categories
+            SET area = COALESCE((
+              SELECT mi.area FROM menu_items mi
+              WHERE mi.category_id = menu_categories.id
+                AND mi.area IN ('bar','cocina')
+              ORDER BY mi.sort_order ASC, mi.created_at ASC LIMIT 1
+            ), 'cocina')
+          `);
+          db.exec(`
+            UPDATE menu_items
+            SET area = (SELECT mc.area FROM menu_categories mc WHERE mc.id = menu_items.category_id),
+                updated_at = datetime('now')
+            WHERE EXISTS (SELECT 1 FROM menu_categories mc WHERE mc.id = menu_items.category_id)
+          `);
+          console.log('[DB] Migration v17: menu_categories.area (área por grupo) + herencia a items');
+        }
+        // Record schema version
       db.prepare(`INSERT OR REPLACE INTO schema_version (version) VALUES (?)`).run(SCHEMA_VERSION);
     });
 

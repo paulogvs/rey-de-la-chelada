@@ -15,6 +15,8 @@ export interface MenuCategory {
   emoji: string;
   sort_order: number;
   is_active: number;
+  /** v17: área del grupo (Barra | Cocina) — la DB la guarda en menu_categories.area */
+  area?: 'bar' | 'cocina' | null;
 }
 
 export interface MenuItem {

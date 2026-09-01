@@ -32,7 +32,7 @@ describe('Schema v13 — cierre de caja rediseñado', () => {
     expect(opening.type).toContain('INTEGER');
     expect(String(opening.dflt_value)).toBe('0');
     // Versión registrada
-    expect(db.prepare('SELECT version FROM schema_version').get().version).toBe(16);
+    expect(db.prepare('SELECT version FROM schema_version').get().version).toBe(17);
     db.close();
   });
 
@@ -80,7 +80,7 @@ describe('Schema v13 — cierre de caja rediseñado', () => {
     expect(row.expected_cash).toBe(5000); // dato viejo preservado
     expect(row.opening_cash).toBe(0);     // columna nueva con default
     expect(row.transactions).toBe(0);
-    expect(db.prepare('SELECT version FROM schema_version ORDER BY version DESC LIMIT 1').get().version).toBe(16);
+    expect(db.prepare('SELECT version FROM schema_version ORDER BY version DESC LIMIT 1').get().version).toBe(17);
     db.close();
   });
 });

@@ -215,6 +215,8 @@ export interface MenuCategoryRow {
   emoji: string | null;
   sort_order: number;
   is_active: number;
+  /** v17: área del grupo (Barra | Cocina) — la DB la guarda en menu_categories.area */
+  area?: 'bar' | 'cocina' | null;
 }
 
 export interface MenuCategoryResult extends ApiResult<{ category?: MenuCategoryRow }> {
@@ -251,6 +253,8 @@ export interface MenuCategoryInput {
   emoji?: string;
   description?: string;
   sort_order?: number;
+  /** v17: área del grupo (Barra | Cocina) — se hereda a los items del grupo */
+  area?: 'bar' | 'cocina';
 }
 
 /** POST /api/menu/items — crear item (admin) */

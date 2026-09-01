@@ -70,13 +70,13 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
   const [importing, setImporting] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, ItemDraft>>({});
   // Crear/editar apartado
-  const [catForm, setCatForm] = useState<{ open: boolean; id: string | null; name: string; emoji: string }>({
-    open: false, id: null, name: '', emoji: '🍽',
+  const [catForm, setCatForm] = useState<{ open: boolean; id: string | null; name: string; emoji: string; area: 'bar' | 'cocina' }>({
+    open: false, id: null, name: '', emoji: '🍽', area: 'cocina',
   });
-  // Crear/editar item
+  // Crear/editar item (v17: el área se HEREDA del apartado — ya no se elige aquí)
   const [itemForm, setItemForm] = useState<{
-    open: boolean; id: string | null; categoryId: string; name: string; area: 'bar' | 'cocina';
-  }>({ open: false, id: null, categoryId: '', name: '', area: 'cocina' });
+    open: boolean; id: string | null; categoryId: string; name: string;
+  }>({ open: false, id: null, categoryId: '', name: '' });
   // v15 (2026-08-29): extras por categoría — cargados bajo demanda + mini-form
   const [extrasByCat, setExtrasByCat] = useState<Record<string, Extra[]>>({});
   const [extraForm, setExtraForm] = useState<{ open: boolean; categoryId: string; name: string; price: number }>({
@@ -238,11 +238,11 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
       return;
     }
     const result = catForm.id
-      ? await updateMenuCategory(token, catForm.id, { name: catForm.name.trim(), emoji: catForm.emoji || '🍽' })
-      : await createMenuCategory(token, { name: catForm.name.trim(), emoji: catForm.emoji || '🍽' });
+      ? await updateMenuCategory(token, catForm.id, { name: catForm.name.trim(), emoji: catForm.emoji || '🍽', area: catForm.area })
+      : await createMenuCategory(token, { name: catForm.name.trim(), emoji: catForm.emoji || '🍽', area: catForm.area });
     if (result.ok) {
       onToast('success', catForm.id ? 'Apartado actualizado' : 'Apartado creado');
-      setCatForm({ open: false, id: null, name: '', emoji: '🍽' });
+      setCatForm({ open: false, id: null, name: '', emoji: '🍽', area: 'cocina' });
       await load();
     } else {
       onToast('error', result.error || 'Error con el apartado');
@@ -281,12 +281,13 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
       onToast('warning', 'Nombre y apartado requeridos');
       return;
     }
+    // v17: el área NO se manda — el server la hereda del apartado (category_id).
     const result = itemForm.id
-      ? await updateMenuItem(token, itemForm.id, { name: itemForm.name.trim(), category_id: itemForm.categoryId, area: itemForm.area })
-      : await createMenuItem(token, { name: itemForm.name.trim(), category_id: itemForm.categoryId, area: itemForm.area, price: null });
+      ? await updateMenuItem(token, itemForm.id, { name: itemForm.name.trim(), category_id: itemForm.categoryId })
+      : await createMenuItem(token, { name: itemForm.name.trim(), category_id: itemForm.categoryId, price: null });
     if (result.ok) {
       onToast('success', itemForm.id ? 'Item actualizado' : 'Item creado');
-      setItemForm({ open: false, id: null, categoryId: '', name: '', area: 'cocina' });
+      setItemForm({ open: false, id: null, categoryId: '', name: '' });
       await load();
     } else {
       onToast('error', result.error || 'Error al guardar item');
@@ -317,7 +318,7 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
           onChange={e => setFilter(e.target.value)}
           aria-label="Buscar item"
         />
-        <Button variant="primary" size="sm" onClick={() => setCatForm({ open: true, id: null, name: '', emoji: '🍽' })}>
+        <Button variant="primary" size="sm" onClick={() => setCatForm({ open: true, id: null, name: '', emoji: '🍽', area: 'cocina' })}>
           <AppIcon name="plus" size="sm" /> Nuevo apartado
         </Button>
         <Button variant="secondary" size="sm" onClick={handleImport} loading={importing}>
@@ -331,7 +332,7 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
 
       {/* v15: modal para crear/renombrar apartado */}
       {catForm.open && (
-        <Modal open={catForm.open} onClose={() => setCatForm({ open: false, id: null, name: '', emoji: '🍽' })} title={catForm.id ? 'Renombrar apartado' : 'Nuevo apartado'}>
+        <Modal open={catForm.open} onClose={() => setCatForm({ open: false, id: null, name: '', emoji: '🍽', area: 'cocina' })} title={catForm.id ? 'Renombrar apartado' : 'Nuevo apartado'}>
           <div className="admin-menu-form">
             <FormField
               label="Nombre"
@@ -345,8 +346,16 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
               onChange={e => setCatForm(f => ({ ...f, emoji: e.target.value }))}
               maxLength={4}
             />
+            {/* v17: área del GRUPO (Barra/Cocina) — se hereda a todos sus items */}
+            <label className="form-field">
+              <span className="form-field__label">Área (KDS)</span>
+              <select className="form-input" value={catForm.area} onChange={e => setCatForm(f => ({ ...f, area: e.target.value as 'bar' | 'cocina' }))}>
+                <option value="bar">Barra</option>
+                <option value="cocina">Cocina</option>
+              </select>
+            </label>
             <div className="admin-promo-actions">
-              <Button variant="ghost" size="sm" onClick={() => setCatForm({ open: false, id: null, name: '', emoji: '🍽' })}>Cancelar</Button>
+              <Button variant="ghost" size="sm" onClick={() => setCatForm({ open: false, id: null, name: '', emoji: '🍽', area: 'cocina' })}>Cancelar</Button>
               <Button variant="primary" size="sm" onClick={handleSaveCategory}>
                 {catForm.id ? 'Guardar' : 'Crear apartado'}
               </Button>
@@ -355,9 +364,9 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
         </Modal>
       )}
 
-      {/* v15: modal para crear/editar item */}
+      {/* v15: modal para crear/editar item (v17: sin área — se hereda del apartado) */}
       {itemForm.open && (
-        <Modal open={itemForm.open} onClose={() => setItemForm({ open: false, id: null, categoryId: '', name: '', area: 'cocina' })} title={itemForm.id ? 'Editar item' : 'Nuevo item'}>
+        <Modal open={itemForm.open} onClose={() => setItemForm({ open: false, id: null, categoryId: '', name: '' })} title={itemForm.id ? 'Editar item' : 'Nuevo item'}>
           <div className="admin-menu-form">
             <FormField
               label="Nombre"
@@ -371,15 +380,9 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
                 {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
               </select>
             </label>
-            <label className="form-field">
-              <span className="form-field__label">Área</span>
-              <select className="form-input" value={itemForm.area} onChange={e => setItemForm(f => ({ ...f, area: e.target.value as 'bar' | 'cocina' }))}>
-                <option value="bar">Barra</option>
-                <option value="cocina">Cocina</option>
-              </select>
-            </label>
+            <p className="admin-muted">El área (Barra/Cocina) se hereda del apartado.</p>
             <div className="admin-promo-actions">
-              <Button variant="ghost" size="sm" onClick={() => setItemForm({ open: false, id: null, categoryId: '', name: '', area: 'cocina' })}>Cancelar</Button>
+              <Button variant="ghost" size="sm" onClick={() => setItemForm({ open: false, id: null, categoryId: '', name: '' })}>Cancelar</Button>
               <Button variant="primary" size="sm" onClick={handleSaveItem}>
                 {itemForm.id ? 'Guardar cambios' : 'Crear item'}
               </Button>
@@ -402,7 +405,7 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
                 <div className="admin-menu-cat__actions">
                   {cat && (
                     <>
-                      <Button variant="ghost" size="sm" onClick={() => setCatForm({ open: true, id: cat.id, name: cat.name, emoji: cat.emoji || '🍽' })} title="Renombrar">
+                      <Button variant="ghost" size="sm" onClick={() => setCatForm({ open: true, id: cat.id, name: cat.name, emoji: cat.emoji || '🍽', area: cat.area === 'bar' ? 'bar' : 'cocina' })} title="Renombrar">
                         <AppIcon name="edit" size="sm" />
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => handleToggleCategory(cat)} title={cat.is_active === 1 ? 'Ocultar apartado' : 'Mostrar apartado'}>
@@ -413,7 +416,7 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
                       </Button>
                     </>
                   )}
-                  <Button variant="secondary" size="sm" onClick={() => setItemForm({ open: true, id: null, categoryId: cat?.id ?? '', name: '', area: 'cocina' })}>
+                  <Button variant="secondary" size="sm" onClick={() => setItemForm({ open: true, id: null, categoryId: cat?.id ?? '', name: '' })}>
                     <AppIcon name="plus" size="sm" /> Agregar item
                   </Button>
                   {cat && (
@@ -468,7 +471,7 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
                           )}
                         </div>
                         <div className="admin-bulk-item__actions">
-                          <Button variant="ghost" size="sm" onClick={() => setItemForm({ open: true, id: item.id, categoryId: item.category_id, name: item.name, area: item.area === 'bar' ? 'bar' : 'cocina' })} title="Editar">
+                          <Button variant="ghost" size="sm" onClick={() => setItemForm({ open: true, id: item.id, categoryId: item.category_id, name: item.name })} title="Editar">
                             <AppIcon name="edit" size="sm" />
                           </Button>
                           <Button variant="ghost" size="sm" onClick={() => handleToggleItem(item)} title={item.is_active === 1 ? 'Ocultar' : 'Mostrar'}>

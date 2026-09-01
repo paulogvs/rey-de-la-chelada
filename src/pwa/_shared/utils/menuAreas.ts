@@ -21,6 +21,9 @@ export type AreaTab = 'barra' | 'cocina' | 'promos';
 export interface CategoryLike {
   id: string;
   name: string;
+  /** v17: área del GRUPO ('bar' | 'cocina') — la DB ahora la guarda en
+   *  menu_categories.area. Si viene, es la autoridad; si no, se infiere. */
+  area?: 'bar' | 'cocina' | null;
 }
 
 /** Mínimo necesario de un item de menú. */
@@ -38,16 +41,19 @@ export function isPromosCategory(categoryName: string): boolean {
 }
 
 /**
- * Área (tab) de una categoría. Inferida del primer item de la categoría.
- * Una categoría sin items cae en 'barra' (default razonable: la mayoría
- * de categorías del menú son de barra y todas las activas tienen items).
+ * Área (tab) de una categoría. v17: si la categoría tiene `area` en la DB
+ * (menu_categories.area) se usa como autoridad. Fallback: inferida del primer
+ * item de la categoría. Una categoría sin items y sin area cae en 'barra'.
  */
 export function areaForCategory(
   categoryId: string,
   categoryName: string,
   items: ItemLike[],
+  categoryArea?: 'bar' | 'cocina' | null,
 ): AreaTab {
   if (isPromosCategory(categoryName)) return 'promos';
+  if (categoryArea === 'cocina') return 'cocina';
+  if (categoryArea === 'bar') return 'barra';
   const item = items.find((i) => i.category_id === categoryId);
   return item && item.area === 'cocina' ? 'cocina' : 'barra';
 }
@@ -59,7 +65,7 @@ export function groupCategoriesByArea<T extends CategoryLike>(
 ): Record<AreaTab, T[]> {
   const result: Record<AreaTab, T[]> = { barra: [], cocina: [], promos: [] };
   for (const cat of categories) {
-    result[areaForCategory(cat.id, cat.name, items)].push(cat);
+    result[areaForCategory(cat.id, cat.name, items, cat.area)].push(cat);
   }
   return result;
 }
@@ -70,5 +76,5 @@ export function getCategoriesForArea<T extends CategoryLike>(
   items: ItemLike[],
   area: AreaTab,
 ): T[] {
-  return categories.filter((c) => areaForCategory(c.id, c.name, items) === area);
+  return categories.filter((c) => areaForCategory(c.id, c.name, items, c.area) === area);
 }

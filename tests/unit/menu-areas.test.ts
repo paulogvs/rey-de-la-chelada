@@ -8,7 +8,7 @@ import {
 } from '@/pwa/_shared/utils/menuAreas';
 import type { MenuCategory, MenuItem } from '@/pwa/_shared/api/menuApi';
 
-function cat(id: string, name: string): MenuCategory {
+function cat(id: string, name: string, area?: 'bar' | 'cocina' | null): MenuCategory {
   return {
     id,
     name,
@@ -16,6 +16,7 @@ function cat(id: string, name: string): MenuCategory {
     emoji: '🍽',
     sort_order: 0,
     is_active: 1,
+    area,
   };
 }
 
@@ -69,6 +70,52 @@ describe('areaForCategory', () => {
 
   it('categoría sin items → barra (default)', () => {
     expect(areaForCategory('cat-vacia', 'Categoría Vacía', items)).toBe('barra');
+  });
+});
+
+describe('areaForCategory — v17 con category.area (autoridad del GRUPO)', () => {
+  const items: MenuItem[] = [
+    item('m1', 'cat-bar', 'bar'),
+    item('m2', 'cat-mix', 'cocina'),
+  ];
+
+  it('category.area gana sobre el primer item', () => {
+    // La categoría dice 'cocina' pero su primer item es 'bar' → manda el grupo.
+    expect(areaForCategory('cat-mix', 'Mixtos', items, 'cocina')).toBe('cocina');
+    expect(areaForCategory('cat-mix', 'Mixtos', items, 'bar')).toBe('barra');
+  });
+
+  it('sin category.area → fallback al primer item (comportamiento legacy)', () => {
+    expect(areaForCategory('cat-mix', 'Mixtos', items)).toBe('cocina');
+    expect(areaForCategory('cat-bar', 'Bar', items)).toBe('barra');
+  });
+
+  it('category.area null → fallback al primer item', () => {
+    expect(areaForCategory('cat-mix', 'Mixtos', items, null)).toBe('cocina');
+  });
+
+  it('Promociones → promos SIEMPRE (independiente de category.area)', () => {
+    expect(areaForCategory('cat-p', 'Promociones', items, 'bar')).toBe('promos');
+  });
+});
+
+describe('getCategoriesForArea — v17 usa category.area para agrupar', () => {
+  const categories = [
+    cat('c1', 'Micheladas', 'bar'),
+    cat('c2', 'Ensaladas', 'cocina'),
+    cat('c3', 'Promociones', 'bar'),
+  ];
+  const items: MenuItem[] = [
+    item('m1', 'c1', 'bar'),
+    // c2 NO tiene item con area cocina (para probar que manda el área del grupo)
+    item('m2', 'c2', 'bar'),
+    item('m3', 'c3', 'bar'),
+  ];
+
+  it('agrupa por el area del GRUPO, no del primer item', () => {
+    expect(getCategoriesForArea(categories, items, 'barra').map(c => c.id)).toEqual(['c1']);
+    expect(getCategoriesForArea(categories, items, 'cocina').map(c => c.id)).toEqual(['c2']);
+    expect(getCategoriesForArea(categories, items, 'promos').map(c => c.id)).toEqual(['c3']);
   });
 });
 

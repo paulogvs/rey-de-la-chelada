@@ -8,7 +8,6 @@ import { formatMoney } from '../../_shared/utils/format';
 import { resolveCartPromoUnitPrice, type PromoCartItem } from '../promoCart';
 import type { DbPromoLike } from '../promosData';
 import type { CartItem } from '../OrderPanel';
-import { PromosCollapsible } from './PromosCollapsible';
 import './CartModal.css';
 
 function resolveCartUnitPrice(
@@ -60,9 +59,9 @@ export function CartModal({
   onConfirm,
   submitting,
   businessDay: _businessDay,
-  businessDayNameLabel,
+  businessDayNameLabel: _businessDayNameLabel,
   activePromos,
-  onApplyPromo,
+  onApplyPromo: _onApplyPromo,
   onClearPromo,
 }: CartModalProps) {
   const handleNotes = useCallback(
@@ -168,18 +167,9 @@ export function CartModal({
             )}
           </section>
 
-          {activePromos.length > 0 && (
-            <PromosCollapsible
-              businessDayNameLabel={businessDayNameLabel}
-              promos={activePromos}
-              appliedIds={cart.filter(ci => ci.promoType).map(ci => ci.promoType as string)}
-              onToggle={id => {
-                const applied = cart.some(ci => ci.promoType === id);
-                if (applied) onClearPromo(id); else onApplyPromo(id);
-              }}
-              savings={savings.savings}
-            />
-          )}
+          {/* v3 (2026-09-01): los promos se agregan SOLO desde la tab Promos —
+              se quitó el PromosCollapsible del carrito (doble vía eliminada). Los
+              items con promoType ya muestran su badge en la línea del carrito. */}
 
           {cart.length > 0 && (
             <div className="order-panel__cart-total">

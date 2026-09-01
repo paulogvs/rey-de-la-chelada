@@ -31,6 +31,12 @@ import {
   applyBulkModifierPriceUpdates,
 } from '../services/menu-bulk-updates.js';
 import { createModifierGroupsForItem, createAdditionsModifiersForItem } from '../scripts/menu-modifier-helpers.js';
+// v17 (2026-09-01): broadcast explícito por mutador — el middleware final
+// router.use que envolvía res.json NUNCA interceptaba las rutas mutadoras
+// (estaban registradas ANTES que el middleware), por eso crear/editar items
+// no refrescaba el menú en meseros. Ahora cada mutador 2xx emite
+// broadcastMenuChanged() explícitamente (debounce 1s dentro de la función).
+import { broadcastMenuChanged } from '../services/order-broadcaster.js';
 
 const router = Router();
 
@@ -47,7 +53,7 @@ router.get('/categories', (req, res) => {
     const { include_inactive } = req.query;
     const where = include_inactive === 'true' ? '1=1' : 'is_active = 1';
     const categories = db.prepare(
-      `SELECT id, name, description, emoji, sort_order, is_active
+      `SELECT id, name, description, emoji, sort_order, is_active, area
        FROM menu_categories WHERE ${where} ORDER BY sort_order ASC, name ASC`
     ).all();
     res.json({ success: true, categories });
@@ -205,18 +211,20 @@ router.get('/items/:id', (req, res) => {
 
 router.post('/categories', requireAuth, requireRole('admin'), (req, res) => {
   try {
-    const { name, description, emoji, sort_order } = req.body;
+    const { name, description, emoji, sort_order, area } = req.body;
     if (!name) {
       return res.status(400).json({ success: false, error: 'Nombre requerido', code: 'NAME_REQUIRED' });
     }
 
     const db = getDb();
     const id = randomUUID();
+    const catArea = area === 'bar' ? 'bar' : 'cocina';
     db.prepare(
-      'INSERT INTO menu_categories (id, name, description, emoji, sort_order) VALUES (?, ?, ?, ?, ?)'
-    ).run(id, name, description || '', emoji || '🍽', sort_order ?? 0);
+      'INSERT INTO menu_categories (id, name, description, emoji, sort_order, area) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(id, name, description || '', emoji || '🍽', sort_order ?? 0, catArea);
 
     const category = db.prepare('SELECT * FROM menu_categories WHERE id = ?').get(id);
+    broadcastMenuChanged();
     res.status(201).json({ success: true, category });
   } catch (err) {
     console.error('[Menu] Create category error:', err.message);
@@ -230,7 +238,7 @@ router.post('/categories', requireAuth, requireRole('admin'), (req, res) => {
 
 router.put('/categories/:id', requireAuth, requireRole('admin'), (req, res) => {
   try {
-    const { name, description, emoji, sort_order, is_active } = req.body;
+    const { name, description, emoji, sort_order, is_active, area } = req.body;
     const db = getDb();
 
     const existing = db.prepare('SELECT id FROM menu_categories WHERE id = ?').get(req.params.id);
@@ -245,6 +253,9 @@ router.put('/categories/:id', requireAuth, requireRole('admin'), (req, res) => {
     if (emoji !== undefined) { updates.push('emoji = ?'); params.push(emoji); }
     if (sort_order !== undefined) { updates.push('sort_order = ?'); params.push(sort_order); }
     if (is_active !== undefined) { updates.push('is_active = ?'); params.push(is_active ? 1 : 0); }
+    // v17: área del grupo. Si cambia → FORZAR todos los items del grupo a esa área.
+    const changeArea = area === 'bar' || area === 'cocina';
+    if (changeArea) { updates.push('area = ?'); params.push(area); }
 
     if (updates.length === 0) {
       return res.status(400).json({ success: false, error: 'Nada que actualizar', code: 'NO_UPDATES' });
@@ -254,7 +265,13 @@ router.put('/categories/:id', requireAuth, requireRole('admin'), (req, res) => {
     params.push(req.params.id);
     db.prepare(`UPDATE menu_categories SET ${updates.join(', ')} WHERE id = ?`).run(...params);
 
+    // "FORZAR TODO": al cambiar el área del grupo, heredarla a todos sus items.
+    if (changeArea) {
+      db.prepare(`UPDATE menu_items SET area = ?, updated_at = datetime('now') WHERE category_id = ?`).run(area, req.params.id);
+    }
+
     const updated = db.prepare('SELECT * FROM menu_categories WHERE id = ?').get(req.params.id);
+    broadcastMenuChanged();
     res.json({ success: true, category: updated });
   } catch (err) {
     console.error('[Menu] Update category error:', err.message);
@@ -268,7 +285,7 @@ router.put('/categories/:id', requireAuth, requireRole('admin'), (req, res) => {
 
 router.post('/items', requireAuth, requireRole('admin'), (req, res) => {
   try {
-    const { name, subtitle, description, price, currency, category_id, image_url, sort_order, is_available, area, preparation_time } = req.body;
+    const { name, subtitle, description, price, currency, category_id, image_url, sort_order, is_available, preparation_time } = req.body;
 
     if (!name || price === undefined || !category_id) {
       return res.status(400).json({
@@ -281,7 +298,8 @@ router.post('/items', requireAuth, requireRole('admin'), (req, res) => {
     const db = getDb();
 
     // Verify category exists
-    const cat = db.prepare('SELECT id FROM menu_categories WHERE id = ?').get(category_id);
+    // v17: el área del item se HEREDA del grupo (menu_categories.area).
+    const cat = db.prepare('SELECT id, area FROM menu_categories WHERE id = ?').get(category_id);
     if (!cat) {
       return res.status(404).json({ success: false, error: 'Categoría no encontrada', code: 'CATEGORY_NOT_FOUND' });
     }
@@ -289,6 +307,8 @@ router.post('/items', requireAuth, requireRole('admin'), (req, res) => {
     const id = randomUUID();
     // Booleanos JS → 0/1 (SQLite no acepta true/false al bindear)
     const availableInt = is_available ? 1 : 0;
+    // La estrategia "FORZAR TODO": el item hereda el área del grupo, no del body.
+    const itemArea = cat.area === 'bar' ? 'bar' : 'cocina';
     db.prepare(`
       INSERT INTO menu_items (id, category_id, name, subtitle, description, price, currency,
                               image_url, is_available, sort_order, area, preparation_time)
@@ -296,10 +316,11 @@ router.post('/items', requireAuth, requireRole('admin'), (req, res) => {
     `).run(
       id, category_id, name, subtitle || '', description || '', price,
       currency || 'BOB', image_url || '', availableInt, sort_order ?? 0,
-      area || 'cocina', preparation_time ?? 15
+      itemArea, preparation_time ?? 15
     );
 
     const item = db.prepare('SELECT * FROM menu_items WHERE id = ?').get(id);
+    broadcastMenuChanged();
     res.status(201).json({ success: true, item });
   } catch (err) {
     console.error('[Menu] Create item error:', err.message);
@@ -313,8 +334,12 @@ router.post('/items', requireAuth, requireRole('admin'), (req, res) => {
 
 router.put('/items/:id', requireAuth, requireRole('admin'), (req, res) => {
   try {
+    // v17: `area` NO se edita desde el body — el item SIEMPRE hereda el área
+    // de su GRUPO (menu_categories.area). Si cambia el apartado (category_id),
+    // el área se recalcula; la estrategia "FORZAR TODO" ya lo hizo al cambiar
+    // el área del grupo.
     const fields = ['name', 'subtitle', 'description', 'price', 'currency', 'category_id', 'image_url',
-                    'sort_order', 'is_available', 'is_active', 'area', 'preparation_time', 'iva_percentage'];
+                    'sort_order', 'is_available', 'is_active', 'preparation_time', 'iva_percentage'];
     const db = getDb();
 
     const existing = db.prepare('SELECT id FROM menu_items WHERE id = ?').get(req.params.id);
@@ -331,6 +356,17 @@ router.put('/items/:id', requireAuth, requireRole('admin'), (req, res) => {
       }
     }
 
+    // v17 "FORZAR TODO": si el item cambia de GRUPO → hereda el área del nuevo
+    // grupo (menu_categories.area). El body.area ya no es la fuente.
+    if (req.body.category_id !== undefined) {
+      const newCat = db.prepare('SELECT area FROM menu_categories WHERE id = ?').get(req.body.category_id);
+      if (newCat) {
+        const forcedArea = newCat.area === 'bar' ? 'bar' : 'cocina';
+        updates.push('area = ?');
+        params.push(forcedArea);
+      }
+    }
+
     if (updates.length === 0) {
       return res.status(400).json({ success: false, error: 'Nada que actualizar', code: 'NO_UPDATES' });
     }
@@ -340,6 +376,7 @@ router.put('/items/:id', requireAuth, requireRole('admin'), (req, res) => {
     db.prepare(`UPDATE menu_items SET ${updates.join(', ')} WHERE id = ?`).run(...params);
 
     const updated = db.prepare('SELECT * FROM menu_items WHERE id = ?').get(req.params.id);
+    broadcastMenuChanged();
     res.json({ success: true, item: updated });
   } catch (err) {
     console.error('[Menu] Update item error:', err.message);
@@ -362,6 +399,7 @@ router.patch('/items/:id/toggle', requireAuth, requireRole('admin'), (req, res) 
     const newActive = item.is_active ? 0 : 1;
     db.prepare('UPDATE menu_items SET is_active = ? WHERE id = ?').run(newActive, req.params.id);
 
+    broadcastMenuChanged();
     res.json({
       success: true,
       is_active: !!newActive,
@@ -402,6 +440,7 @@ router.patch('/items/:id/price', requireAuth, requireRole('admin'), (req, res) =
     `).run(price, req.params.id);
 
     const updated = db.prepare('SELECT id, name, price FROM menu_items WHERE id = ?').get(req.params.id);
+    broadcastMenuChanged();
     res.json({ success: true, item: updated, message: 'Precio actualizado' });
   } catch (err) {
     console.error('[Menu] Price update error:', err.message);
@@ -425,6 +464,7 @@ router.post('/items/bulk-prices', requireAuth, requireRole('admin'), (req, res) 
     const db = getDb();
     const result = applyBulkPriceUpdates(db, req.body.updates);
 
+    broadcastMenuChanged();
     res.json({
       success: true,
       updated: result.updated,
@@ -484,6 +524,7 @@ router.patch('/modifier-options/:id/price', requireAuth, requireRole('admin'), (
       .run(priceAdjustment, req.params.id);
 
     const updated = db.prepare('SELECT id, name, price_adjustment FROM modifier_options WHERE id = ?').get(req.params.id);
+    broadcastMenuChanged();
     res.json({ success: true, option: updated, message: 'Precio de opción actualizado' });
   } catch (err) {
     console.error('[Menu] Modifier option price error:', err.message);
@@ -505,6 +546,7 @@ router.post('/modifier-options/bulk-prices', requireAuth, requireRole('admin'), 
     const db = getDb();
     const result = applyBulkModifierPriceUpdates(db, req.body.updates);
 
+    broadcastMenuChanged();
     res.json({
       success: true,
       updated: result.updated,
@@ -555,6 +597,7 @@ router.delete('/items/:id', requireAuth, requireRole('admin'), (req, res) => {
     });
     tx();
 
+    broadcastMenuChanged();
     res.json({ success: true, message: 'Item eliminado', deleted: true });
   } catch (err) {
     console.error('[Menu] Delete item error:', err.message);
@@ -588,6 +631,7 @@ router.delete('/categories/:id', requireAuth, requireRole('admin'), (req, res) =
     }
 
     db.prepare('DELETE FROM menu_categories WHERE id = ?').run(req.params.id);
+    broadcastMenuChanged();
     res.json({ success: true, message: 'Categoría eliminada', deleted: true });
   } catch (err) {
     console.error('[Menu] Delete category error:', err.message);
@@ -635,8 +679,8 @@ router.post('/import-seed', requireAuth, requireRole('admin'), (req, res) => {
           if (!existingCat) {
             const catId = randomUUID();
             db.prepare(
-              'INSERT INTO menu_categories (id, name, description, emoji, sort_order) VALUES (?, ?, ?, ?, ?)'
-            ).run(catId, catName, '', '🍽', 0);
+              'INSERT INTO menu_categories (id, name, description, emoji, sort_order, area) VALUES (?, ?, ?, ?, ?, ?)'
+            ).run(catId, catName, '', '🍽', 0, areaLower);
             existingCat = { id: catId };
             createdCategories.push(catName);
           } else {
@@ -684,6 +728,7 @@ router.post('/import-seed', requireAuth, requireRole('admin'), (req, res) => {
     });
     tx();
 
+    broadcastMenuChanged();
     res.json({
       success: true,
       message: `Importación: ${createdItems.length} item(s) creado(s), ${createdCategories.length} apartado(s) creado(s)`,
@@ -696,22 +741,6 @@ router.post('/import-seed', requireAuth, requireRole('admin'), (req, res) => {
     console.error('[Menu] Import seed error:', err.message);
     res.status(500).json({ success: false, error: 'Error al importar del seed', code: 'IMPORT_SEED_ERROR' });
   }
-});
-
-// v14 (2026-08-29): avisar a los staff PWAs (meseros/cocina/bar/caja) que el
-// menú cambió → refetch en vivo. Solo mutadores (POST/PUT/PATCH/DELETE) y
-// solo respuestas exitosas (2xx). GET no dispara.
-import { broadcastMenuChanged } from '../services/order-broadcaster.js';
-const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-router.use((req, res, next) => {
-  const originalJson = res.json.bind(res);
-  res.json = (body) => {
-    if (MUTATING_METHODS.has(req.method) && res.statusCode >= 200 && res.statusCode < 300) {
-      broadcastMenuChanged();
-    }
-    return originalJson(body);
-  };
-  next();
 });
 
 export default router;

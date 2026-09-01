@@ -37,7 +37,7 @@ function seedMiniWorld(db) {
 
 describe('Migración v9 — precio manual (price_variable), promo_price y promo_label', () => {
   it('SCHEMA_VERSION ahora es 13 (motor financiero)', () => {
-    expect(SCHEMA_VERSION).toBe(16);
+    expect(SCHEMA_VERSION).toBe(17);
   });
 
   it('DB nueva: menu_items con price_variable + promo_price y order_items con promo_label', () => {
@@ -47,7 +47,7 @@ describe('Migración v9 — precio manual (price_variable), promo_price y promo_
     expect(hasColumn(db, 'menu_items', 'promo_price')).toBe(true);
     expect(hasColumn(db, 'order_items', 'promo_label')).toBe(true);
     expect(hasColumn(db, 'order_items', 'promo_type')).toBe(true); // v10
-    expect(currentVersion(db)).toBe(16);
+    expect(currentVersion(db)).toBe(17);
 
     // Defaults correctos
     const itemsDdl = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='menu_items'").get().sql;
@@ -108,7 +108,7 @@ describe('Migración v9 — precio manual (price_variable), promo_price y promo_
     expect(hasColumn(db, 'menu_items', 'price_variable')).toBe(true);
     expect(hasColumn(db, 'menu_items', 'promo_price')).toBe(true);
     expect(hasColumn(db, 'order_items', 'promo_label')).toBe(true);
-    expect(currentVersion(db)).toBe(16);
+    expect(currentVersion(db)).toBe(17);
 
     // No destructivo: item existente queda con defaults v9
     const item = db.prepare('SELECT * FROM menu_items WHERE id = ?').get('m1');
@@ -149,7 +149,7 @@ describe('Migración v9 — precio manual (price_variable), promo_price y promo_
     const item = db.prepare('SELECT * FROM menu_items WHERE id = ?').get('m1');
     expect(item.promo_price).toBe(1200);
     expect(item.price_variable).toBe(0);
-    expect(currentVersion(db)).toBe(16);
+    expect(currentVersion(db)).toBe(17);
     db.close();
   });
 
@@ -160,7 +160,7 @@ describe('Migración v9 — precio manual (price_variable), promo_price y promo_
     db.exec(`ALTER TABLE order_items DROP COLUMN promo_label`);
     // sube el version a 9 → no debe migrar (version >= SCHEMA_VERSION)
     applySchema(db);
-    expect(currentVersion(db)).toBe(16);
+    expect(currentVersion(db)).toBe(17);
     expect(hasColumn(db, 'order_items', 'promo_label')).toBe(false);
     db.close();
   });
