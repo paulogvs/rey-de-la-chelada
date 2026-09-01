@@ -149,6 +149,10 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
     const q = filter.trim().toLowerCase();
     const visible = q ? items.filter(i => i.name.toLowerCase().includes(q)) : items;
     const map = new Map<string, AdminMenuItem[]>();
+    // Categorías vacías también deben aparecer (apartado recién creado).
+    for (const cat of categories) {
+      if (!map.has(cat.name)) map.set(cat.name, []);
+    }
     for (const item of visible) {
       const cat = categories.find(c => c.id === item.category_id);
       const key = cat?.name ?? item.category_name ?? '—';
@@ -325,10 +329,10 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
         <Badge variant="info">{activeCount}/{items.length} activos</Badge>
       </div>
 
+      {/* v15: modal para crear/renombrar apartado */}
       {catForm.open && (
-        <Card className="admin-section">
-          <h3>{catForm.id ? 'Renombrar apartado' : 'Nuevo apartado'}</h3>
-          <div className="admin-menu-form admin-menu-form--inline">
+        <Modal open={catForm.open} onClose={() => setCatForm({ open: false, id: null, name: '', emoji: '🍽' })} title={catForm.id ? 'Renombrar apartado' : 'Nuevo apartado'}>
+          <div className="admin-menu-form">
             <FormField
               label="Nombre"
               value={catForm.name}
@@ -341,53 +345,47 @@ export function MenuPanel({ token, onToast }: MenuPanelProps) {
               onChange={e => setCatForm(f => ({ ...f, emoji: e.target.value }))}
               maxLength={4}
             />
-            <div className="admin-menu-form__actions">
+            <div className="admin-promo-actions">
+              <Button variant="ghost" size="sm" onClick={() => setCatForm({ open: false, id: null, name: '', emoji: '🍽' })}>Cancelar</Button>
               <Button variant="primary" size="sm" onClick={handleSaveCategory}>
                 {catForm.id ? 'Guardar' : 'Crear apartado'}
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setCatForm({ open: false, id: null, name: '', emoji: '🍽' })}>Cancelar</Button>
             </div>
           </div>
-        </Card>
+        </Modal>
       )}
 
+      {/* v15: modal para crear/editar item */}
       {itemForm.open && (
-        <Card className="admin-section">
-          <h3>{itemForm.id ? 'Editar item' : 'Nuevo item'}</h3>
-          <div className="admin-menu-form admin-menu-form--inline">
+        <Modal open={itemForm.open} onClose={() => setItemForm({ open: false, id: null, categoryId: '', name: '', area: 'cocina' })} title={itemForm.id ? 'Editar item' : 'Nuevo item'}>
+          <div className="admin-menu-form">
             <FormField
               label="Nombre"
               value={itemForm.name}
               onChange={e => setItemForm(f => ({ ...f, name: e.target.value }))}
               placeholder="Nombre del producto"
             />
-            <label className="admin-menu-form__label" htmlFor="menu-panel-cat">Apartado</label>
-            <select
-              id="menu-panel-cat"
-              className="form-input--mono"
-              value={itemForm.categoryId}
-              onChange={e => setItemForm(f => ({ ...f, categoryId: e.target.value }))}
-            >
-              {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
-            </select>
-            <label className="admin-menu-form__label" htmlFor="menu-panel-area">Área</label>
-            <select
-              id="menu-panel-area"
-              className="form-input--mono"
-              value={itemForm.area}
-              onChange={e => setItemForm(f => ({ ...f, area: e.target.value as 'bar' | 'cocina' }))}
-            >
-              <option value="bar">Barra</option>
-              <option value="cocina">Cocina</option>
-            </select>
-            <div className="admin-menu-form__actions">
+            <label className="form-field">
+              <span className="form-field__label">Apartado</span>
+              <select className="form-input" value={itemForm.categoryId} onChange={e => setItemForm(f => ({ ...f, categoryId: e.target.value }))}>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
+              </select>
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Área</span>
+              <select className="form-input" value={itemForm.area} onChange={e => setItemForm(f => ({ ...f, area: e.target.value as 'bar' | 'cocina' }))}>
+                <option value="bar">Barra</option>
+                <option value="cocina">Cocina</option>
+              </select>
+            </label>
+            <div className="admin-promo-actions">
+              <Button variant="ghost" size="sm" onClick={() => setItemForm({ open: false, id: null, categoryId: '', name: '', area: 'cocina' })}>Cancelar</Button>
               <Button variant="primary" size="sm" onClick={handleSaveItem}>
                 {itemForm.id ? 'Guardar cambios' : 'Crear item'}
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setItemForm({ open: false, id: null, categoryId: '', name: '', area: 'cocina' })}>Cancelar</Button>
             </div>
           </div>
-        </Card>
+        </Modal>
       )}
 
       {loading ? (

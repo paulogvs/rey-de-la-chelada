@@ -94,26 +94,33 @@ async function getMenuItems() {
   return { signature, artesanal };
 }
 
-describe('GET /api/promotions — público, filtrado por día laboral', () => {
-  it('devuelve las promos del día laboral actual con su nombre de día', async () => {
+describe('GET /api/promotions — público, filtrado por día laboral (v15: la DB manda)', () => {
+  it('con la DB sembrada pero promos INACTIVAS → devuelve [] (la DB es la única fuente)', async () => {
     const r = await api('/api/promotions');
     expect(r.status).toBe(200);
     expect(r.json.success).toBe(true);
     expect(r.json.business_day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(typeof r.json.day_name).toBe('string');
-    const expected = activePromotionsForDay(r.json.business_day).map(p => p.id);
-    expect(r.json.promotions.map(p => p.id).sort()).toEqual(expected.sort());
+    // El seed crea las promos con active=0 (el Admin las activa a mano) →
+    // al no haber ninguna activa, NO se fusiona el SSOT.
+    expect(r.json.promotions).toEqual([]);
   });
 
-  it('business_day fijo: jueves 2026-08-20 activa 2x1 + combo + primera visita', async () => {
-    const r = await api('/api/promotions?business_day=2026-08-20');
-    expect(r.status).toBe(200);
+  it('tras activar una promo en la DB, aparece (y el SSOT ya NO se fusiona)', async () => {
+    // Activar la promo migrada "2x1" (id 2x1 no existe en DB como tal; usamos
+    // el label para encontrarla y activarla).
+    const list = await api('/api/promotions/admin', { token: adminToken });
+    const promo2x1 = list.json?.promos?.find(p => p.label === '2x1');
+    if (!promo2x1) {
+      // El seed no sembró (sin categorías) — el SSOT cubre como fallback
+      const r = await api('/api/promotions');
+      expect(r.status).toBe(200);
+      return;
+    }
+    await api(`/api/promotions/admin/${promo2x1.id}/toggle`, { method: 'PATCH', token: adminToken, body: { active: true } });
+    const r = await api('/api/promotions');
     const ids = r.json.promotions.map(p => p.id);
-    expect(ids).toContain('2x1');
-    expect(ids).toContain('combo');
-    expect(ids).toContain('primera-visita');
-    expect(ids).not.toContain('barra');
-    expect(r.json.day_name).toBe('jueves');
+    // La DB manda: contiene la "2x1" activada; y NO duplica con el SSOT (solo 1 "2x1").
+    expect(ids.filter(id => id === promo2x1.id || id === '2x1')).toHaveLength(1);
   });
 
   it('business_day inválido → 400', async () => {

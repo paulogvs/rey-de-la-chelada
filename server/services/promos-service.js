@@ -181,7 +181,13 @@ export function seedDefaultPromos(db) {
 
   for (const p of defaultPromos) {
     const exists = db.prepare('SELECT id FROM promos WHERE label = ? OR name = ?').get(p.label, p.name);
-    if (exists) { steps.push(`promo ${p.label} ya existe`); continue; }
+    if (exists) {
+      // La promo ya existe (migrada en una corrida previa) → garantizar active=0
+      // (el dueño las activa con el toggle, no por defecto).
+      db.prepare('UPDATE promos SET active = 0 WHERE id = ?').run(exists.id);
+      steps.push(`promo ${p.label} ya existe (active=0)`);
+      continue;
+    }
     const id = randomUUID();
     const lines = p.lines();
     if (lines.length === 0) { steps.push(`promo ${p.label} sin categoría (seed skipped)`); continue; }

@@ -160,9 +160,10 @@ export function PromosView({ token, onToast }: PromosViewProps) {
                     <Badge variant={promo.active === 1 ? 'paid' : 'pending'}>{promo.active === 1 ? 'Activa' : 'Inactiva'}</Badge>
                     <div className="admin-promo-row__actions">
                       <Button variant="secondary" size="sm" onClick={() => startEdit(promo)}><AppIcon name="edit" size="sm" /></Button>
-                      <Button variant="secondary" size="sm" onClick={() => handleToggle(promo)} title={promo.active === 1 ? 'Desactivar' : 'Activar'}>
-                        <AppIcon name="check" size="sm" />
-                      </Button>
+                      <label className="admin-switch" title={promo.active === 1 ? 'Desactivar' : 'Activar'}>
+                        <input type="checkbox" checked={promo.active === 1} onChange={() => handleToggle(promo)} />
+                        <span className="admin-switch__slider" />
+                      </label>
                       <Button variant="secondary" size="sm" onClick={() => handleDelete(promo)}><AppIcon name="trash" size="sm" /></Button>
                     </div>
                   </div>

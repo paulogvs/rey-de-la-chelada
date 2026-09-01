@@ -53,7 +53,9 @@ function ssotPromos(businessDay: string): ActivePromo[] {
 
 export function useActivePromos(): UseActivePromosResult {
   const businessDay = useMemo(() => businessDayDateStr(), []);
-  const [promos, setPromos] = useState<ActivePromo[]>(() => ssotPromos(businessDay));
+  // v15 (2026-08-31): la DB es la única fuente. Inicializa VACÍO (no SSOT) —
+  // se carga de GET /api/promotions. El SSOT solo es fallback si la API falla.
+  const [promos, setPromos] = useState<ActivePromo[]>([]);
 
   const reload = useCallback(async () => {
     try {
