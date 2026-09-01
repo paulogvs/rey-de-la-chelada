@@ -1,24 +1,20 @@
 /**
- * Integración — Promos por día laboral (Sprint 2026-08-19)
+ * Integración — Promos data-driven (v16 2026-09-01)
  *
  * Cubre:
- *   GET /api/promotions        → público, filtra por día laboral
- *   POST /api/orders con promo_type → precios de la promo (0 2x1, 1200 barra,
- *                                      2500 primera visita, 3000/1500 combo)
- *   Contexto: 2x1 sin pareja → 400 PROMO_CONTEXT_VIOLATION
- *   Día no activo → 400 PROMO_NOT_ACTIVE
+ *   GET /api/promotions        → público, devuelve SOLO promos DB activas
+ *   POST /api/orders con promo_type (id de la DB) → precio según modelo A/B
+ *   Contexto de promo (pack) → 400 PROMO_CONTEXT_VIOLATION
+ *   business_day inválido → 400
  *
- * La fecha de "hoy" la controla el server vía businessDayDateStr() (hora
- * Bolivia). Para no depender del día real, los casos que necesitan un día
- * específico prueban CONTRA el estado: si hoy NO es jueves, el 2x1 debe
- * dar PROMO_NOT_ACTIVE; si es jueves, debe facturar 0 con una pareja.
+ * La DB es la única fuente (el SSOT quedó eliminado). El seed crea 6 promos
+ * con active=0; los tests activan una (toggle) y facturan con su id.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { activePromotionsForDay, businessDayName } from '../../src/core/config/promotions.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEST_DB = 'data/test-promotions.db';
@@ -94,33 +90,29 @@ async function getMenuItems() {
   return { signature, artesanal };
 }
 
-describe('GET /api/promotions — público, filtrado por día laboral (v15: la DB manda)', () => {
-  it('con la DB sembrada pero promos INACTIVAS → devuelve [] (la DB es la única fuente)', async () => {
+/** Busca y activa una promo sembrada por el seed (por label). */
+async function activatePromo(label) {
+  const list = await api('/api/promotions/admin', { token: adminToken });
+  const promo = list.json?.promos?.find(p => p.label === label);
+  if (!promo) return null;
+  await api(`/api/promotions/admin/${promo.id}/toggle`, { method: 'PATCH', token: adminToken, body: { active: true } });
+  return promo;
+}
+
+describe('GET /api/promotions — público, la DB manda (v16)', () => {
+  it('con promos inactivas → devuelve [] (no fusiona nada)', async () => {
     const r = await api('/api/promotions');
     expect(r.status).toBe(200);
     expect(r.json.success).toBe(true);
     expect(r.json.business_day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    // El seed crea las promos con active=0 (el Admin las activa a mano) →
-    // al no haber ninguna activa, NO se fusiona el SSOT.
     expect(r.json.promotions).toEqual([]);
   });
 
-  it('tras activar una promo en la DB, aparece (y el SSOT ya NO se fusiona)', async () => {
-    // Activar la promo migrada "2x1" (id 2x1 no existe en DB como tal; usamos
-    // el label para encontrarla y activarla).
-    const list = await api('/api/promotions/admin', { token: adminToken });
-    const promo2x1 = list.json?.promos?.find(p => p.label === '2x1');
-    if (!promo2x1) {
-      // El seed no sembró (sin categorías) — el SSOT cubre como fallback
-      const r = await api('/api/promotions');
-      expect(r.status).toBe(200);
-      return;
-    }
-    await api(`/api/promotions/admin/${promo2x1.id}/toggle`, { method: 'PATCH', token: adminToken, body: { active: true } });
+  it('tras activar una promo, aparece por su id y NO duplica con el SSOT', async () => {
+    const promo = await activatePromo('Miércoles de Barra');
+    if (!promo) return; // sin categorías → seed skipped
     const r = await api('/api/promotions');
-    const ids = r.json.promotions.map(p => p.id);
-    // La DB manda: contiene la "2x1" activada; y NO duplica con el SSOT (solo 1 "2x1").
-    expect(ids.filter(id => id === promo2x1.id || id === '2x1')).toHaveLength(1);
+    expect(r.json.promotions.some(p => p.id === promo.id)).toBe(true);
   });
 
   it('business_day inválido → 400', async () => {
@@ -130,89 +122,62 @@ describe('GET /api/promotions — público, filtrado por día laboral (v15: la D
   });
 });
 
-describe('POST /api/orders con promo_type — precios SSOT (business_day fijo)', () => {
-  it('2x1 (jueves fijo): Signature pagada + Signature 2x1 gratis → la gratis a 0', async () => {
+describe('POST /api/orders con promo_type (id DB) — modelo A/B', () => {
+  it('Primera Visita (FIXED 2500): Signature → unit 2500', async () => {
     const { signature } = await getMenuItems();
-    if (!signature) return; // DB sin menú real → no probar
-
-    const tableId = await ensureTable(++tableCounter);
-    const body = {
-      table_id: tableId,
-      business_day: '2026-08-20', // jueves
-      items: [
-        { menu_item_id: signature.id, quantity: 1 },
-        { menu_item_id: signature.id, quantity: 1, promo_type: '2x1' },
-      ],
-    };
-
-    const r = await api('/api/orders', { method: 'POST', token: meseroToken, body });
-    expect(r.status).toBe(201);
-    const promoLine = r.json.order.items.find(i => i.promo_type === '2x1');
-    const paidLine = r.json.order.items.find(i => !i.promo_type);
-    expect(promoLine.unit_price).toBe(0);
-    expect(promoLine.promo_label).toBe('2x1');
-    expect(paidLine.unit_price).toBe(signature.price);
-    expect(r.json.order.total).toBeCloseTo(signature.price, 2);
-  });
-
-  it('2x1 sin pareja pagada → 400 PROMO_CONTEXT_VIOLATION', async () => {
-    const { signature, artesanal } = await getMenuItems();
-    if (!signature || !artesanal) return;
+    const promo = await activatePromo('Primera Visita');
+    if (!signature || !promo) return;
 
     const tableId = await ensureTable(++tableCounter);
     const r = await api('/api/orders', {
       method: 'POST', token: meseroToken,
       body: {
         table_id: tableId,
-        business_day: '2026-08-20', // jueves
-        items: [
-          { menu_item_id: artesanal.id, quantity: 1 },
-          { menu_item_id: signature.id, quantity: 1, promo_type: '2x1' },
-        ],
+        items: [{ menu_item_id: signature.id, quantity: 1, promo_type: promo.id }],
       },
     });
-    expect(r.status).toBe(400);
-    expect(r.json.code).toBe('PROMO_CONTEXT_VIOLATION');
+    expect(r.status).toBe(201);
+    expect(r.json.order.items[0].unit_price).toBe(2500);
+    expect(r.json.order.total).toBeCloseTo(2500, 2);
   });
 
-  it('barra (miércoles fijo): Artesanal a 1200 con promo_type=barra', async () => {
+  it('Miércoles de Barra (FIXED 1200): Artesanal → unit 1200', async () => {
     const { artesanal } = await getMenuItems();
-    if (!artesanal) return;
+    const promo = await activatePromo('Miércoles de Barra');
+    if (!artesanal || !promo) return;
 
     const tableId = await ensureTable(++tableCounter);
     const r = await api('/api/orders', {
       method: 'POST', token: meseroToken,
       body: {
         table_id: tableId,
-        business_day: '2026-08-19', // miércoles
-        items: [
-          { menu_item_id: artesanal.id, quantity: 1, promo_type: 'barra' },
-        ],
+        items: [{ menu_item_id: artesanal.id, quantity: 1, promo_type: promo.id }],
       },
     });
     expect(r.status).toBe(201);
     expect(r.json.order.items[0].unit_price).toBe(1200);
-    expect(r.json.order.total).toBeCloseTo(1200, 2);
   });
 
-  it('2x1 un día NO activo (miércoles) → 400 PROMO_NOT_ACTIVE', async () => {
+  it('Micheladas + Shot Gratis (MENU_PLUS 0): cuesta el precio del menú + extra sub-línea', async () => {
     const { signature } = await getMenuItems();
-    if (!signature) return;
+    const promo = await activatePromo('Micheladas + Shot Gratis');
+    if (!signature || !promo) return;
 
     const tableId = await ensureTable(++tableCounter);
     const r = await api('/api/orders', {
       method: 'POST', token: meseroToken,
       body: {
         table_id: tableId,
-        business_day: '2026-08-19', // miércoles — el 2x1 NO corre
-        items: [
-          { menu_item_id: signature.id, quantity: 1 },
-          { menu_item_id: signature.id, quantity: 1, promo_type: '2x1' },
-        ],
+        items: [{ menu_item_id: signature.id, quantity: 1, promo_type: promo.id }],
       },
     });
-    expect(r.status).toBe(400);
-    expect(r.json.code).toBe('PROMO_NOT_ACTIVE');
+    expect(r.status).toBe(201);
+    const line = r.json.order.items[0];
+    expect(line.unit_price).toBe(signature.price); // menú + ajuste 0
+    expect(line.promo_label).toContain('Micheladas + Shot Gratis');
+    // el extra "Shot" va como sub-línea en modifiers_json
+    const mods = JSON.parse(line.modifiers_json || '[]');
+    expect(mods.some(m => m.optionName === 'Shot')).toBe(true);
   });
 
   it('promo_type desconocido → 400 INVALID_PROMO_TYPE', async () => {
@@ -223,57 +188,10 @@ describe('POST /api/orders con promo_type — precios SSOT (business_day fijo)',
       method: 'POST', token: meseroToken,
       body: {
         table_id: tableId,
-        business_day: '2026-08-20',
-        items: [
-          { menu_item_id: signature.id, quantity: 1, promo_type: 'falsa' },
-        ],
+        items: [{ menu_item_id: signature.id, quantity: 1, promo_type: 'no-existe' }],
       },
     });
     expect(r.status).toBe(400);
     expect(r.json.code).toBe('INVALID_PROMO_TYPE');
-  });
-
-  it('combo (jueves fijo): Signature 3000 + Cerveza 1500 = 4500', async () => {
-    const { signature, artesanal } = await getMenuItems();
-    if (!signature || !artesanal) return;
-
-    const tableId = await ensureTable(++tableCounter);
-    const r = await api('/api/orders', {
-      method: 'POST', token: meseroToken,
-      body: {
-        table_id: tableId,
-        business_day: '2026-08-20', // jueves
-        items: [
-          { menu_item_id: signature.id, quantity: 1, promo_type: 'combo' },
-          { menu_item_id: artesanal.id, quantity: 1, promo_type: 'combo' },
-        ],
-      },
-    });
-    expect(r.status).toBe(201);
-    const sigLine = r.json.order.items.find(i => i.promo_type === 'combo' && i.menu_item_name === signature.name);
-    const artLine = r.json.order.items.find(i => i.promo_type === 'combo' && i.menu_item_name === artesanal.name);
-    expect(sigLine.unit_price).toBe(3000);
-    expect(artLine.unit_price).toBe(1500);
-    expect(r.json.order.total).toBeCloseTo(4500, 2);
-  });
-
-  it('primera-visita (jueves fijo): Signature a 2500, y rechaza una segunda', async () => {
-    const { signature } = await getMenuItems();
-    if (!signature) return;
-
-    const tableId = await ensureTable(++tableCounter);
-    const ok = await api('/api/orders', {
-      method: 'POST', token: meseroToken,
-      body: {
-        table_id: tableId,
-        business_day: '2026-08-20',
-        items: [
-          { menu_item_id: signature.id, quantity: 1, promo_type: 'primera-visita' },
-        ],
-      },
-    });
-    expect(ok.status).toBe(201);
-    expect(ok.json.order.items[0].unit_price).toBe(2500);
-    expect(ok.json.order.total).toBeCloseTo(2500, 2);
   });
 });

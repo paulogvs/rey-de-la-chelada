@@ -20,6 +20,23 @@
 /** Zona horaria del negocio (Bolivia, UTC-4, sin DST) */
 export const BUSINESS_TIMEZONE = 'America/La_Paz';
 
+/** Índice del día de la semana: 0=domingo … 6=sábado (español, sin acento) */
+export const PROMOTION_DAYS = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+
+/**
+ * Nombre del día de la semana (español, sin acento) de un businessDayStr.
+ * v16 (2026-09-01): se movió aquí desde src/core/config/promotions.js (SSOT
+ * eliminado) para que los hooks (useActivePromos / PromotionsToday) no
+ * dependan del código de promos. Misma función pura que el server
+ * (server/utils/date-utils.js, sync manual).
+ * @param dateStr — 'YYYY-MM-DD' del día laboral
+ * @returns string 'domingo'..'sabado'
+ */
+export function businessDayName(dateStr: string): string {
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  return PROMOTION_DAYS[new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay()];
+}
+
 // Formatters hoisteados (react-doctor js-hoist-intl): se crean UNA vez al
 // cargar el módulo. Construir Intl en cada llamada desperdicia CPU, sobre
 // todo en cortes/reportes y render de componentes que formatean fechas.

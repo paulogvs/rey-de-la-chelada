@@ -35,9 +35,12 @@ import { PrintReceipt } from '../_shared/components/PrintReceipt';
 import { buildReceiptData } from '../_shared/utils/receipt';
 import { computeTotals } from '@/core/config/iva';
 import { summarizeOrderReview } from './orderReview';
-import { PROMOTIONS_BY_ID } from '@/core/config/promotions.js';
-import { canApplyPromo, applyPromoToCart, resolveCartPromoUnitPrice, cartSavings, type PromoCartItem } from './promoCart';
-import { matchesPromoLine, dbPromoUnitPrice } from './promosData';
+import { resolveCartPromoUnitPrice, cartSavings, type PromoCartItem } from './promoCart';
+import {
+  isGroupPromo, promoGroupIds, promoItemIds,
+  resolvePromoUnitPrice as dbResolvePromoUnitPrice,
+  type DbPromoLike, type MenuItemLike,
+} from './promosData';
 import { useKDSWebSocket } from '../_shared/hooks/useKDSWebSocket';
 import { useActivePromos, type ActivePromo } from '../_shared/hooks/useActivePromos';
 
@@ -123,25 +126,19 @@ function resolveCartUnitPrice(
 }
 
 /**
- * v15 FASE 3: precio unitario de una línea del carrito con promo.
- *   - promo SSOT → espejo del server (promoCart.resolveCartPromoUnitPrice)
- *   - promo data-driven (DB) → promoUnitPrice guardado al aplicar (reparto
- *     proporcional del price_total, MISMA regla que el server)
+ * v16: precio unitario de una línea del carrito con promo (display).
+ * Se resuelve con la promo de la DB (modelo A/B) + el item elegido — MISMA
+ * regla que el server order-pricing.js.
  */
-function cartItemPromoUnitPrice(ci: CartItem, businessDay: string): number | null {
+function cartItemPromoUnitPrice(ci: CartItem, activePromos: ActivePromo[]): number | null {
   if (!ci.promoType) return null;
-  if (PROMOTIONS_BY_ID[ci.promoType]) {
-    return resolveCartPromoUnitPrice(ci as PromoCartItem, businessDay);
-  }
-  return ci.promoUnitPrice ?? null;
+  return resolveCartPromoUnitPrice(ci as PromoCartItem, activePromos as DbPromoLike[]);
 }
 
-/** Label de la promo para el badge del carrito (SSOT o data-driven). */
+/** Label de la promo para el badge del carrito (DB data-driven). */
 function cartPromoLabel(ci: CartItem, activePromos: ActivePromo[]): string | null {
   if (!ci.promoType) return null;
-  return PROMOTIONS_BY_ID[ci.promoType]?.label
-    ?? activePromos.find(p => p.id === ci.promoType)?.label
-    ?? null;
+  return activePromos.find(p => p.id === ci.promoType)?.label ?? null;
 }
 
 interface DetailModifier {
@@ -183,6 +180,11 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
   const [submitting, setSubmitting] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
 
+  // v16: modal selector de promo de GRUPO — el mesero elige item + cantidad.
+  const [promoPicker, setPromoPicker] = useState<ActivePromo | null>(null);
+  const [promoPickerItem, setPromoPickerItem] = useState<MenuItem | null>(null);
+  const [promoPickerQty, setPromoPickerQty] = useState(1);
+
   // ── S2-B: pedido en curso de la mesa (si hay uno activo) ──
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [loadingActive, setLoadingActive] = useState(false);
@@ -192,50 +194,69 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
   // FASE 4A: modo edición del pedido activo (agregar items → nueva ronda)
   const [editMode, setEditMode] = useState(false);
 
-  // ── Sprint Promos (2026-08-19) + FASE 3 (v15): día laboral + promos
-  //    activas del panel (data-driven) fusionadas con el SSOT. El hook
-  //    carga GET /api/promotions (fallback al SSOT si la API falla) y
-  //    expone reload() para refetchear al recibir menu_changed.
+  // ── Sprint Promos (2026-08-19) + v16 (2026-09-01): día laboral + promos
+  //    activas de la DB (el SSOT quedó ELIMINADO). El hook carga de
+  //    GET /api/promotions y expone reload() al recibir menu_changed.
   const { promos: activePromos, businessDay, businessDayNameLabel, reload: reloadPromos } = useActivePromos();
 
-  /** Aplica una promo al carrito (botones del panel "Promos de hoy") */
+  /** Aplica una promo al carrito (botones del panel "Promos de hoy"). */
   const handleApplyPromo = useCallback((promoId: string) => {
-    // Promos fijas del SSOT → flujo histórico (promoCart espejo del server)
-    const ssotPromo = PROMOTIONS_BY_ID[promoId];
-    if (ssotPromo) {
-      const check = canApplyPromo(cart, promoId, businessDay);
-      if (!check.ok) {
-        addToast({ type: 'warning', message: check.reason || 'No se puede aplicar esta promo', duration: 3500 });
-        return;
-      }
-      setCart(prev => applyPromoToCart(prev, promoId, businessDay));
-      addToast({ type: 'success', message: `Promo aplicada: ${ssotPromo.label || promoId}`, duration: 2500 });
-      return;
-    }
-
-    // v15 FASE 3: promo data-driven del panel (id = UUID de la tabla promos).
-    // Marca la PRIMERA línea del carrito que matchee una línea de la promo
-    // (item_id directo o group_id = categoría) con promoType = promo.id y
-    // promoUnitPrice = reparto proporcional (display). El server re-valida
-    // contra la DB al facturar (order-pricing.js).
     const dbPromo = activePromos.find(p => p.id === promoId);
     if (!dbPromo || !dbPromo.lines || dbPromo.lines.length === 0) {
       addToast({ type: 'warning', message: 'Esta promo no está disponible', duration: 3500 });
       return;
     }
-    const targetIdx = cart.findIndex(ci =>
-      !ci.promoType && dbPromo.lines!.some(line => matchesPromoLine(ci.menuItem, line))
-    );
-    if (targetIdx === -1) {
-      addToast({ type: 'warning', message: `Agrega ${dbPromo.label} al carrito para aplicar la promo`, duration: 3500 });
+    // Promo de GRUPO → modal selector (elige item + cantidad dentro del grupo).
+    if (isGroupPromo(dbPromo)) {
+      const firstLine = dbPromo.lines.find(l => l.group_id);
+      setPromoPicker(dbPromo);
+      setPromoPickerItem(null);
+      // Pre-inicializa la cantidad con la de la línea (2x1 → 2, shot → 1).
+      setPromoPickerQty(Math.max(1, firstLine?.quantity || 1));
       return;
     }
-    const unit = dbPromoUnitPrice(dbPromo, cart[targetIdx].menuItem);
-    setCart(prev => prev.map((ci, i) =>
-      i === targetIdx ? { ...ci, promoType: promoId, promoUnitPrice: unit ?? undefined } : ci
-    ));
+    // Promo de ITEM específico → directo al pedido (sin modal).
+    const itemId = promoItemIds(dbPromo)[0];
+    if (!itemId) {
+      addToast({ type: 'warning', message: 'Esta promo no tiene un item válido', duration: 3500 });
+      return;
+    }
+    const menuItem = items.find(i => i.id === itemId);
+    if (!menuItem) {
+      addToast({ type: 'warning', message: 'El item de la promo no está en el menú', duration: 3500 });
+      return;
+    }
+    const unit = dbResolvePromoUnitPrice(dbPromo as DbPromoLike, menuItem as MenuItemLike);
+    // El extra de la promo NO se envía como modifier (el server lo inyecta
+    // como sub-línea en mods_json vía order-pricing.mergePromoModifiers).
+    setCart(prev => [...prev, {
+      menuItem,
+      quantity: 1,
+      selectedModifiers: [],
+      notes: '',
+      promoType: promoId,
+      promoUnitPrice: unit,
+    }]);
     addToast({ type: 'success', message: `Promo aplicada: ${dbPromo.label}`, duration: 2500 });
-  }, [cart, businessDay, activePromos, addToast]);
+  }, [activePromos, items, addToast]);
+
+  /** Confirma el item+cantidad elegidos en el modal de promo de GRUPO. */
+  const confirmGroupPromo = useCallback((promo: ActivePromo, item: MenuItem, qty: number) => {
+    const unit = dbResolvePromoUnitPrice(promo as DbPromoLike, item as MenuItemLike);
+    const total = (unit ?? 0) * qty;
+    setCart(prev => [...prev, {
+      menuItem: item,
+      quantity: qty,
+      selectedModifiers: [],
+      notes: '',
+      promoType: promo.id,
+      promoUnitPrice: unit,
+    }]);
+    setPromoPicker(null);
+    setPromoPickerItem(null);
+    setPromoPickerQty(1);
+    addToast({ type: 'success', message: `Promo aplicada: ${promo.label} (${total > 0 ? formatMoney(total) : 'GRATIS'})`, duration: 2500 });
+  }, [addToast]);
 
   /** Quita una promo del carrito (también limpia el precio de display DB) */
   const handleClearPromo = useCallback((promoId: string) => {
@@ -244,11 +265,18 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
     ));
   }, []);
 
-  /** Preview de ahorro del carrito (promos ya marcadas) */
+  /** Preview de ahorro del carrito (promos ya aplicadas) */
   const savings = useMemo(
-    () => cartSavings(cart as PromoCartItem[], businessDay),
-    [cart, businessDay]
+    () => cartSavings(cart as PromoCartItem[], activePromos as DbPromoLike[]),
+    [cart, activePromos]
   );
+
+  // v16: items que la promo de GRUPO ofrece en el modal selector.
+  const promoPickerItems = useMemo(() => {
+    if (!promoPicker) return [];
+    const groups = promoGroupIds(promoPicker as DbPromoLike);
+    return items.filter(i => groups.includes(i.category_id));
+  }, [promoPicker, items]);
 
   // Si la mesa ya tiene currentOrderId, cargar el pedido y mostrar su estado
   // en lugar de crear uno nuevo (el mesero ve items/listos y puede entregar).
@@ -481,7 +509,7 @@ export function OrderPanel({ table, token, onOrderPlaced, onCancel: _onCancel, o
 // v15 FASE 3: promos data-driven usan promoUnitPrice del carrito)
 const cartTotal = cart.reduce((sum, ci) => {
   if (ci.promoType) {
-    const unit = cartItemPromoUnitPrice(ci, businessDay);
+    const unit = cartItemPromoUnitPrice(ci, activePromos);
     return sum + (unit ?? 0) * ci.quantity;
   }
   const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
@@ -492,7 +520,7 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
   if (ci.promoType) {
     return {
       quantity: ci.quantity,
-      unitPrice: cartItemPromoUnitPrice(ci, businessDay) ?? 0,
+      unitPrice: cartItemPromoUnitPrice(ci, activePromos) ?? 0,
     };
   }
   const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
@@ -947,7 +975,7 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
           {cart.map((ci, index) => {
             const modAdjustment = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
             const unit = ci.promoType
-              ? (cartItemPromoUnitPrice(ci, businessDay) ?? 0)
+              ? (cartItemPromoUnitPrice(ci, activePromos) ?? 0)
               : (resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdjustment) ?? 0);
             const lineTotal = unit * ci.quantity;
             const promoLabel = cartPromoLabel(ci, activePromos);
@@ -1229,9 +1257,67 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
         )}
       </Modal>
 
+      {/* ── v16: modal selector de promo de GRUPO (elige item + cantidad) ── */}
+      <Modal
+        open={!!promoPicker}
+        onClose={() => { setPromoPicker(null); setPromoPickerItem(null); setPromoPickerQty(1); }}
+        title={promoPicker ? (promoPicker.label || promoPicker.name || 'Promo') : 'Promo'}
+      >
+        {promoPicker && (
+          <div className="order-panel__detail">
+            {promoPicker.description && (
+              <p className="order-panel__detail-desc">{promoPicker.description}</p>
+            )}
+            <p className="order-panel__detail-desc" style={{ color: 'var(--tx-muted, #888)' }}>
+              Elige el item de la promo y la cantidad.
+            </p>
+            {promoPickerItems.length === 0 ? (
+              <p className="order-panel__active-hint">Esta promo no tiene items del grupo en el menú.</p>
+            ) : (
+              <div className="order-panel__items" style={{ maxHeight: 260, overflowY: 'auto' }}>
+                {promoPickerItems.map(item => (
+                  <button
+                    key={item.id}
+                    className={`order-panel__item ${promoPickerItem?.id === item.id ? 'order-panel__item--selected' : ''}`}
+                    onClick={() => setPromoPickerItem(item)}
+                  >
+                    <div className="order-panel__item-info">
+                      <span className="order-panel__item-name">{item.name}</span>
+                      <span className="order-panel__item-price">
+                        {item.price != null ? formatMoney(item.price) : 'Ver variantes'}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {promoPickerItem && (
+              <div className="order-panel__detail-footer">
+                <QuantityStepper
+                  value={promoPickerQty}
+                  min={1}
+                  max={50}
+                  onChange={setPromoPickerQty}
+                  size="md"
+                />
+                <Button
+                  variant="primary"
+                  fullWidth
+                  onClick={() => confirmGroupPromo(promoPicker, promoPickerItem, promoPickerQty)}
+                >
+                  {(() => {
+                    const unit = dbResolvePromoUnitPrice(promoPicker as DbPromoLike, promoPickerItem as MenuItemLike);
+                    return `Agregar (${unit > 0 ? formatMoney(unit * promoPickerQty) : 'GRATIS'})`;
+                  })()}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
       {/* Print comanda (cart preview) */}
-      <PrintReceipt
-        open={printOpen}
+      <PrintReceipt        open={printOpen}
         onClose={() => setPrintOpen(false)}
         kind="order"
         receipt={buildReceiptData({
@@ -1243,9 +1329,14 @@ const cartSummary = summarizeOrderReview(cart.map(ci => {
           paymentMethod: undefined,
           items: cart.map(ci => {
             const modAdj = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
-            const unit = resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdj) ?? 0;
+            // v16: líneas con promo se imprimen con el precio de la promo.
+            const unit = ci.promoType
+              ? (cartItemPromoUnitPrice(ci, activePromos) ?? 0)
+              : (resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdj) ?? 0);
             return {
-              menuItemName: ci.menuItem.name,
+              menuItemName: ci.promoType
+                ? `PROMO - ${cartPromoLabel(ci, activePromos) || ci.promoType} - ${ci.menuItem.name}`
+                : ci.menuItem.name,
               quantity: ci.quantity,
               unitPrice: unit,
               subtotal: unit * ci.quantity,

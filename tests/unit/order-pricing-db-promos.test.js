@@ -20,6 +20,9 @@ const activeDbMock = vi.hoisted(() => ({ fn: vi.fn() }));
 
 vi.mock('../../server/services/promos-service.js', () => ({
   activePromosForBusinessDay: (...args) => activeDbMock.fn(...args),
+  promoLineMatchesItem: (line, menuItem) =>
+    !!((line.item_id && line.item_id === menuItem.id) ||
+       (line.group_id && line.group_id === menuItem.category_id)),
 }));
 
 const DB_PROMO_2x1 = {
@@ -27,6 +30,8 @@ const DB_PROMO_2x1 = {
   name: '2x1 Quesadillas',
   label: '2x1 Quesadillas',
   description: 'Dos pizzas al precio de una',
+  price_mode: 'FIXED',
+  price_value: 5000,
   price_total: 5000,
   max_per_order: 1,
   lines: [{ item_id: null, group_id: 'pizzas', quantity: 2 }],
@@ -37,6 +42,8 @@ const DB_PROMO_COMBO = {
   name: 'Combo Pizza + Michelada',
   label: 'Combo',
   description: 'Una pizza + una michelada',
+  price_mode: 'FIXED',
+  price_value: 6000,
   price_total: 6000,
   max_per_order: 1,
   lines: [{ group_id: 'pizzas', quantity: 1 }, { group_id: 'micheladas', quantity: 1 }],
@@ -62,7 +69,7 @@ describe('resolvePromoUnitPrice — promos data-driven (DB)', () => {
     const r = resolvePromoUnitPrice(mockDb('Pizzas'), PIZZA_ITEM, 'promo-abc', { businessDay: DAY });
     expect(r.error).toBeNull();
     expect(r.unitPrice).toBe(2500); // 5000 / 2 unidades del pack
-    expect(r.promoLabel).toBe('2x1 Quesadillas');
+    expect(r.promoLabel).toBe('PROMO - 2x1 Quesadillas');
   });
 
   it('combo con 2 líneas: reparte el price_total entre ambas (3000 + 3000)', () => {
@@ -92,7 +99,7 @@ describe('resolvePromoUnitPrice — promos data-driven (DB)', () => {
   it('línea por item_id directo también matchea', () => {
     activeDbMock.fn.mockReturnValue([{
       id: 'promo-item', name: 'Pizza del día', label: 'Pizza del día',
-      price_total: 3500, max_per_order: 1,
+      price_mode: 'FIXED', price_value: 3500, price_total: 3500, max_per_order: 1,
       lines: [{ item_id: 'q1', quantity: 1 }],
     }]);
     const r = resolvePromoUnitPrice(mockDb('Pizzas'), PIZZA_ITEM, 'promo-item', { businessDay: DAY });

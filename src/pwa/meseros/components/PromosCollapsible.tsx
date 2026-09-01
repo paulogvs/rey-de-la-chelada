@@ -6,7 +6,7 @@ import './PromosCollapsible.css';
 export interface PromosCollapsibleProps {
   /** Día laboral (ej. "domingo") — el turno vigente, no el día calendario. */
   businessDayNameLabel: string;
-  promos: { id: string; label: string; description: string }[];
+  promos: { id: string; label: string; description?: string }[];
   /** Ids de promos ya aplicadas en el carrito. */
   appliedIds: string[];
   /** Aplica o quita una promo del carrito. */

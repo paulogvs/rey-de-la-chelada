@@ -37,6 +37,7 @@ function makeDb() {
     CREATE TABLE promos (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, label TEXT NOT NULL,
       description TEXT NOT NULL DEFAULT '', price_total INTEGER NOT NULL DEFAULT 0,
+      price_mode TEXT NOT NULL DEFAULT 'FIXED', price_value INTEGER NOT NULL DEFAULT 0,
       max_per_order INTEGER NOT NULL DEFAULT 1, active INTEGER NOT NULL DEFAULT 1,
       created_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );

@@ -1,53 +1,38 @@
 /**
  * ═══════════════════════════════════════════════════════════
- *  Promotions Routes — Promos del día laboral (Sprint 2026-08-19)
+ *  Promotions Routes — Promos del día laboral (v16 2026-09-01)
  *
  *  GET /api/promotions              → Promos activas HOY (día laboral)
  *  GET /api/promotions?business_day=YYYY-MM-DD → Promos de una fecha fija
- *                                                (tests/consumidores)
  *
  *  PÚBLICO (sin JWT): el menú de clientes muestra "promos de hoy" sin
- *  login. Desde v15 FASE 3 (2026-08-31) el GET fusiona:
- *    1) promos data-driven de la DB (promos-service.activePromosForBusinessDay)
- *    2) promos fijas del SSOT (src/core/config/promotions.js) como fallback
- *  La DB gana si comparte id; si la DB falla o está vacía, el SSOT cubre.
+ *  login. Desde v15 FASE 3 el GET devuelve SOLO las promos data-driven de
+ *  la DB (promos-service.activePromosForBusinessDay). Desde v16 el SSOT
+ *  (src/core/config/promotions.js) quedó ELIMINADO: la DB es la única
+ *  fuente de verdad. Si la tabla `promos` no existe aún (migración sin
+ *  correr) → [] (no rompe, no fusiona nada).
  * ═══════════════════════════════════════════════════════════
  */
 
 import { Router } from 'express';
-import { businessDayDateStr } from '../utils/date-utils.js';
-import { activePromotionsForDay, businessDayName } from '../../src/core/config/promotions.js';
+import { businessDayDateStr, businessDayName } from '../utils/date-utils.js';
 import { activePromosForBusinessDay } from '../services/promos-service.js';
 
 const router = Router();
 
 /**
- * Promos activas del día laboral — SOLO data-driven (DB).
- *
- * v15 (2026-08-31): el SSOT (src/core/config/promotions.js) ya NO se fusiona.
- * Solo sirvió para sembrar la DB (seedDefaultPromos). La DB es la única fuente
- * de verdad: el Admin crea/activa/desactiva desde el panel (toggle ON/OFF).
- * Si la DB aún no tiene promos sembradas (migración no corrió), se cae al SSOT
- * como fallback temporal para no romper — pero una vez sembradas, la DB manda.
+ * Promos activas del día laboral — SOLO data-driven (DB). Si la DB aún no
+ * tiene la tabla `promos` (migración no corrió) → [] (no rompe).
  */
 export function mergedActivePromotions(businessDay) {
-  let dbActive;
-  let hasPromos = false;
   try {
-    dbActive = activePromosForBusinessDay(businessDay);
-    hasPromos = true; // la tabla promos existe (schema v15 aplicado)
+    return activePromosForBusinessDay(businessDay);
   } catch {
-    dbActive = [];
-    hasPromos = false;
+    return [];
   }
-  // Si la DB tiene la tabla `promos` (migración corrió), la DB es la ÚNICA
-  // fuente: devolver solo las activas (si ninguna está activa → []).
-  // El fallback al SSOT es SOLO si la tabla no existe aún (primera vez).
-  if (hasPromos) return dbActive;
-  return activePromotionsForDay(businessDay);
 }
 
-// GET /api/promotions — promos activas del día laboral (DB + SSOT)
+// GET /api/promotions — promos activas del día laboral (DB)
 router.get('/', (req, res) => {
   try {
     // Validación: business_day opcional con formato YYYY-MM-DD (regex simple)

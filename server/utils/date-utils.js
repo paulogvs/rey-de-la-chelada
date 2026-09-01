@@ -21,6 +21,23 @@
 /** Zona horaria del negocio (Bolivia, UTC-4, sin DST) */
 export const BUSINESS_TIMEZONE = 'America/La_Paz';
 
+/** Índice del día de la semana: 0=domingo … 6=sábado (español, sin acento) */
+export const PROMOTION_DAYS = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+
+/**
+ * Nombre del día de la semana (español, sin acento) de un businessDayStr.
+ * v16 (2026-09-01): se movió aquí desde src/core/config/promotions.js (SSOT
+ * eliminado) para que promos-service / routes no dependan del código de
+ * promos. Misma función pura: recibe 'YYYY-MM-DD' y devuelve 'domingo'..'sabado'.
+ * @param {string} businessDayStr — 'YYYY-MM-DD' del día laboral
+ * @returns {string}
+ */
+export function businessDayName(businessDayStr) {
+  const [y, m, d] = String(businessDayStr).split('-').map(Number);
+  // Mediodía UTC (mismo patrón que addDaysLocal) — getUTCDay nunca cruza día.
+  return PROMOTION_DAYS[new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay()];
+}
+
 /** Modifier de SQLite: timestamps UTC almacenados → fecha/hora local */
 export const SQL_UTC_OFFSET_MODIFIER = '-4 hours';
 
@@ -169,6 +186,7 @@ export function businessDayExpr(column) {
 export default {
   BUSINESS_TIMEZONE, SQL_UTC_OFFSET_MODIFIER,
   BUSINESS_DAY_START_HOUR,
+  PROMOTION_DAYS, businessDayName,
   localDateStr, localDateTimeStr, localDateExpr, localHourExpr, localHour,
   businessDayDateStr, businessDayExpr,
 };

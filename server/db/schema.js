@@ -46,7 +46,13 @@
 //     - transactions   → nº de transacciones del día laboral
 //   El cierre viejo (v12) solo guardaba expected_cash (efectivo del día); los
 //   cierres históricos quedan con las nuevas columnas en 0 (no se pierde nada).
-const SCHEMA_VERSION = 15;
+// v16 (2026-09-01): PROMOS — modelo A/B de precio. Añade a `promos`:
+//   - price_mode TEXT NOT NULL DEFAULT 'FIXED'  → 'FIXED' (precio TOTAL del
+//     pack) | 'MENU_PLUS' (precio = item.menu_price + ajuste)
+//   - price_value INTEGER NOT NULL DEFAULT 0     → para FIXED = total del pack;
+//     para MENU_PLUS = ajuste (+centavos). ADD COLUMN aditivo; las promos
+//     existentes quedan con FIXED y price_value=0 (el seed v16 las rellena).
+const SCHEMA_VERSION = 16;
 
 const CREATE_TABLES = [
   // â”€â”€ Staff / Users (v5: 4 roles â€” admin, mesero, kds, caja) â”€â”€â”€â”€â”€
@@ -345,13 +351,21 @@ const CREATE_TABLES = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_category_extras_category ON category_extras(category_id)`,
 
-  // Promos: modelo único "set de líneas (items/grupos + extras) + precio total".
+  // Promos: modelo único "set de líneas (items/grupos + extras) + precio".
+  // v16: price_mode/price_value — cómo se cobra la promo:
+  //   # FIXED     → price_value = precio TOTAL del pack (se reparte entre las
+  //                  unidades de las líneas; 1 item → 1 precio; combo → split)
+  //   # MENU_PLUS → price_value = ajuste; el precio de línea = menu_item.price
+  //                  + price_value (línea única) o la 1ª unidad paga y el resto
+  //                  gratis cuando la línea tiene quantity > 1 (2x1/BOGO).
   `CREATE TABLE IF NOT EXISTS promos (
     id            TEXT PRIMARY KEY,
     name          TEXT NOT NULL,
     label         TEXT NOT NULL,
     description   TEXT NOT NULL DEFAULT '',
-    price_total   INTEGER NOT NULL DEFAULT 0, -- centavos (precio que pone Admin)
+    price_total   INTEGER NOT NULL DEFAULT 0, -- centavos (legacy — se migra a price_mode/price_value)
+    price_mode    TEXT NOT NULL DEFAULT 'FIXED' CHECK(price_mode IN ('FIXED','MENU_PLUS')),
+    price_value   INTEGER NOT NULL DEFAULT 0, -- centavos (FIXED=total pack, MENU_PLUS=ajuste)
     max_per_order INTEGER NOT NULL DEFAULT 1,
     active        INTEGER NOT NULL DEFAULT 1, -- toggle global
     created_by    TEXT,
@@ -519,6 +533,20 @@ function applySchema(db) {
            db.exec(`ALTER TABLE cash_closings ADD COLUMN ${col} ${ddl}`);
            console.log(`[DB] Migration v13: cash_closings.${col} (cierre rediseñado)`);
          }
+       }
+       // v16 (2026-09-01): promos — modelo A/B de precio. ADD COLUMN aditivo
+       // (no destructivo: las promos existentes quedan FIXED/0 y el seed v16
+       // les asigna el price_mode/price_value correcto en el próximo arranque).
+       // SQLite no permite CHECK en ADD COLUMN → las columnas se añaden sin
+       // constraint; la app valida los valores. Para DBs fresh, CREATE_TABLES
+       // ya trae el CHECK.
+       if (!hasColumn(db, 'promos', 'price_mode')) {
+         db.exec(`ALTER TABLE promos ADD COLUMN price_mode TEXT NOT NULL DEFAULT 'FIXED'`);
+         console.log('[DB] Migration v16: promos.price_mode (modelo A/B)');
+       }
+       if (!hasColumn(db, 'promos', 'price_value')) {
+         db.exec(`ALTER TABLE promos ADD COLUMN price_value INTEGER NOT NULL DEFAULT 0`);
+         console.log('[DB] Migration v16: promos.price_value');
        }
        // Record schema version
       db.prepare(`INSERT OR REPLACE INTO schema_version (version) VALUES (?)`).run(SCHEMA_VERSION);

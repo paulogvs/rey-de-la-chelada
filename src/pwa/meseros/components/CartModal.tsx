@@ -5,8 +5,8 @@ import { Card } from '@/ui/components/Card';
 import { QuantityStepper } from '@/ui/components/QuantityStepper';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { formatMoney } from '../../_shared/utils/format';
-import { PROMOTIONS_BY_ID } from '@/core/config/promotions.js';
 import { resolveCartPromoUnitPrice, type PromoCartItem } from '../promoCart';
+import type { DbPromoLike } from '../promosData';
 import type { CartItem } from '../OrderPanel';
 import { PromosCollapsible } from './PromosCollapsible';
 import './CartModal.css';
@@ -24,13 +24,10 @@ function resolveCartUnitPrice(
   return null;
 }
 
-/** v15 FASE 3: precio de línea con promo (SSOT espejo server | DB → promoUnitPrice). */
-function cartItemPromoUnitPrice(ci: CartItem, businessDay: string): number | null {
+/** v16: precio de línea con promo (resuelto desde la promo de la DB). */
+function cartItemPromoUnitPrice(ci: CartItem, activePromos: DbPromoLike[]): number | null {
   if (!ci.promoType) return null;
-  if (PROMOTIONS_BY_ID[ci.promoType]) {
-    return resolveCartPromoUnitPrice(ci as PromoCartItem, businessDay);
-  }
-  return ci.promoUnitPrice ?? null;
+  return resolveCartPromoUnitPrice(ci as PromoCartItem, activePromos);
 }
 
 export interface CartModalProps {
@@ -46,7 +43,7 @@ export interface CartModalProps {
   submitting: boolean;
   businessDay: string;
   businessDayNameLabel: string;
-  activePromos: { id: string; label: string; description: string }[];
+  activePromos: DbPromoLike[];
   onApplyPromo: (promoId: string) => void;
   onClearPromo: (promoId: string) => void;
 }
@@ -62,7 +59,7 @@ export function CartModal({
   savings,
   onConfirm,
   submitting,
-  businessDay,
+  businessDay: _businessDay,
   businessDayNameLabel,
   activePromos,
   onApplyPromo,
@@ -102,11 +99,11 @@ export function CartModal({
               cart.map((ci, index) => {
               const modAdj = ci.selectedModifiers.reduce((s, m) => s + (m.priceAdjustment ?? 0), 0);
               const unit = ci.promoType
-                ? (cartItemPromoUnitPrice(ci, businessDay) ?? 0)
+                ? (cartItemPromoUnitPrice(ci, activePromos) ?? 0)
                 : (resolveCartUnitPrice(ci.menuItem, ci.manualPrice, ci.applyPromo, modAdj) ?? 0);
               const lineTotal = unit * ci.quantity;
               const promoLabel = ci.promoType
-                ? (PROMOTIONS_BY_ID[ci.promoType]?.label ?? activePromos.find(p => p.id === ci.promoType)?.label ?? null)
+                ? (activePromos.find(p => p.id === ci.promoType)?.label ?? null)
                 : null;
               return (
                 <Card key={index} padded={false} className="order-panel__cart-item cart-modal__item">

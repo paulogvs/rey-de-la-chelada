@@ -1,9 +1,13 @@
 /**
- * ADMIN — PromosView (v15 2026-08-29): panel de promos data-driven.
+ * ADMIN — PromosView (v16 2026-09-01): panel de promos data-driven.
  *
  * Crea/edita/activa/desactiva promos. Modelo: set de líneas
- * (items del menú o grupos + extras) + precio total puesto por Admin.
- * Programador de días: día de la semana y/o rango de fechas.
+ * (items del menú o grupos + extras) + MODO de precio:
+ *   - PRECIO FIJO (FIXED)  → el armador pone el precio TOTAL del pack.
+ *   - MENÚ + AJUSTE (MENU_PLUS) → el armador pone un ajuste; el precio =
+ *     item.menu_price + ajuste (grupo+extra) con 1ª unidad pagada y resto
+ *     gratis si la línea tiene cantidad > 1 (2x1/BOGO).
+ * Cada línea puede llevar UN extra (precio 0 = gratis).
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -17,6 +21,7 @@ import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { formatMoney } from '../../_shared/utils/format';
 import { fetchAdminMenuItems } from '../../_shared/api/adminApi';
 import { fetchMenuCategories } from '../../_shared/api/menuApi';
+import { fetchCategoryExtras } from '../../_shared/api/promosApi';
 import {
   fetchAdminPromos, createAdminPromo, updateAdminPromo, toggleAdminPromo, deleteAdminPromo,
   type Promo, type PromoLine,
@@ -28,20 +33,25 @@ interface PromosViewProps {
 }
 
 interface MenuEntry { id: string; name: string; category_name?: string; }
+interface ExtraOption { id: string; name: string; price: number; }
 
 interface DraftLine extends PromoLine { key: number; _label: string; }
+
+type PriceMode = 'FIXED' | 'MENU_PLUS';
 
 export function PromosView({ token, onToast }: PromosViewProps) {
   const [promos, setPromos] = useState<Promo[]>([]);
   const [items, setItems] = useState<MenuEntry[]>([]);
   const [categories, setCategories] = useState<MenuEntry[]>([]);
+  const [extrasByCat, setExtrasByCat] = useState<Record<string, ExtraOption[]>>({});
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Promo | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Draft del formulario
   const [name, setName] = useState('');
-  const [price, setPrice] = useState(0);
+  const [priceMode, setPriceMode] = useState<PriceMode>('FIXED');
+  const [priceValue, setPriceValue] = useState(0);
   const [lines, setLines] = useState<DraftLine[]>([]);
 
   const load = useCallback(async () => {
@@ -68,14 +78,25 @@ export function PromosView({ token, onToast }: PromosViewProps) {
 
   useEffect(() => { load(); }, [load]);
 
+  // Cargar extras del grupo bajo demanda (para el select de extra por línea).
+  const loadExtras = useCallback(async (categoryId: string) => {
+    if (extrasByCat[categoryId]) return;
+    const r = await fetchCategoryExtras(token, categoryId);
+    if (r.ok) {
+      const list: ExtraOption[] = (r.data?.extras ?? []).map(e => ({ id: e.id, name: e.name, price: e.price }));
+      setExtrasByCat(prev => ({ ...prev, [categoryId]: list }));
+    }
+  }, [token, extrasByCat]);
+
   const resetDraft = useCallback(() => {
-    setName(''); setPrice(0); setLines([]);
+    setName(''); setPriceMode('FIXED'); setPriceValue(0); setLines([]);
   }, []);
 
   const startEdit = useCallback((promo: Promo) => {
     setEditing(promo);
     setName(promo.name);
-    setPrice(promo.price_total);
+    setPriceMode(promo.price_mode === 'MENU_PLUS' ? 'MENU_PLUS' : 'FIXED');
+    setPriceValue(promo.price_value ?? promo.price_total ?? 0);
     setLines((promo.lines || []).map((l, i) => ({
       ...l,
       key: i,
@@ -84,31 +105,47 @@ export function PromosView({ token, onToast }: PromosViewProps) {
   }, [items, categories]);
 
   const addLine = useCallback((kind: 'item' | 'group', id: string, label: string) => {
+    if (kind === 'group') void loadExtras(id);
     setLines(prev => [...prev, {
       key: Date.now() + Math.random(),
       ...(kind === 'item' ? { item_id: id } : { group_id: id }),
       quantity: 1,
+      extra_id: null,
+      extra_price: null,
       _label: label,
     }]);
-  }, []);
+  }, [loadExtras]);
 
   const removeLine = useCallback((key: number) => {
     setLines(prev => prev.filter(l => l.key !== key));
   }, []);
 
+  // v16: extra por línea — al cambiar el grupo también se resetea el extra.
+  const setLineExtra = useCallback((key: number, extraId: string, extraPrice: number) => {
+    setLines(prev => prev.map(l => l.key === key
+      ? { ...l, extra_id: extraId || null, extra_price: extraId ? extraPrice : null }
+      : l));
+  }, []);
+
+  const updateLineQuantity = useCallback((key: number, quantity: number) => {
+    setLines(prev => prev.map(l => l.key === key ? { ...l, quantity } : l));
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (!name.trim()) { onToast('warning', 'Pon un nombre a la promo'); return; }
     if (lines.length === 0) { onToast('warning', 'Agrega al menos un item/grupo a la promo'); return; }
-    if (price <= 0) { onToast('warning', 'Pon el precio de la promo'); return; }
+    if (priceValue <= 0 && priceMode === 'FIXED') { onToast('warning', 'Pon el precio (total) de la promo'); return; }
     setSaving(true);
     try {
       const data = {
         name: name.trim(),
         label: name.trim(),
-        price_total: price,
-        // v15: sin programador de días — el dueño activa/desactiva a mano.
+        price_mode: priceMode,
+        price_value: priceValue,
         schedule: [],
-        lines: lines.map(({ item_id, group_id, quantity, extra_id, extra_price }) => ({ item_id, group_id, quantity, extra_id, extra_price })),
+        lines: lines.map(({ item_id, group_id, quantity, extra_id, extra_price }) => ({
+          item_id, group_id, quantity, extra_id, extra_price,
+        })),
       };
       const result = editing
         ? await updateAdminPromo(token, editing.id, data)
@@ -122,7 +159,7 @@ export function PromosView({ token, onToast }: PromosViewProps) {
     } finally {
       setSaving(false);
     }
-  }, [name, lines, price, editing, token, onToast, resetDraft, load]);
+  }, [name, lines, priceMode, priceValue, editing, token, onToast, resetDraft, load]);
 
   const handleToggle = useCallback(async (promo: Promo) => {
     const r = await toggleAdminPromo(token, promo.id, promo.active !== 1);
@@ -139,8 +176,7 @@ export function PromosView({ token, onToast }: PromosViewProps) {
 
   return (
     <div className="admin-view">
-      {loading ? <Loader block label="Cargando promos…" /> : (
-        <>
+      {loading ? <Loader block label="Cargando promos…" /> : (        <>
           {/* Lista de promos */}
           <Card className="admin-section">
             <div className="admin-section__head">
@@ -155,7 +191,12 @@ export function PromosView({ token, onToast }: PromosViewProps) {
                   <div key={promo.id} className="admin-promo-row">
                     <div className="admin-promo-row__info">
                       <strong>{promo.label}</strong>
-                      <span className="admin-muted">{promo.price_total > 0 ? formatMoney(promo.price_total) : '—'} · {promo.lines.length} línea(s)</span>
+                      <span className="admin-muted">
+                        {promo.price_mode === 'MENU_PLUS'
+                          ? (promo.price_value ? `Menú + ${formatMoney(promo.price_value)}` : 'Precio del menú')
+                          : formatMoney(promo.price_value ?? promo.price_total ?? 0)}
+                        {' '}· {promo.lines.length} línea(s)
+                      </span>
                     </div>
                     <Badge variant={promo.active === 1 ? 'paid' : 'pending'}>{promo.active === 1 ? 'Activa' : 'Inactiva'}</Badge>
                     <div className="admin-promo-row__actions">
@@ -174,23 +215,78 @@ export function PromosView({ token, onToast }: PromosViewProps) {
 
           {/* Formulario crear/editar */}
           <Card className="admin-section">
-            <div className="admin-section__head"><h3>{editing ? 'Editar promo' : 'Nueva promo'}</h3><Badge variant="info">set de items + precio</Badge></div>
+            <div className="admin-section__head"><h3>{editing ? 'Editar promo' : 'Nueva promo'}</h3><Badge variant="info">set de items + modo A/B</Badge></div>
             <div className="admin-promo-form">
               <FormField label="Nombre de la promo" value={name} onChange={e => setName(e.target.value)} placeholder="Ej: 2x1 Quesadillas" />
+
+              {/* v16: ¿cómo se cobra la promo? */}
               <label className="form-field">
-                <span className="form-field__label">Precio de la promo (Bs)</span>
-                <MoneyInput value={price} onChange={setPrice} variant="lg" placeholder="0,00" />
+                <span className="form-field__label">¿Cómo se cobra?</span>
+                <select
+                  className="form-input"
+                  value={priceMode}
+                  onChange={e => setPriceMode(e.target.value as PriceMode)}
+                >
+                  <option value="FIXED">Precio FIJO (total de la promo)</option>
+                  <option value="MENU_PLUS">Menú + ajuste (precio del item + extra)</option>
+                </select>
               </label>
+              <label className="form-field">
+                <span className="form-field__label">
+                  {priceMode === 'FIXED' ? 'Precio total de la promo (Bs)' : 'Ajuste sobre el precio del menú (Bs)'}
+                </span>
+                <MoneyInput value={priceValue} onChange={setPriceValue} variant="lg" placeholder="0,00" />
+              </label>
+              {priceMode === 'MENU_PLUS' && (
+                <p className="admin-muted" style={{ fontSize: 12 }}>
+                  💡 Con una línea de cantidad &gt; 1, la 1ª unidad paga y el resto va GRATIS (2x1).
+                </p>
+              )}
 
               {/* Armador de líneas */}
               <div className="admin-promo-lines">
                 <span className="form-field__label">Items / Grupos de la promo</span>
-                {lines.map(line => (
-                  <div key={line.key} className="admin-promo-line">
-                    <span>{line._label} × {line.quantity || 1}</span>
-                    <button type="button" onClick={() => removeLine(line.key)} aria-label="Quitar línea"><AppIcon name="x" size="sm" /></button>
-                  </div>
-                ))}
+                {lines.map(line => {
+                  const catExtras = line.group_id ? (extrasByCat[line.group_id] || []) : [];
+                  return (
+                    <div key={line.key} className="admin-promo-line">
+                      <span>{line._label} ×
+                        <input
+                          type="number"
+                          min={1}
+                          value={line.quantity || 1}
+                          style={{ width: 48, marginInline: 4 }}
+                          onChange={e => updateLineQuantity(line.key, Math.max(1, Number(e.target.value) || 1))}
+                          aria-label="Cantidad"
+                        />
+                      </span>
+                      {/* v16: extra opcional de la línea */}
+                      {line.group_id && (
+                        <select
+                          defaultValue=""
+                          onChange={e => {
+                            const ex = catExtras.find(x => x.id === e.target.value);
+                            setLineExtra(line.key, ex ? ex.id : '', ex ? ex.price : 0);
+                            e.target.value = '';
+                          }}
+                          title="Agregar extra (0 = gratis)"
+                        >
+                          <option value="">+ Extra…</option>
+                          {catExtras.map(ex => (
+                            <option key={ex.id} value={ex.id}>{ex.name} ({ex.price ? formatMoney(ex.price) : 'gratis'})</option>
+                          ))}
+                        </select>
+                      )}
+                      {line.extra_id && (
+                        <span className="admin-muted" style={{ fontSize: 12 }}>
+                          → {catExtras.find(x => x.id === line.extra_id)?.name || 'Extra'} (+{formatMoney(line.extra_price ?? 0)})
+                          <button type="button" onClick={() => setLineExtra(line.key, '', 0)} aria-label="Quitar extra"><AppIcon name="x" size="sm" /></button>
+                        </span>
+                      )}
+                      <button type="button" onClick={() => removeLine(line.key)} aria-label="Quitar línea"><AppIcon name="x" size="sm" /></button>
+                    </div>
+                  );
+                })}
                 <div className="admin-promo-picker">
                   <select defaultValue="" onChange={e => {
                     const v = e.target.value;
@@ -209,7 +305,6 @@ export function PromosView({ token, onToast }: PromosViewProps) {
                 </div>
               </div>
 
-              {/* v15: sin programador de días — la promo se activa/desactiva en la lista */}
               <p className="admin-muted" style={{ fontSize: 13 }}>
                 💡 Actívala/desactívala con el toggle en la lista, según el día que la necesites.
               </p>

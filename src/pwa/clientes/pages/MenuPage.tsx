@@ -10,7 +10,7 @@
  * - Tap item → detail view (modifiers, description, photo)
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import type { MenuItem } from '@/core/types';
 import { useTableSession } from '../hooks/useTableSession';
 import { useMenu } from '../hooks/useMenu';
@@ -23,8 +23,10 @@ import { CategoryButton, MenuBanner, PageHeader, CustomerActions } from '../comp
 import { canSubmitClientOrder } from '../utils/orderSendGate';
 import { computeTotals } from '@/core/config/iva';
 import { businessDayDateStr } from '@/core/config/local-date';
-import { activePromotionsForDay } from '@/core/config/promotions.js';
 import './MenuPage.css';
+
+/** Promo mínima del GET /api/promotions (solo para el banner informativo). */
+interface ClientPromo { id: string; name?: string; label?: string; lines?: { group_id?: string | null; item_id?: string | null }[]; }
 
 /** Draft item type for local state */
 interface DraftItem {
@@ -84,19 +86,38 @@ export function MenuPage({
   const [showSummary, setShowSummary] = useState(false);
   const [sending, setSending] = useState(false);
 
-  // ── Sprint Promos (2026-08-19): banner de promos del día laboral + badge
-  // "PROMO HOY" en los items de las categorías cubiertas. Informativo —
-  // el cobro de promos es manual del mesero (nunca automático).
-  const businessDay = useMemo(() => businessDayDateStr(), []);
-  const activePromos = useMemo(() => activePromotionsForDay(businessDay), [businessDay]);
+  // ── Sprint Promos (2026-08-19) + v16 (2026-09-01): banner de promos del
+  // día laboral. El SSOT quedó ELIMINADO — se carga de GET /api/promotions
+  // (la DB es la única fuente). Informativo — el cobro es manual del mesero.
+  const [clientPromos, setClientPromos] = useState<ClientPromo[]>([]);
+  useEffect(() => {
+    let disposed = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/promotions?business_day=${businessDayDateStr()}`);
+        const json = await res.json().catch(() => null);
+        if (disposed) return;
+        if (res.ok && json?.success && Array.isArray(json.promotions)) {
+          setClientPromos(json.promotions);
+        }
+      } catch { /* API caída → sin banner de promos */ }
+    })();
+    return () => { disposed = true; };
+  }, []);
+  // Promos que cubren grupos con items → badge "PROMO HOY" en la card.
   const promoCats = useMemo(() => {
     const set = new Set<string>();
-    for (const p of activePromos) {
-      if (p.categoryName) set.add(p.categoryName);
+    for (const p of clientPromos) {
+      for (const line of p.lines || []) {
+        if (line.group_id) {
+          const cat = items.find(i => i.category_id === line.group_id)?.category_name;
+          if (cat) set.add(cat);
+        }
+      }
     }
     return set;
-  }, [activePromos]);
-  const bannerText = activePromos.map(p => p.name).join(' · ');
+  }, [clientPromos, items]);
+  const bannerText = clientPromos.map(p => p.name || p.label || '').filter(Boolean).join(' · ');
 
   // Map API shape (snake_case) → UI shape (camelCase)
   const cats = (selectedCategory
@@ -222,7 +243,7 @@ export function MenuPage({
       />
 
       {/* Sprint Promos: banner informativo "Promos de hoy" (día laboral) */}
-      {activePromos.length > 0 && (
+      {clientPromos.length > 0 && (
         <div className="clientes-promo-banner" role="status">
           <span className="clientes-promo-banner__icon" aria-hidden="true">🏆</span>
           <span className="clientes-promo-banner__text">

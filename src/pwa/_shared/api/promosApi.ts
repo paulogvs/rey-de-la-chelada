@@ -27,6 +27,8 @@ export interface Promo {
   label: string;
   description?: string;
   price_total: number;
+  price_mode?: 'FIXED' | 'MENU_PLUS' | string;
+  price_value?: number;
   max_per_order?: number;
   active: number;
   lines: PromoLine[];

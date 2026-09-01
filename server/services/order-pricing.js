@@ -12,21 +12,19 @@
  *  INTEGER centavos y la config SSOT (promotions/iva) también. No hay
  *  floats de dinero aquí. La conversión a decimal solo ocurre en display.
  *
- *  Extraído de server/routes/orders.js (donde vivía resolveModifierAdjustment)
- *  para que sync.js (push offline) recalcule EXACTAMENTE igual que el
- *  POST /api/orders online. SSOT IVA: src/core/config/iva.js.
+ *  v16 (2026-09-01): el SSOT src/core/config/promotions.js quedó ELIMINADO.
+ *  Las promos se resuelven SOLO desde la DB vía promos-service, con el
+ *  modelo A/B (price_mode/price_value):
+ *    - FIXED     → price_value = total del pack (se reparte entre unidades)
+ *    - MENU_PLUS → precio de línea = menu_item.price + price_value; con
+ *                  línea de quantity>1 la 1ª unidad paga y el resto gratis
+ *  La regla BOGO (2x1) ya no vive en código: se modela como MENU_PLUS 0 con
+ *  línea de quantity 2 en la DB.
  * ═══════════════════════════════════════════════════════════
  */
 
 import { computeTotals, round2, toCents } from '../../src/core/config/iva.js';
-import {
-  promoById,
-  promoUnitPrice,
-  isPromotionActiveForDay,
-  SIGNATURE_CATEGORY,
-  ARTESANAL_CATEGORY,
-} from '../../src/core/config/promotions.js';
-import { activePromosForBusinessDay } from './promos-service.js'; // v15 FASE 3: promos data-driven (DB)
+import { activePromosForBusinessDay, promoLineMatchesItem } from './promos-service.js';
 
 /**
  * Resolve modifier adjustments for an order item from the DB.
@@ -70,10 +68,6 @@ export function resolveModifierAdjustment(db, menuItemId, modifiers) {
 /**
  * Normaliza un manualPrice del cliente (número o string "12,5" con coma
  * decimal del MoneyInput) → centavos enteros, o null si no es válido.
- * v11: el API espera CENTAVOS (contrato SSOT). Por tolerancia con clientes
- * legacy que aún manden Bs con decimales (ej. "10.5"), si el número NO es
- * entero se convierte con toCents() (10.5 → 1050). Un entero (1050) se
- * interpreta como centavos y pasa directo.
  * @param {*} value
  * @returns {number|null} centavos
  */
@@ -132,10 +126,6 @@ export function resolveItemUnitPrice(db, menuItem, { manualPrice, applyPromo = f
 
   // 3. Sin precio base (manual "Consultar precio", promo display o pizza cuyo
   //    price quedó null): el server NUNCA factura 0.
-  //    a. manualPrice explícito del mesero → gana (Bs 0 no válido)
-  //    b. sin manual → los modifiers pueden dar el precio (pizza con tamaño
-  //       Familiar: el ajuste ES el precio)
-  //    c. si nada aporta precio → 400 PRICE_REQUIRED_MANUAL
   const manual = parseManualPrice(manualPrice);
   if (manual != null && manual > 0) {
     return { unitPrice: round2(manual + adjustment), promoLabel: null, error: null, summary };
@@ -153,7 +143,6 @@ export function resolveItemUnitPrice(db, menuItem, { manualPrice, applyPromo = f
 
 /**
  * Recalcula subtotal/iva/total de un pedido a partir de order_items.
- * (MISMO helper que server/routes/orders.js — SSOT para recalc.)
  *
  * @param {object} db — better-sqlite3
  * @param {string} orderId
@@ -181,115 +170,121 @@ export function categoryNameOf(db, menuItem) {
 }
 
 /**
- * ── Promos data-driven (DB) — v15 FASE 3 (2026-08-31) ────────────────────
+ * v16: inyecta el EXTRA de la promo como sub-línea del item en los modifiers
+ * (modifiers_json). Así el KDS lo ve preparar (optionName) y la caja NO lo
+ * cobra aparte (priceAdjustment 0 — ya incluido o gratis según el modelo).
+ * @param {Array} summary — modifiers resueltos del item (resolveModifierAdjustment)
+ * @param {{ name: string }|null} promoExtra — extra de la promo (resolvePromoUnitPrice)
+ * @returns {Array}
+ */
+export function mergePromoModifiers(summary, promoExtra) {
+  if (!promoExtra) return Array.isArray(summary) ? summary : [];
+  return [
+    ...(Array.isArray(summary) ? summary : []),
+    { groupName: 'Promo', optionName: promoExtra.name, priceAdjustment: 0 },
+  ];
+}
+
+/**
+ * ── Promos data-driven (DB) — v16 (2026-09-01) ────────────────────────────
  *
  * Las promos creadas en el panel Admin (tabla promos) llegan como
- * promo_type = promo.id (UUID). El SSOT (promotions.js) no las conoce, así
- * que el server las resuelve desde promos-service:
+ * promo_type = promo.id (UUID). El SSOT (promotions.js) quedó eliminado;
+ * el server las resuelve SOLO desde promos-service:
  *   - deben estar ACTIVAS en el businessDay (activePromosForBusinessDay)
- *   - el menu_item debe matchear una línea de la promo (item_id directo o
- *     group_id = categoría del item)
- *   - precio: reparto proporcional del price_total entre TODAS las unidades
- *     del pack (unitPrice = price_total / totalUnits) — el pack completo
- *     siempre suma price_total (2x1, combos, packs).
+ *   - el menu_item debe matchear una línea de la promo (promoLineMatchesItem)
+ *   - precio: modelo A/B (price_mode/price_value):
+ *       FIXED     → unit = price_value / totalUnits (split del pack)
+ *       MENU_PLUS → unit = menu_item.price + price_value; si la línea es
+ *                   única con quantity>1 (2x1) → (menú+ajuste)/quantity
+ *                   (la 1ª unidad paga, el resto gratis).
+ *   - `promoExtra` (opcional): el extra de la línea, para mostrarlo como
+ *     sub-línea en el KDS/orden (price 0 dentro de la promo — no suma).
  */
 
-function dbPromoForItem(promoType, businessDay, menuItem) {
-  if (!businessDay || !promoType) return null;
-  let active;
-  try {
-    active = activePromosForBusinessDay(businessDay);
-  } catch {
-    return null; // DB sin schema v15 → no hay promos data-driven
-  }
-  const promo = (active || []).find(p => p.id === promoType);
-  if (!promo) return null;
-  const line = (promo.lines || []).find(l =>
-    (l.item_id && l.item_id === menuItem.id) ||
-    (l.group_id && l.group_id === menuItem.category_id)
-  );
-  return { promo, line }; // line puede ser undefined (item no elegible)
-}
-
 /**
- * Resuelve el unit_price de una línea con PROMO (Sprint Promos 2026-08-19).
+ * Resuelve el unit_price de una línea con PROMO (Sprint Promos, v16).
  *
  * Contrato (aprobado con el dueño):
- *   - La línea con `promo_type` se factura con el precio de la promo
- *     (2x1 → 0, Miércoles de Barra → 12, Primera Visita → 25,
- *     Combo → 30 Signature / 15 Cerveza). NUNCA acepta precios del cliente.
- *   - v15 FASE 3: promo_type también puede ser el id de una promo
- *     data-driven de la DB (panel Admin) — se valida activa en el día +
- *     líneas presentes (item_id/group_id) y se reparte el price_total.
- *   - Valida: tipo conocido → día laboral activo → categoría elegible.
- *   - Las reglas de CONTEXTO (par 2x1, una vez primera visita, par combo)
- *     las valida validatePromoContext() en el route (necesitan el pedido).
+ *   - La línea con `promo_type` (id de una promo de la DB) se factura con el
+ *     precio de la promo según el modelo A/B. NUNCA acepta precios del cliente.
+ *   - Valida: promo activa en el día laboral → item matchea una línea →
+ *     precio según price_mode/price_value.
+ *   - Las reglas de CONTEXTO (packs del pack, max_per_order) las valida
+ *     validatePromoContext() en el route (necesitan el pedido completo).
  *
  * @param {object} db — better-sqlite3
- * @param {object} menuItem — { id, category_id }
- * @param {string} promoType — '2x1' | 'barra' | 'combo' | 'primera-visita' | <promo-id DB>
+ * @param {object} menuItem — { id, category_id, price }
+ * @param {string} promoType — id de una promo de la DB
  * @param {{ businessDay?: string }} opts — 'YYYY-MM-DD' del día laboral
- * @returns {{ unitPrice: number|null, promoLabel: string|null, error: { code: string, message: string }|null }}
+ * @returns {{ unitPrice: number|null, promoLabel: string|null, promoExtra?: { id: string, name: string, price: number }|null, error: { code: string, message: string }|null, promoCategory?: string|null }}
  */
 export function resolvePromoUnitPrice(db, menuItem, promoType, { businessDay } = {}) {
-  const promo = promoById(promoType);
-  if (!promo) {
-    // v15 FASE 3: ¿promo data-driven de la DB?
-    const dbMatch = dbPromoForItem(promoType, businessDay, menuItem);
-    if (dbMatch) {
-      if (!dbMatch.line) {
-        return {
-          unitPrice: null,
-          promoLabel: null,
-          error: {
-            code: 'PROMO_ITEM_NOT_ELIGIBLE',
-            message: `${dbMatch.promo.label || dbMatch.promo.name} no aplica a este item`,
-          },
-        };
-      }
-      const totalUnits = Math.max(1, dbMatch.promo.lines.reduce((s, l) => s + (l.quantity || 1), 0));
-      const unitPrice = round2((dbMatch.promo.price_total || 0) / totalUnits);
-      return {
-        unitPrice,
-        promoLabel: dbMatch.promo.label || dbMatch.promo.name,
-        promoCategory: categoryNameOf(db, menuItem),
-        error: null,
-      };
-    }
-    return { unitPrice: null, promoLabel: null, error: { code: 'INVALID_PROMO_TYPE', message: `Tipo de promo inválido: ${promoType}` } };
-  }
-  if (promo.promoType === 'MODIFIER') {
-    return { unitPrice: null, promoLabel: null, error: { code: 'PROMO_NOT_A_LINE', message: `${promo.name} es un adicional del item, no una línea propia` } };
-  }
-  if (!isPromotionActiveForDay(promoType, businessDay)) {
-    return { unitPrice: null, promoLabel: null, error: { code: 'PROMO_NOT_ACTIVE', message: `${promo.name} no está activa este día laboral` } };
-  }
-  const categoryName = categoryNameOf(db, menuItem);
-  if (promo.categoryName && categoryName !== promo.categoryName) {
-    return { unitPrice: null, promoLabel: null, error: { code: 'PROMO_ITEM_NOT_ELIGIBLE', message: `${promo.name} aplica solo a ${promo.categoryName}` } };
-  }
-  if (promo.promoType === 'COMBO' && !promo.comboPrices?.[categoryName]) {
-    return { unitPrice: null, promoLabel: null, error: { code: 'PROMO_ITEM_NOT_ELIGIBLE', message: `${promo.name} aplica solo a Signature + Cerveza Artesanal` } };
-  }
-  const price = promoUnitPrice(promo, categoryName);
-  if (price == null) {
-    return { unitPrice: null, promoLabel: null, error: { code: 'PROMO_NOT_A_LINE', message: `${promo.name} no define precio de línea` } };
-  }
-  return { unitPrice: round2(price), promoLabel: promo.label || promo.name, promoCategory: categoryName, error: null };
-}
-
-/**
- * Reglas de contexto para promos data-driven (DB, v15 FASE 3).
- * allLines puede incluir `itemId`/`categoryId` (los routes los enriquecen)
- * para validar que las líneas del pack estén presentes en el pedido.
- */
-function validateDbPromoContext(allLines, promoType, businessDay) {
-  if (!businessDay) return { valid: true };
   let active;
   try {
     active = activePromosForBusinessDay(businessDay);
   } catch {
-    return { valid: true }; // DB sin schema v15 → el route ya lo rechazó
+    return { unitPrice: null, promoLabel: null, error: { code: 'INVALID_PROMO_TYPE', message: `Tipo de promo inválido: ${promoType}` } };
+  }
+  const promo = (active || []).find(p => p.id === promoType);
+  if (!promo) {
+    return { unitPrice: null, promoLabel: null, error: { code: 'INVALID_PROMO_TYPE', message: `Tipo de promo inválido o no activa: ${promoType}` } };
+  }
+  const line = (promo.lines || []).find(l => promoLineMatchesItem(l, menuItem));
+  if (!line) {
+    return {
+      unitPrice: null,
+      promoLabel: null,
+      error: { code: 'PROMO_ITEM_NOT_ELIGIBLE', message: `${promo.label} no aplica a este item` },
+    };
+  }
+  const lines = promo.lines || [];
+  const totalUnits = Math.max(1, lines.reduce((s, l) => s + (l.quantity || 1), 0));
+  const menuItemPrice = Number(menuItem.price) || 0;
+  const priceValue = Number(promo.price_value) || 0;
+
+  let unitPrice;
+  if (promo.price_mode === 'MENU_PLUS') {
+    const base = menuItemPrice + priceValue;
+    // Pack único con quantity>1 (2x1/BOGO): la 1ª unidad paga, el resto gratis.
+    if (lines.length === 1 && (lines[0].quantity || 1) > 1) {
+      unitPrice = Math.round(base / (lines[0].quantity || 1));
+    } else {
+      unitPrice = base;
+    }
+  } else {
+    // FIXED: price_value = total del pack → reparto por unidades.
+    unitPrice = Math.round(priceValue / totalUnits);
+  }
+
+  // Extra de la línea → sub-línea KDS (price 0 dentro de la promo).
+  let promoExtra = null;
+  if (line.extra_id) {
+    const extra = db.prepare('SELECT id, name, price FROM category_extras WHERE id = ?').get(line.extra_id);
+    if (extra) promoExtra = { id: extra.id, name: extra.name, price: 0 };
+  }
+
+  return {
+    unitPrice: round2(unitPrice),
+    promoLabel: `PROMO - ${promo.label}`,
+    promoCategory: categoryNameOf(db, menuItem),
+    promoExtra,
+    error: null,
+  };
+}
+
+/**
+ * Reglas de contexto para promos data-driven (DB, v16).
+ * allLines puede incluir `itemId`/`categoryId` (los routes los enriquecen)
+ * para validar que las líneas del pack estén presentes en el pedido +
+ * max_per_order (packs por pedido).
+ */
+export function validatePromoContext(allLines, promoType, businessDay) {
+  let active;
+  try {
+    active = activePromosForBusinessDay(businessDay);
+  } catch {
+    return { valid: true }; // DB sin schema → el route ya lo rechazó
   }
   const promo = (active || []).find(p => p.id === promoType);
   if (!promo) return { valid: true }; // promo no activa hoy → el route la rechazó
@@ -306,13 +301,13 @@ function validateDbPromoContext(allLines, promoType, businessDay) {
     return {
       valid: false,
       code: 'PROMO_CONTEXT_VIOLATION',
-      message: `${promo.label || promo.name} se aplica hasta ${maxPacks} vez/veces por pedido`,
+      message: `${promo.label} se aplica hasta ${maxPacks} vez/veces por pedido`,
     };
   }
 
   // 2) líneas del pack presentes en el pedido (item_id directo o group_id
-  //    = categoría del item). Sin itemId/categoryId en las líneas (rutas
-  //    legacy) esta validación se omite — max_per_order ya protege.
+  //    = categoría del item). Sin itemId/categoryId (rutas omitidas) esta
+  //    validación se omite — max_per_order ya protege.
   for (const line of promo.lines || []) {
     const need = line.quantity || 1;
     const have = (Array.isArray(allLines) ? allLines : []).reduce((s, l) => {
@@ -325,82 +320,19 @@ function validateDbPromoContext(allLines, promoType, businessDay) {
       return {
         valid: false,
         code: 'PROMO_CONTEXT_VIOLATION',
-        message: `${promo.label || promo.name} requiere ${need} unidad(es) de cada producto del pack`,
+        message: `${promo.label} requiere ${need} unidad(es) de cada producto del pack`,
       };
     }
   }
   return { valid: true };
 }
 
-/**
- * Valida las reglas de CONTEXTO de una promo contra TODAS las líneas del
- * pedido (existentes + nuevas). Se llama UNA vez por tipo de promo en el
- * route, después de pre-validar cada línea con resolvePromoUnitPrice.
- *
- * Líneas: [{ categoryName, promoType, quantity }] (sin importar db).
- * v15 FASE 3: `itemId`/`categoryId` opcionales para promos data-driven.
- *
- * Reglas (SSOT):
- *   - BOGO (2x1): unidades gratis ≤ unidades pagadas de la categoría.
- *   - PRICE_OVERRIDE con oncePerOrder (Primera Visita): máx 1 unidad.
- *   - COMBO: pares Signature/Cerveza balanceados (misma cantidad, ≥1).
- *   - Promos DB: max_per_order (packs) + líneas del pack presentes.
- *
- * @param {Array<{categoryName?: string|null, promoType?: string|null, quantity?: number, itemId?: string|null, categoryId?: string|null}>} allLines
- * @param {string} promoType
- * @param {string} businessDay — 'YYYY-MM-DD' del día laboral
- * @returns {{ valid: boolean, code?: string, message?: string }}
- */
-export function validatePromoContext(allLines, promoType, businessDay) {
-  const promo = promoById(promoType);
-  // Tipo desconocido: si es una promo de la DB, validar contexto DB;
-  // si no existe ni SSOT ni DB, el route ya lo rechazó (no opina).
-  if (!promo) return validateDbPromoContext(allLines, promoType, businessDay);
-  const lines = (Array.isArray(allLines) ? allLines : []).filter(l => l && l.promoType === promoType);
-  if (lines.length === 0) return { valid: true };
-  // Si la promo no está activa hoy, el route lo rechaza antes (resolvePromoUnitPrice).
-  if (!isPromotionActiveForDay(promoType, businessDay)) return { valid: true };
-
-  const units = lines.reduce((s, l) => s + (l.quantity || 1), 0);
-  const otherLines = (Array.isArray(allLines) ? allLines : []).filter(l => l && l.promoType !== promoType);
-
-  switch (promo.promoType) {
-    case 'BOGO': {
-      const paidUnits = otherLines
-        .filter(l => l.categoryName === promo.categoryName)
-        .reduce((s, l) => s + (l.quantity || 1), 0);
-      if (units > paidUnits) {
-        return {
-          valid: false,
-          code: 'PROMO_CONTEXT_VIOLATION',
-          message: 'El 2x1 requiere una Michelada Signature pagada por cada unidad gratis',
-        };
-      }
-      return { valid: true };
-    }
-    case 'PRICE_OVERRIDE': {
-      if (promo.oncePerOrder && units > 1) {
-        return {
-          valid: false,
-          code: 'PROMO_CONTEXT_VIOLATION',
-          message: `${promo.name} solo se aplica una vez por pedido`,
-        };
-      }
-      return { valid: true };
-    }
-    case 'COMBO': {
-      const sigUnits = lines.filter(l => l.categoryName === SIGNATURE_CATEGORY).reduce((s, l) => s + (l.quantity || 1), 0);
-      const artUnits = lines.filter(l => l.categoryName === ARTESANAL_CATEGORY).reduce((s, l) => s + (l.quantity || 1), 0);
-      if (sigUnits < 1 || artUnits < 1 || sigUnits !== artUnits) {
-        return {
-          valid: false,
-          code: 'PROMO_CONTEXT_VIOLATION',
-          message: 'El combo requiere 1 Michelada Signature + 1 Cerveza Artesanal por par',
-        };
-      }
-      return { valid: true };
-    }
-    default:
-      return { valid: true };
-  }
-}
+export default {
+  resolveModifierAdjustment,
+  resolveItemUnitPrice,
+  resolvePromoUnitPrice,
+  validatePromoContext,
+  categoryNameOf,
+  recalcOrder,
+  mergePromoModifiers,
+};

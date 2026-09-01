@@ -24,7 +24,7 @@ import { randomUUID } from 'node:crypto';
 import { getDb } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { computeTotals, round2 } from '../../src/core/config/iva.js';
-import { resolveModifierAdjustment, resolveItemUnitPrice, resolvePromoUnitPrice, validatePromoContext } from '../services/order-pricing.js';
+import { resolveModifierAdjustment, resolveItemUnitPrice, resolvePromoUnitPrice, validatePromoContext, mergePromoModifiers } from '../services/order-pricing.js';
 import { businessDayDateStr } from '../utils/date-utils.js';
 import { recordPayment } from '../services/financial/payment-service.js';
 
@@ -263,6 +263,7 @@ router.post('/push', requireAuth, (req, res) => {
             const { summary } = resolveModifierAdjustment(db, menuItem.id, item.modifiers);
             const unitPrice = pricing.unitPrice;
             const itemSubtotal = round2(unitPrice * quantity);
+            const mergedModifiers = mergePromoModifiers(summary, pricing.promoExtra);
             grossSubtotal += itemSubtotal;
             orderItems.push({
               id: item.id || randomUUID(),
@@ -270,7 +271,7 @@ router.post('/push', requireAuth, (req, res) => {
               menu_item_name: menuItem.name,
               quantity,
               unit_price: unitPrice,
-              modifiers_json: summary.length > 0 ? JSON.stringify(summary) : null,
+              modifiers_json: mergedModifiers.length > 0 ? JSON.stringify(mergedModifiers) : null,
               subtotal: itemSubtotal,
               status: ITEM_STATUS_MAP[item.status] || 'pending',
               preparation_notes: item.preparation_notes || item.notes || '',

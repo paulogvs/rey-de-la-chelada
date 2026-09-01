@@ -27,7 +27,7 @@ import { logger } from '../utils/logger.js'; // S1/T2: errores de pedidos al log
 import { broadcastOrderCreated, broadcastOrderStatusChange, broadcastOrderComplete, isOrderFullyReady, isModuleFullyReady, broadcastModuleReady } from '../services/order-broadcaster.js';
 import { broadcaster, buildKDSEvent, KDSEventType } from '../services/websocket-broadcaster.js';
 import { computeTotals, round2 } from '../../src/core/config/iva.js';
-import { resolveModifierAdjustment, resolveItemUnitPrice, resolvePromoUnitPrice, validatePromoContext, categoryNameOf, recalcOrder } from '../services/order-pricing.js';
+import { resolveModifierAdjustment, resolveItemUnitPrice, resolvePromoUnitPrice, validatePromoContext, categoryNameOf, recalcOrder, mergePromoModifiers } from '../services/order-pricing.js';
 import { recalcOrderStatus, resolveRound } from '../services/order-status.js';
 import { businessDayDateStr } from '../utils/date-utils.js';
 
@@ -353,6 +353,7 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
         });
       }
       const { summary } = resolveModifierAdjustment(db, menuItem.id, item.modifiers);
+      const lineModifiers = mergePromoModifiers(summary, pricing.promoExtra);
       const unitPrice = pricing.unitPrice;
       const itemSubtotal = round2(unitPrice * quantity);
 
@@ -369,7 +370,7 @@ router.post('/', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
         promo_type: item.promo_type || null,
         promo_category: categoryNameOf(db, menuItem),
         menu_item_category_id: menuItem.category_id, // v15 FASE 3: contexto promos DB
-        modifiers_json: summary.length > 0 ? JSON.stringify(summary) : null,
+        modifiers_json: lineModifiers.length > 0 ? JSON.stringify(lineModifiers) : null,
         preparation_notes: item.notes || '',
         status: 'pending',
         kds_module: item.kds_module || menuItem.area || 'cocina',
@@ -589,7 +590,9 @@ router.put('/:id', requireAuth, requireRole('admin', 'mesero'), (req, res) => {
             const { summary } = resolveModifierAdjustment(db, menuItem.id, item.modifiers);
             const unitPrice = pricing.unitPrice;
             const itemSubtotal = round2(unitPrice * quantity);
-            const modifiersJson = summary.length > 0 ? JSON.stringify(summary) : null;
+            const modifiersJson = mergePromoModifiers(summary, pricing.promoExtra).length > 0
+              ? JSON.stringify(mergePromoModifiers(summary, pricing.promoExtra))
+              : null;
             const notesField = item.notes || '';
             const promoTypeField = item.promo_type || null;
 
@@ -914,12 +917,16 @@ router.post('/:id/items', requireAuth, requireRole('admin', 'mesero'), (req, res
 
     // FASE 4B: ronda — misma si hay trabajo sin procesar, nueva si todo se procesó
     const round = resolveRound(db, req.params.id);
+    // v16: sub-línea del extra de la promo (si aplica) — KDS la ve preparar,
+    // caja no la cobra aparte (priceAdjustment 0).
+    const modSummary = resolveModifierAdjustment(db, menuItem.id, modifiers).summary;
+    const mergedModifiers = mergePromoModifiers(modSummary, pricing.promoExtra);
     db.prepare(`
       INSERT INTO order_items (id, order_id, menu_item_id, menu_item_name, quantity,
                                unit_price, modifiers_json, subtotal, status, round, preparation_notes, promo_label, promo_type)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
     `).run(randomUUID(), req.params.id, menuItem.id, menuItem.name, qty, unitPrice,
-           modifiers ? JSON.stringify(modifiers) : null, itemSubtotal, round, notes || '',
+           mergedModifiers.length > 0 ? JSON.stringify(mergedModifiers) : null, itemSubtotal, round, notes || '',
            pricing.promoLabel, promoType);
 
     recalcOrder(db, req.params.id);
