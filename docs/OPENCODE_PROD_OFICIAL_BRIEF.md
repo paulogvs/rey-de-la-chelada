@@ -3,7 +3,8 @@
 > **DESTINATARIO:** OpenCode en la PC de PRODUCCIÓN OFICIAL.
 > **AUTOR:** @forchi (Rey de la Chelada — FORCH.iA)
 > **Fecha:** 2026-09-02 · **App:** rey-de-la-chelada
-> **Objetivo:** Llevar el código NUEVO (v18) desde GitHub hacia la PROD oficial
+> **COMMIT OBJETIVO:** `264cce9`
+> **Objetivo:** Llevar el código NUEVO desde GitHub hacia la PROD oficial
 > **SIN** perder ni tocar la base de datos real (movimientos, cierres, menú editado).
 
 ---
@@ -27,6 +28,8 @@ NO ejecutar limpieza/borrado, NO `DROP TABLE`, NO borrar `data/*.db`, NO `git cl
 | **Item nuevo disponible (v18)** | Al crear un item en Admin ya NO se manda `price: null`. El modal es **solo Nombre + Precio**. El server fuerza `is_available=1` (salvo indicación explícita) → **aparece al instante en meseros**. | Ningún riesgo a la DB; mejora del flujo de menú. |
 | **Modal de nuevo apartado simplificado** | Solo **Nombre + Área (Barra/Cocina)**. El icono es **automático** (**🍻 Barra / 🍽 Cocina**) — ya NO se edita manualmente. | Cosmético; sin riesgo a datos. |
 | **Iconos estandarizados** | Barra 🍻 · Cocina 🍽 (coincide con el seed `load-menu`). | Cosmético. |
+| **Export de Reportes (v19)** | Admin → Reportes → botones **"Exportar HTML"** (.html imprimible → Ctrl+P Guardar PDF) y **"Copiar WhatsApp"** (texto resumido del día). | Solo frontend, lee APIs existentes. No toca DB. |
+| **Gráfico de barras (v19)** | Admin → Estadísticas → "Top por CANTIDAD" con **barras doradas** (CSS puro). | Solo frontend. No toca DB. |
 
 ---
 
