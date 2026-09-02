@@ -301,6 +301,31 @@
 
 .order-panel__categories::-webkit-scrollbar { display: none; }
 
+/* v19: en PC (≥1025px) mostramos UNA BARRA DE SCROLL horizontal visible y
+   fina, para que sea estándar poder recorrer las subpestañas a la derecha.
+   En móvil/tablet se mantiene el swipe táctil (scrollbar oculta). */
+@media (min-width: 1025px) {
+  .order-panel__categories {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--dorado-rey) 55%, transparent) transparent;
+    padding-bottom: var(--space-2);
+  }
+  .order-panel__categories::-webkit-scrollbar {
+    display: block;
+    height: 8px;
+  }
+  .order-panel__categories::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .order-panel__categories::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--dorado-rey) 55%, transparent);
+    border-radius: var(--radius-full);
+  }
+  .order-panel__categories::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--dorado-rey) 75%, transparent);
+  }
+}
+
 /* FASE B — máscara de degradado lateral (fade) sobre los tabs */
 .order-panel__categories::after {
   content: '';
@@ -308,6 +333,14 @@
   inset: 0;
   pointer-events: none;
   background: linear-gradient(90deg, var(--bg) 0%, transparent 6%, transparent 94%, var(--bg) 100%);
+}
+
+/* v19: en PC la máscara lateral NO debe tapar la barra de scroll — la
+   limitamos a la zona de los chips (deja libre el padding-bottom). */
+@media (min-width: 1025px) {
+  .order-panel__categories::after {
+    inset: 0 0 var(--space-2) 0;
+  }
 }
 
 .order-panel__cat-btn {

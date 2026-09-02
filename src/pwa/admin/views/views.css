@@ -47,7 +47,7 @@
 .admin-view {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-5);
 }
 
 .admin-muted {
@@ -652,7 +652,7 @@
 .admin-extras-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
 .admin-extras-create { display: grid; grid-template-columns: 1fr 160px auto; gap: 12px; align-items: end; border-top: 1px solid var(--border); padding-top: 16px; }
 
-/* ============ Extras en Menú (v15 2026-08-29) ============ */
+/* ============ Extras en Menï¿½ (v15 2026-08-29) ============ */
 .admin-menu-extras { margin-top: 14px; }
 .admin-menu-extras__divider { border-top: 2px dashed var(--border); margin-bottom: 10px; }
 .admin-menu-extras__header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--dorado-rey); font-weight: 600; font-size: 13px; }
@@ -681,7 +681,7 @@
 .admin-switch input:checked + .admin-switch__slider { background: var(--dorado-rey); }
 .admin-switch input:checked + .admin-switch__slider::before { transform: translateX(20px); }
 
-/* ============ Armador de Promos v16 (diseño app) ============ */
+/* ============ Armador de Promos v16 (diseï¿½o app) ============ */
 .admin-promo-line { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
 .admin-promo-line__label { font-weight: 600; }
 .admin-promo-line__qty { display: inline-flex; align-items: center; gap: 4px; }

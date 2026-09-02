@@ -173,7 +173,7 @@
   flex: 1;
   min-width: 0;
   overflow-y: auto;
-  padding: var(--space-5) var(--space-6);
+  padding: var(--space-5) var(--space-6) var(--space-6);
   max-width: 1320px;
 }
 
@@ -185,7 +185,11 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  margin: calc(var(--space-5) * -1) calc(var(--space-6) * -1) var(--space-5);
+  /* v19: más aire entre la franja fija del título y el contenido que sigue.
+     El negativo superior compensa el padding de .admin-main (queda pegado
+     al borde), pero el bottom ahora deja espacio real para que el primer
+     apartado NO toque el título. */
+  margin: calc(var(--space-5) * -1) calc(var(--space-6) * -1) var(--space-6);
   padding: calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--space-6);
   background: var(--header-gradient);
   border-bottom: 1px solid var(--glass-border);
