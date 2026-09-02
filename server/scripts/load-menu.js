@@ -80,6 +80,7 @@ export function loadMenuFromSeed(db, { log = console.log } = {}) {
         name: catName,
         emoji: catEmoji,
         sort_order: categorySort++,
+        area: areaLower,
       });
 
       for (const seedItem of cat.items || []) {
@@ -160,17 +161,18 @@ export function loadMenuFromSeed(db, { log = console.log } = {}) {
         db.prepare(`
           UPDATE menu_categories
            SET emoji = COALESCE(?, emoji),
+               area = COALESCE(?, area),
                is_active = 1,
-              sort_order = COALESCE(?, sort_order),
-              updated_at = datetime('now')
+               sort_order = COALESCE(?, sort_order),
+               updated_at = datetime('now')
           WHERE id = ?
-        `).run(cat.emoji, cat.sort_order, existing.id);
+        `).run(cat.emoji, cat.area, cat.sort_order, existing.id);
         categoriesUpdated++;
       } else {
         db.prepare(`
-          INSERT INTO menu_categories (id, name, emoji, sort_order)
-          VALUES (?, ?, ?, ?)
-        `).run(randomUUID(), cat.name, cat.emoji, cat.sort_order);
+          INSERT INTO menu_categories (id, name, emoji, sort_order, area)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(randomUUID(), cat.name, cat.emoji, cat.sort_order, cat.area);
         categoriesCreated++;
       }
     }
