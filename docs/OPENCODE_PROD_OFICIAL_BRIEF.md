@@ -45,9 +45,12 @@ NO ejecutar limpieza/borrado, NO `DROP TABLE`, NO borrar `data/*.db`, NO `git cl
 
 ---
 
-## PASOS (en la PC OFICIAL, con PROD en `D:\OTRO DISCO\REY DE LA CHELADA`)
+## PASOS (en la PC OFICIAL)
 
-> **Presupuesto:** estos pasos son idénticos salvo las notas ⚠️. Son SEGUROS para la DB real.
+> **⚠️ La ruta `D:\OTRO DISCO\REY DE LA CHELADA` en esta doc es SOLO un ejemplo de la PC de
+> PRUEBAS. En la PC OFICIAL, la carpeta puede ser OTRA.** Antes de ejecutar, **detecta la ruta real**
+> (busca `rey-de-la-chelada.db` o el `package.json` del proyecto) y usa esa como base de todos los
+> comandos. Los pasos son idénticos salvo las notas ⚠️. Son SEGUROS para la DB real.
 
 1. **RESPALDO de la DB (obligatorio, antes de tocar NADA):**
    ```powershell
