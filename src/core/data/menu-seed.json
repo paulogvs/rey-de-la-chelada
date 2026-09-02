@@ -41,10 +41,7 @@
           { "nombre_categoria": "Gaseosas 500 ml", "items": [
             { "id": "BAR-060", "nombre": "Coca-Cola", "precio": 1500 }, { "id": "BAR-061", "nombre": "Fanta", "precio": 1500 }, { "id": "BAR-062", "nombre": "Sprite", "precio": 1500 }
           ]},
-          { "nombre_categoria": "Agua", "items": [{ "id": "BAR-063", "nombre": "Vital", "precio": 1000 }]},
-          { "nombre_categoria": "Promociones", "items": [
-            { "id": "PROMO-001", "nombre": "Jueves de Chelada 2x1", "precio": null }, { "id": "PROMO-002", "nombre": "Miércoles de Barra", "precio": 1200 }, { "id": "PROMO-003", "nombre": "Combo Michelada + Cerveza", "precio": 4500 }, { "id": "PROMO-004", "nombre": "Primera Visita", "precio": 2500 }, { "id": "PROMO-005", "nombre": "Doble Escarchado", "precio": 500 }, { "id": "PROMO-006", "nombre": "Shot + Michelada", "precio": 1500 }
-          ]}
+          { "nombre_categoria": "Agua", "items": [{ "id": "BAR-063", "nombre": "Vital", "precio": 1000 }]}
         ]
       },
       "COCINA": {

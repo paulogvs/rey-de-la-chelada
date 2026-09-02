@@ -305,8 +305,10 @@ router.post('/items', requireAuth, requireRole('admin'), (req, res) => {
     }
 
     const id = randomUUID();
-    // Booleanos JS → 0/1 (SQLite no acepta true/false al bindear)
-    const availableInt = is_available ? 1 : 0;
+    // v18: un item creado SIEMPRE queda DISPONIBLE (is_available=1) salvo que el
+    //      admin lo indique explícitamente. Esto evita que items nuevos queden
+    //      ocultos en meseros por no mandar is_available.
+    const availableInt = is_available === false ? 0 : (is_available === true ? 1 : 1);
     // La estrategia "FORZAR TODO": el item hereda el área del grupo, no del body.
     const itemArea = cat.area === 'bar' ? 'bar' : 'cocina';
     db.prepare(`

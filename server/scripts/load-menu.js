@@ -73,7 +73,8 @@ export function loadMenuFromSeed(db, { log = console.log } = {}) {
 
     for (const cat of area.categorias || []) {
       const catName = cat.nombre_categoria;
-      const catEmoji = areaKey === 'BAR' ? '🍺' : '🍽️';
+      // v18: icono estandarizado — 🍻 Barra / 🍽️ Cocina (coincide con el Admin).
+      const catEmoji = areaKey === 'BAR' ? '🍻' : '🍽️';
 
       categories.push({
         name: catName,
