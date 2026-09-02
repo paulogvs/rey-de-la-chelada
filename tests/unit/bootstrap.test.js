@@ -8,14 +8,14 @@
  * first boot: staff (admin/mesero/kds) + tables + real menu + prices.
  *
  * Verifica:
- *  - empty DB → staff(4: admin/mesero/kds/caja) + tables(10) + categories(19) + items(105)
+ *  - empty DB → staff(4: admin/mesero/kds/caja) + tables(10) + categories(18) + items(99)
  *  - idempotente: second run duplicates nothing
  *  - S1/v5: DB con staff existente → ensureBootstrap asegura el rol caja sin duplicar
  *  - official seed prices replace stale catalog prices on existing DB
  *  - Sprint 1 (2026-08-17): menú BAR con precios reales; SOLO quedan NULL los
- *    items "Consultar precio" (price_variable=1, 2) y la promo display
- *    "Jueves de Chelada 2x1" (price_variable=0, no facturable). El demo no
- *    pisa manuales ni promos.
+ *    items "Consultar precio" (price_variable=1). v18: la categoría Promociones
+ *    se quitó del menú (se maneja desde el armador de promos), así que ya no
+ *    hay promo display null.
  *  - 2026-08-20: catálogo oficial — BAR 72 + COCINA 33 = 105 items, 19 categorías. Sin XL.
  */
 
@@ -47,18 +47,19 @@ describe('ensureBootstrap', () => {
     expect(barra).toBeTruthy();
     expect(barra.section).toBe('barra');
 
-    // Real menu: 19 categories, 105 explicit catalog lines.
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n).toBe(19);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(105);
+    // Real menu: 18 categories, 99 explicit catalog lines (v18: sin "Promociones").
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n).toBe(18);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(99);
     expect(db.prepare("SELECT COUNT(*) AS n FROM menu_categories WHERE name = 'Cervezas'").get().n).toBe(0);
 
     // Sprint 1: precios REALES del seed cargados (los items BAR ya no son null).
-    // Solo quedan NULL: 1 item "Consultar precio" (Churrasco Italiano,
-    // price_variable=1) + 1 promo display (Jueves de Chelada 2x1,
-    // price_variable=0, no facturable). Las 5 pizzas AHORA tienen precio base
+    // Solo queda NULL: 1 item "Consultar precio" (Churrasco Italiano,
+    // price_variable=1). v18: ya NO hay promo display null en el menú
+    // (la categoría Promociones se quitó — se maneja desde el armador de promos).
+    // Las 5 pizzas AHORA tienen precio base
     // (Mediana) + ajuste Familiar en modifier_options (Opción B 2026-08-25).
     expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND price_variable = 1').get().n).toBe(1);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND price_variable = 0').get().n).toBe(1);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND price_variable = 0').get().n).toBe(0);
     // El demo rellenó TODA la cocina EXCEPTO el item manual (Churrasco Italiano)
     expect(db.prepare("SELECT COUNT(*) AS n FROM menu_items WHERE price IS NULL AND area = 'cocina'").get().n).toBe(1);
     // Sprint Promos (2026-08-19): Opción A aprobada — el seed ya NO trae
@@ -86,8 +87,8 @@ describe('ensureBootstrap', () => {
     expect(second.seeded).toBe(false);
     expect(db.prepare('SELECT COUNT(*) AS n FROM staff').get().n).toBe(4);
     expect(db.prepare('SELECT COUNT(*) AS n FROM tables').get().n).toBe(11); // 10 salón + BARRA
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n).toBe(19);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(105);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_categories').get().n).toBe(18);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(99);
     expect(db.prepare('SELECT COUNT(*) AS n FROM modifier_groups').get().n).toBeGreaterThan(0);
     db.close();
   });
@@ -270,7 +271,7 @@ describe('ensureBootstrap', () => {
     try {
       const db = makeDb();
       const result = ensureBootstrap(db);
-      expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(105);
+      expect(db.prepare('SELECT COUNT(*) AS n FROM menu_items').get().n).toBe(99);
       expect(result.steps).toContain('menu-loaded');
       db.close();
     } finally {
