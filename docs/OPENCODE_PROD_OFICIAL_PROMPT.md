@@ -1,68 +1,147 @@
-# PROMPT — OpenCode PC PROD OFICIAL (v18)
+# PROMPT FINAL — OpenCode PC PROD OFICIAL (commit b78f8a7)
 
-> Copiar y pegar en OpenCode en la PC de PRODUCCIÓN OFICIAL.
-> Repo: https://github.com/paulogvs/rey-de-la-chelada (público, branch main)
+> **DESTINATARIO:** OpenCode en la PC de PRODUCCIÓN OFICIAL.
+> **REPO:** https://github.com/paulogvs/rey-de-la-chelada (público, branch `main`)
+> **COMMIT OBJETIVO:** `b78f8a7` (último — incluye fix de layout Admin + scroll horizontal Meseros + v18 del menú)
+> **OBJETIVO:** Actualizar la app a la v18/config final SIN romper nada y SIN perder la base de datos de producción.
 
 ---
 
-**PROMPT PARA OPENCODE (PC de PRODUCCIÓN OFICIAL):**
+**PROMPT PARA OPENCODE (copia y pega tal cual):**
 
-Actualiza la app **"Rey de la Chelada"** desde el repo público **https://github.com/paulogvs/rey-de-la-chelada** (branch `main`) hasta la **v18**, configurándolo todo bien, **SIN perder la base de datos de producción** (el archivo `data/rey-de-la-chelada.db`).
+Actualiza la app **"Rey de la Chelada"** desde el repo público
+`https://github.com/paulogvs/rey-de-la-chelada` (branch `main`), dejando el repositorio
+**exactamente en el commit `b78f8a7`** (o el `HEAD` de `main` si ya está más adelante y es
+compatible). Configúralo todo bien, **sin romper la app** y **sin perder la base de datos de
+producción** (`data/rey-de-la-chelada.db`, que tiene movimientos, cierres y menú editado).
+Al final el servicio debe quedar **arriba y funcional**.
 
-## PASO 0 — DETECTAR LA RUTA REAL DEL PROYECTO (NO la asumas)
+## PASO 0 — DETECTAR LA RUTA REAL DEL PROYECTO (NO asumas ninguna ruta)
 
-Antes de ejecutar nada, **localiza la carpeta donde está instalada la app** en esta PC.
-No tengo una ruta fija: puede ser `D:\OTRO DISCO\REY DE LA CHELADA`, otro disco, u otra carpeta.
+La app puede estar en cualquier carpeta de esta PC. **LOCALIZALA antes de nada.**
 
-**Cómo detectarla (pruébalas en orden):**
-1. `Get-ChildItem -Path C:\,D:\ -Filter "rey-de-la-chelada.db" -Recurse -ErrorAction SilentlyContinue` → busca el archivo de DB.
-2. O busca el `package.json` con `"name": "rey-de-la-chelada"`: `Get-ChildItem -Path C:\,D:\ -Filter "package.json" -Recurse -ErrorAction SilentlyContinue | Select-String "rey-de-la-chelada"`.
-3. O pregunta si hay una carpeta app conocida (ej. `start-hidden.vbs`, `AGENTS.md`, `scripts\backup-db.mjs`).
+1. Busca el archivo de DB:
+   `Get-ChildItem -Path C:\,D:\ -Filter "rey-de-la-chelada.db" -Recurse -ErrorAction SilentlyContinue`
+2. O busca el `package.json` del proyecto:
+   `Get-ChildItem -Path C:\,D:\ -Filter "package.json" -Recurse -ErrorAction SilentlyContinue | Select-String "rey-de-la-chelada"`
+3. O busca archivos típicos: `start-hidden.vbs`, `AGENTS.md`, `scripts\backup-db.mjs`, `scripts\start.bat`.
 
-> ⚠️ **Importante:** cuando encuentres la carpeta, define una variable local `$PROD` con esa ruta y **úsala en TODOS** los comandos que siguen. **NO uses la ruta de esta doc como si fuera fija.**
-
-Ejemplo genérico (ajusta `$PROD` a la ruta real encontrada):
+Cuando la encuentres, define:
 ```powershell
-$PROD = "C:\RUTA\REAL\ENCONTRADA"   # ← cámbiala
+$PROD = "C:\RUTA\REAL\ENCONTRADA"   # ← cámbiala por la carpeta real
 Set-Location $PROD
 ```
+> ⚠️ Usa `$PROD` en TODOS los comandos. NO asumas `D:\OTRO DISCO\REY DE LA CHELADA`.
 
-## REGLAS OBLIGATORIAS (leer antes de tocar nada)
+## REGLAS OBLIGATORIAS (LEELAS ANTES DE TOCAR NADA)
 
-1. **La DB de PRODUCCIÓN es REAL** — tiene **movimientos, cierres de caja y menú posiblemente editado**. **NO la reseteo.** NO `DROP TABLE`, NO borrar `data/*.db`, NO `git clean -fdx`, NO limpiar `orders/payments/cash_closings`.
-2. **Backup obligatorio** ANTES de cualquier paso (desde `$PROD`):
+1. **La DB de producción es REAL y NO se resetea.** Prohibido: `DROP TABLE`, borrar `data/*.db`,
+   `git clean -fdx`, limpiar `orders` / `payments` / `cash_closings`.
+2. **Backup obligatorio** ANTES de cualquier paso. Guarda la copia en un lugar seguro:
    ```powershell
    Set-Location $PROD
    node scripts\backup-db.mjs
    ```
-   Guarda el `.db`/backup resultante en un lugar seguro.
-3. **Respeta el `MENU_MANAGEMENT` del `.env`** (léelo primero):
-   - **`admin`** → el seed NO se auto-importa. El menú lo gestiona el Admin UI. Solo baja código, migra schema aditivo y NO toques el menú existente.
-   - **`seed`** (o ausente) → el seed es autoridad y al arrancar re-importa el catálogo. **Pregúntame** antes de arrancar si quieres que re-seedee el menú (pisa precios editados) o no.
+   (Backup WAL-safe con integridad verificada. Conserva ese backup toda la sesión.)
+3. **Respeta `MENU_MANAGEMENT`** del `.env` (léelo con `Get-Content .env | Select-String MENU_MANAGEMENT`):
+   - **`admin`** → el seed NO se re-importa solo. El menú lo gestiona el Admin UI. NO re-seedea; solo migra schema aditivo.
+   - **`seed`** (o ausente) → el seed es la autoridad y al arrancar re-importa el catálogo **OJO**: puede pisar precios editados. **Pregúntame ANTES de arrancar** si quieres re-seedar o conservar el menú actual.
+4. **NO cambies el modelo de cobro, precios ni flujos de pedidos.** Solo actualiza el código a `b78f8a7`.
 
-## PASOS (todos desde `$PROD`)
+## PASOS DE ACTUALIZACIÓN
 
-1. **Clonar/pull** desde `https://github.com/paulogvs/rey-de-la-chelada`:
-   - Si la carpeta **ya es un repo git**: `git fetch origin` + `git pull origin main`.
-   - Si **NO existe** el repo aún: `git clone https://github.com/paulogvs/rey-de-la-chelada .` (dentro de `$PROD`).
-2. `npm install --legacy-peer-deps` (obligatorio).
-3. **Migración de schema ADITIVA** (`menu_categories.area`, v17): se agrega solo si falta la columna (`hasColumn→ADD COLUMN`). NO borra datos. SEGURA.
-4. `npm run build`.
-5. **Reiniciar el servicio** (detener y arrancar con los scripts del proyecto — según lo que haya: `scripts\stop.bat`, `scripts\start.bat`, `start-hidden.vbs`).
-6. Verificar `GET /health` (debe responder `ok`).
+### 1. Bajar el código al commit objetivo
+```powershell
+Set-Location $PROD
+git fetch origin
+git checkout -- . 2>$null   # descarta cambios locales SIN tocar data/ (data/ no está en git)
+git pull origin main
+git checkout b78f8a7        # fija el commit objetivo (o quédate en HEAD de main si ya es ≥ b78f8a7 y compatible)
+git log --oneline -1        # confirma: debe mostrar b78f8a7 (o uno posterior)
+```
+> Si la carpeta NO es un repo git aún: `git clone https://github.com/paulogvs/rey-de-la-chelada .` dentro de `$PROD`.
+> ⚠️ `data/`, `.env` y `node_modules` NO están en git — `git pull`/`checkout` NO los tocan. No pierdes la DB.
 
-## DESPUÉS DE ARRANCAR — configurar lo nuevo
+### 2. Instalar dependencias
+```powershell
+Set-Location $PROD
+npm install --legacy-peer-deps
+```
 
-1. **Armador de promos (Admin → Promos):** verifica que funcione el CRUD y que sigan las 6 promos de ejemplo (desactivadas). Si el dueño ya creó promos, se conservan.
-2. **Menú renovado al nuevo seed** (si aplica, según `MENU_MANAGEMENT`): debe quedar con **99 items / 18 categorías** (12 bar: 🍻 · 6 cocina: 🍽️), **sin la categoría "Promociones"** del menú.
-   - Si en la DB existía una categoría **"Promociones"** de antes, y quieres que **desaparezca** del menú, **ocúltala** (Admin → Menú → apartado "Promociones" → ojo). **NO la borres** (podría haber pedidos históricos que la referencien). Si la ocultas, el historial se conserva.
-3. **Item nuevo disponible:** crea un item en Admin → Menú → debe aparecer **al instante en meseros** (con nombre + precio). El modal ahora es solo **nombre + precio**.
-4. **Grupos con área correcta:** verifica en meseros que cada grupo aparezca SOLO en su pestaña (Barra o Cocina), sin duplicar.
+### 3. Migración de schema ADITIVA (v17 — menu_categories.area)
+- Se ejecuta **sola** al arrancar. Es **aditiva**: usa `ADD COLUMN` + `hasColumn`.
+- Si la columna `area` ya existe, NO hace nada (no rompe).
+- Si no existe, la agrega e infiere el área de cada categoría desde su primer item (o `cocina` si está vacía).
+- **NO borra datos, NO toca pedidos/pagos/cierres.** Es SEGURA.
 
-## VERIFICACIÓN FINAL
+### 4. Build
+```powershell
+Set-Location $PROD
+npm run build
+```
 
-- `GET /health` → `ok`.
-- Nº de items / categorías / si existe "Promociones" (reporta el resultado).
-- Los movimientos/cierres existentes **NO deben haber cambiado** (compáralos con el backup).
+### 5. Detener el servicio (si está corriendo) y liberar la DB
+```powershell
+Set-Location $PROD
+if (Test-Path scripts\stop.bat) { cmd /c scripts\stop.bat }
+elseif (Test-Path stop.bat) { cmd /c stop.bat }
+Start-Sleep -Seconds 3
+```
 
-**Nunca improvises ni asumas rutas.** Seguí este prompt. Si algo no cuadra (repo ya existe, `.env` raro, DB bloqueada, o no encuentras la carpeta), **pregúntame** antes de continuar. Al final, dame un resumen claro de: la ruta `$PROD` que usaste, qué se actualizó y qué se conservó.
+### 6. Arrancar el servicio
+```powershell
+Set-Location $PROD
+if (Test-Path scripts\start.bat) { cmd /c scripts\start.bat }
+elseif (Test-Path start.bat) { cmd /c start.bat }
+# Si usas start-hidden.vbs / PM2, usa el método habitual de esta PC.
+Start-Sleep -Seconds 8
+```
+
+## VERIFICACIÓN DE SERVICIO FUNCIONAL
+
+### 1. Health check
+```powershell
+Invoke-RestMethod -Uri "http://localhost:3002/health" -TimeoutSec 8
+# → status: ok
+```
+
+### 2. Verificar que la DB NO se perdió (movimientos intactos)
+```powershell
+node -e "const d=require('better-sqlite3')('data/rey-de-la-chelada.db');const o=s=>d.prepare(s).get();console.log('pedidos',o('SELECT COUNT(*) n FROM orders').n,'pagos',o('SELECT COUNT(*) n FROM payments').n,'cierres',o('SELECT COUNT(*) n FROM cash_closings').n)"
+```
+- Los conteos de `orders` / `payments` / `cash_closings` deben ser **los mismos que antes del update**
+  (compáralos con el backup o con lo que reportaste antes de tocar).
+- **No deben ser 0** si había movimiento real. Si eran 0, OK; si no, **NO reinicies desde cero**.
+
+### 3. Verificar menú (solo lectura)
+```powershell
+node -e "const d=require('better-sqlite3')('data/rey-de-la-chelada.db');const o=s=>d.prepare(s).get();const q=s=>d.prepare(s).all();console.log('items',o('SELECT COUNT(*) n FROM menu_items').n,'categorias',o('SELECT COUNT(*) n FROM menu_categories').n);console.log('promos_cat',o(\"SELECT COUNT(*) n FROM menu_categories WHERE name LIKE '%Promo%'\").n);console.log('BAR',q(\"SELECT COUNT(*) n FROM menu_categories WHERE area='bar'\")[0].n,'COCINA',q(\"SELECT COUNT(*) n FROM menu_categories WHERE area='cocina'\")[0].n)"
+```
+
+## DESPUÉS DE ARRANCAR — CONFIGURAR LO NUEVO (v18)
+
+1. **Armador de promos (Admin → Promos):** verificar que el CRUD funcione y que sigan las promos
+   existentes (si el dueño creó, se conservan). Si el seed sembró las 6 de ejemplo, quedan desactivadas.
+2. **Item nuevo disponible:** Admin → Menú → "Agregar item" → ahora el modal es **solo nombre + precio**.
+   Crea uno de prueba → debe aparecer **al instante en meseros**. (Esto valida el bug v18 corregido.)
+3. **Grupos con área correcta:** en meseros, cada grupo debe verse SOLO en su pestaña
+   (Barra o Cocina), sin duplicarse.
+4. **Categoría "Promociones" en el menú:** si existe en la DB oficial, **NO la borres**.
+   Solo repórtamela. Si quieres que no se vea, la oculto luego desde Admin (el historial se conserva).
+
+## QUÉ REPORTARME AL FINAL
+
+- **La ruta `$PROD`** que usaste.
+- **Confirmación** de `git log --oneline -1` (idealmente `b78f8a7`).
+- **Health** → `ok`.
+- **Conteos** de `orders` / `payments` / `cash_closings` (que no hayan cambiado vs backup).
+- **Menú**: nº items, nº categorías, si existe categoría "Promociones", nº BAR/COCINA.
+- Si hubo que **re-seedar** (y si pisó precios editados) o no.
+- Cualquier **warning/error** de build, migración o arranque.
+
+## REGLAS FINALES
+
+- **NO improvises**, NO asumas rutas, NO toques la DB real.
+- Si algo no cuadra (no encuentras la carpeta, la DB está bloqueada, `git` da conflicto,
+  `npm install` falla, `start` no levanta), **PREGUNTAME ANTES de continuar**.
+- El objetivo es **dejar el servicio arriba y funcional** sin romper la app ni perder movimientos.
