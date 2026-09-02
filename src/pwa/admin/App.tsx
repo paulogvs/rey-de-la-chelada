@@ -20,6 +20,7 @@ import { LoginScreen } from '../_shared/components/LoginScreen';
 import { PwaLayout } from '../_shared/components/PwaLayout';
 import { Badge } from '@/ui/components/Badge';
 import { Loader } from '@/ui/components/Loader';
+import { FormField } from '@/ui/components/FormField';
 import { ToastProvider, useToast } from '@/ui/components/Toast';
 import { AppIcon, type AppIconName } from '@/ui/components/AppIcon/AppIcon';
 import { DashboardView } from './views/DashboardView';
@@ -72,6 +73,9 @@ function AdminApp() {
   // v14 (2026-08-29): día laboral seleccionado — permite ver días ANTERIORES
   // (pedidos, pagos, reportes históricos). Default: hoy.
   const [selectedDay, setSelectedDay] = useState<string>(() => businessDayDateStr());
+  // v16: rango de fechas del panel Estadísticas (arriba en el topbar).
+  const [statsFrom, setStatsFrom] = useState<string>(() => businessDayDateStr());
+  const [statsTo, setStatsTo] = useState<string>(() => businessDayDateStr());
 
   const restricted = isAuthenticated && user && user.role !== 'admin';
 
@@ -156,6 +160,13 @@ function AdminApp() {
               {['orders', 'payments', 'reports', 'closings', 'dashboard'].includes(view) && (
                 <BusinessDayPicker value={selectedDay} onChange={setSelectedDay} />
               )}
+              {view === 'stats' && (
+                <div className="admin-stats-range" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <FormField type="date" variant="sm" value={statsFrom} onChange={e => setStatsFrom(e.target.value)} aria-label="Desde" />
+                  <span className="admin-muted">→</span>
+                  <FormField type="date" variant="sm" value={statsTo} onChange={e => setStatsTo(e.target.value)} aria-label="Hasta" />
+                </div>
+              )}
               <Badge variant="info">Admin</Badge>
               {user && (
                 <button className="admin-topbar__logout" onClick={handleLogout} title="Cerrar sesión">
@@ -173,7 +184,7 @@ function AdminApp() {
           {view === 'reports' && <ReportView token={token} onToast={handleToast} initialDate={selectedDay} />}
           {view === 'payments' && <PaymentsView token={token} onToast={handleToast} businessDay={selectedDay} />}
           {view === 'orders' && <OrderHistoryView token={token} businessDay={selectedDay} title="Historial de pedidos" />}
-          {view === 'stats' && <StatsView token={token} onToast={handleToast} />}
+          {view === 'stats' && <StatsView token={token} onToast={handleToast} from={statsFrom} to={statsTo} />}
           {view === 'promos' && <PromosView token={token} onToast={handleToast} />}
           {view === 'settings' && <SettingsView token={token} onToast={handleToast} />}
         </main>

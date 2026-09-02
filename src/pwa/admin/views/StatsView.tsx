@@ -11,7 +11,6 @@ import { Card } from '@/ui/components/Card';
 import { Badge } from '@/ui/components/Badge';
 import { Button } from '@/ui/components/Button';
 import { Loader } from '@/ui/components/Loader';
-import { FormField } from '@/ui/components/FormField';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { formatMoney } from '../../_shared/utils/format';
 import { businessDayDateStr } from '../../_shared/utils/localDate';
@@ -21,6 +20,9 @@ import { csvLine, downloadCsv } from '../../_shared/utils/csvExport';
 interface StatsViewProps {
   token: string;
   onToast: (type: 'success' | 'error' | 'warning', message: string) => void;
+  /** v16: rango de fechas controlado desde el topbar (AdminApp). */
+  from?: string;
+  to?: string;
 }
 
 interface PopularRow {
@@ -32,10 +34,11 @@ interface PopularRow {
   total_revenue: number;
 }
 
-export function StatsView({ token, onToast }: StatsViewProps) {
+export function StatsView({ token, onToast, from, to }: StatsViewProps) {
   const today = businessDayDateStr();
-  const [from, setFrom] = useState(today);
-  const [to, setTo] = useState(today);
+  // v16: el rango viene del topbar (AdminApp). Fallback a hoy si no llega.
+  const effectiveFrom = from ?? today;
+  const effectiveTo = to ?? today;
   const [range, setRange] = useState<{ total_orders: number; total_revenue: number; avg_order: number } | null>(null);
   const [byQty, setByQty] = useState<PopularRow[]>([]);
   const [byRevenue, setByRevenue] = useState<PopularRow[]>([]);
@@ -43,14 +46,14 @@ export function StatsView({ token, onToast }: StatsViewProps) {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    if (!from || !to) return;
+    if (!effectiveFrom || !effectiveTo) return;
     setLoading(true);
     try {
       const [sr, qty, rev, cat] = await Promise.all([
-        fetchSalesRange(token, from, to),
-        fetchPopularItems(token, from, 10, undefined, { from, to, orderBy: 'quantity', groupBy: 'item' }),
-        fetchPopularItems(token, from, 10, undefined, { from, to, orderBy: 'revenue', groupBy: 'item' }),
-        fetchPopularItems(token, from, 20, undefined, { from, to, orderBy: 'quantity', groupBy: 'category' }),
+        fetchSalesRange(token, effectiveFrom, effectiveTo),
+        fetchPopularItems(token, effectiveFrom, 10, undefined, { from: effectiveFrom, to: effectiveTo, orderBy: 'quantity', groupBy: 'item' }),
+        fetchPopularItems(token, effectiveFrom, 10, undefined, { from: effectiveFrom, to: effectiveTo, orderBy: 'revenue', groupBy: 'item' }),
+        fetchPopularItems(token, effectiveFrom, 20, undefined, { from: effectiveFrom, to: effectiveTo, orderBy: 'quantity', groupBy: 'category' }),
       ]);
       if (sr.ok && sr.totals) setRange(sr.totals);
       if (qty.ok) setByQty(qty.data?.items ?? []);
@@ -61,28 +64,27 @@ export function StatsView({ token, onToast }: StatsViewProps) {
     } finally {
       setLoading(false);
     }
-  }, [token, from, to, onToast]);
+  }, [token, effectiveFrom, effectiveTo, onToast]);
 
   useEffect(() => { load(); }, [load]);
 
   const exportCsv = useCallback(() => {
     const lines = [
-      csvLine(['Rango', `${from} → ${to}`]),
+      csvLine(['Rango', `${effectiveFrom} → ${effectiveTo}`]),
       csvLine([]),
       csvLine(['#', 'Producto', 'Categoría', 'Pedidos', 'Cantidad', 'Ingresos (Bs)']),
       ...byQty.map((p, i) => csvLine([i + 1, p.item_name ?? p.category_name, p.category_name ?? '', p.times_ordered, p.total_quantity, (p.total_revenue / 100).toFixed(2).replace('.', ',')])),
     ];
     const csv = lines.join('\n');
-    downloadCsv(`estadisticas-${from}-a-${to}.csv`, csv);
+    downloadCsv(`estadisticas-${effectiveFrom}-a-${effectiveTo}.csv`, csv);
     onToast('success', 'CSV descargado');
-  }, [from, to, byQty, onToast]);
+  }, [effectiveFrom, effectiveTo, byQty, onToast]);
 
   return (
     <div className="admin-view">
+      {/* v16: el rango (Desde → Hasta) vive en el topbar global del Admin. Aquí solo quedan los botones. */}
       <div className="admin-toolbar" style={{ flexWrap: 'wrap', gap: 10 }}>
-        <FormField type="date" variant="sm" value={from} onChange={e => setFrom(e.target.value)} aria-label="Desde" />
-        <span className="admin-muted">→</span>
-        <FormField type="date" variant="sm" value={to} onChange={e => setTo(e.target.value)} aria-label="Hasta" />
+        <span className="admin-muted">Rango: {effectiveFrom} → {effectiveTo}</span>
         <Button variant="secondary" size="sm" onClick={load} loading={loading}>
           <AppIcon name="refresh" size="sm" /> Actualizar
         </Button>
