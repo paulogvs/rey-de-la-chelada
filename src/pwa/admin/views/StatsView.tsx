@@ -118,20 +118,38 @@ export function StatsView({ token, onToast, from, to }: StatsViewProps) {
             <Card className="admin-section">
               <div className="admin-section__head"><h3>Top productos por CANTIDAD</h3><Badge variant="info">{from} → {to}</Badge></div>
               {byQty.length === 0 ? <p className="admin-muted">Sin datos en el rango.</p> : (
-                <table className="admin-stats-table">
-                  <thead><tr><th>#</th><th>Producto</th><th>Categoría</th><th>Cantidad</th><th>Ingresos</th></tr></thead>
-                  <tbody>
-                    {byQty.map((p, i) => (
-                      <tr key={i}>
-                        <td>{i + 1}</td>
-                        <td><strong>{p.item_name ?? p.category_name}</strong></td>
-                        <td>{p.category_name ?? ''}</td>
-                        <td>{p.total_quantity}</td>
-                        <td>{formatMoney(p.total_revenue)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <>
+                  {/* v19: gráfico de barras CSS (top 5 por cantidad) */}
+                  <div className="admin-stats-bars">
+                    {byQty.slice(0, 5).map((p, i) => {
+                      const max = Math.max(...byQty.slice(0, 5).map(x => x.total_quantity), 1);
+                      const pct = Math.max(6, Math.round((p.total_quantity / max) * 100));
+                      return (
+                        <div key={i} className="admin-stats-bar">
+                          <span className="admin-stats-bar__label" title={p.item_name}>{p.item_name}</span>
+                          <span className="admin-stats-bar__track">
+                            <span className="admin-stats-bar__fill" style={{ width: `${pct}%` }} />
+                          </span>
+                          <span className="admin-stats-bar__val">{p.total_quantity}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <table className="admin-stats-table">
+                    <thead><tr><th>#</th><th>Producto</th><th>Categoría</th><th>Cantidad</th><th>Ingresos</th></tr></thead>
+                    <tbody>
+                      {byQty.map((p, i) => (
+                        <tr key={i}>
+                          <td>{i + 1}</td>
+                          <td><strong>{p.item_name ?? p.category_name}</strong></td>
+                          <td>{p.category_name ?? ''}</td>
+                          <td>{p.total_quantity}</td>
+                          <td>{formatMoney(p.total_revenue)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
               )}
             </Card>
 

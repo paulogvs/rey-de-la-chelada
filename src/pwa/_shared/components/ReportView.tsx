@@ -18,8 +18,17 @@ import { Loader } from '@/ui/components/Loader';
 import { FormField } from '@/ui/components/FormField';
 import { AppIcon } from '@/ui/components/AppIcon/AppIcon';
 import { fetchClosings, type ClosingRow } from '../api/adminApi';
+import { fetchDailySales, fetchPopularItems, type PopularItem } from '../api/reportsApi';
 import { localDateTimeStr } from '../utils/localDate';
 import { formatMoney } from '../utils/format';
+import {
+  buildReportHtml,
+  buildWhatsAppText,
+  downloadReportHtml,
+  type ReportClosing,
+  type ReportDaily,
+  type ReportPopularItem,
+} from '../utils/reportExport';
 
 interface ReportViewProps {
   token: string;
@@ -28,10 +37,26 @@ interface ReportViewProps {
   initialDate?: string;
 }
 
+/** Convierte un PopularItem del API al tipo del export (subset). */
+function toPopular(i: PopularItem): ReportPopularItem {
+  return {
+    item_name: i.item_name,
+    category_name: i.category_name ?? null,
+    times_ordered: i.times_ordered,
+    total_quantity: i.total_quantity,
+    total_revenue: i.total_revenue,
+  };
+}
+
 export function ReportView({ token, onToast, initialDate }: ReportViewProps) {
   const [closings, setClosings] = useState<ClosingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState(initialDate ?? '');
+  // v19: datos extra para el reporte exportable (pedidos + top productos del día)
+  const [daily, setDaily] = useState<ReportDaily | null>(null);
+  const [popularQty, setPopularQty] = useState<ReportPopularItem[]>([]);
+  const [popularRevenue, setPopularRevenue] = useState<ReportPopularItem[]>([]);
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,17 +74,124 @@ export function ReportView({ token, onToast, initialDate }: ReportViewProps) {
     }
   }, [token, onToast, date]);
 
+  // v19: cargar pedidos del día + top productos al cambiar la fecha seleccionada
+  const loadDayExtra = useCallback(async (day: string) => {
+    if (!day) return;
+    try {
+      const [dr, qty, rev] = await Promise.all([
+        fetchDailySales(token, day),
+        fetchPopularItems(token, day, 5, undefined, { from: day, to: day, orderBy: 'quantity', groupBy: 'item' }),
+        fetchPopularItems(token, day, 5, undefined, { from: day, to: day, orderBy: 'revenue', groupBy: 'item' }),
+      ]);
+      if (dr.daily) {
+        setDaily({
+          totalOrders: dr.daily.totalOrders,
+          completedOrders: dr.daily.completedOrders,
+          cancelledOrders: dr.daily.cancelledOrders,
+          grossRevenue: dr.daily.grossRevenue,
+          totalSales: dr.daily.totalSales,
+          totalIva: dr.daily.totalIva,
+          baseRevenue: dr.daily.baseRevenue,
+          averageTicket: dr.daily.averageTicket,
+          byMethod: dr.daily.byMethod,
+          hourly: dr.daily.hourly,
+        });
+      }
+      if (qty.ok) setPopularQty((qty.data?.items ?? []).map(toPopular));
+      if (rev.ok) setPopularRevenue((rev.data?.items ?? []).map(toPopular));
+    } catch {
+      // silencioso: el reporte principal sigue siendo el cierre
+    }
+  }, [token]);
+
   // v14: sincronizar con el picker global del Admin
   useEffect(() => {
-    if (initialDate) setDate(initialDate);
-  }, [initialDate]);
+    if (initialDate) {
+      setDate(initialDate);
+      void loadDayExtra(initialDate);
+    }
+  }, [initialDate, loadDayExtra]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Selección en el toolbar interno (Caja no tiene picker global)
+  const handleDateChange = useCallback((value: string) => {
+    setDate(value);
+    void loadDayExtra(value);
+  }, [loadDayExtra]);
 
   const selected = useMemo(
     () => closings.find(c => c.closing_date === date) ?? null,
     [closings, date]
   );
+
+  // ── Export HTML / WhatsApp (v19) ─────────────────────────────
+  const handleExportHtml = useCallback(() => {
+    if (!date) { onToast('warning', 'Selecciona un día para exportar'); return; }
+    setExporting(true);
+    try {
+      const closing: ReportClosing | null = selected
+        ? {
+            closing_date: selected.closing_date,
+            opened_at: selected.opened_at,
+            closed_at: selected.closed_at,
+            closed_by_name: selected.closed_by_name,
+            opening_cash: selected.opening_cash,
+            expected_cash: selected.expected_cash,
+            actual_cash: selected.actual_cash,
+            expected_qr: selected.expected_qr,
+            expenses_cash: selected.expenses_cash,
+            expenses_qr: selected.expenses_qr,
+            transactions: selected.transactions,
+            total_general: selected.total_general,
+            cash_difference: selected.cash_difference,
+            notes: selected.notes,
+          }
+        : null;
+      const html = buildReportHtml({
+        closing,
+        daily,
+        popularQty,
+        popularRevenue,
+        businessName: 'Rey de la Chelada',
+      });
+      downloadReportHtml(`reporte-cierre-${date}.html`, html);
+      onToast('success', 'Reporte HTML descargado. Ábrelo y usa Ctrl+P → Guardar como PDF.');
+    } catch {
+      onToast('error', 'No se pudo generar el reporte');
+    } finally {
+      setExporting(false);
+    }
+  }, [date, selected, daily, popularQty, popularRevenue, onToast]);
+
+  const handleCopyWhatsApp = useCallback(async () => {
+    if (!date) { onToast('warning', 'Selecciona un día para copiar'); return; }
+    try {
+      const closing: ReportClosing | null = selected
+        ? {
+            closing_date: selected.closing_date,
+            opened_at: selected.opened_at,
+            closed_at: selected.closed_at,
+            closed_by_name: selected.closed_by_name,
+            opening_cash: selected.opening_cash,
+            expected_cash: selected.expected_cash,
+            actual_cash: selected.actual_cash,
+            expected_qr: selected.expected_qr,
+            expenses_cash: selected.expenses_cash,
+            expenses_qr: selected.expenses_qr,
+            transactions: selected.transactions,
+            total_general: selected.total_general,
+            cash_difference: selected.cash_difference,
+            notes: selected.notes,
+          }
+        : null;
+      const text = buildWhatsAppText({ closing, daily, popularQty, popularRevenue, businessName: 'Rey de la Chelada' });
+      await navigator.clipboard.writeText(text);
+      onToast('success', 'Resumen copiado para WhatsApp');
+    } catch {
+      onToast('error', 'No se pudo copiar. Revisa permisos del portapapeles.');
+    }
+  }, [date, selected, daily, popularQty, popularRevenue, onToast]);
 
   return (
     <div className="admin-view">
@@ -72,13 +204,19 @@ export function ReportView({ token, onToast, initialDate }: ReportViewProps) {
             type="date"
             variant="constrained" className="form-input--mono"
             value={date}
-            onChange={e => setDate(e.target.value)}
+            onChange={e => handleDateChange(e.target.value)}
             aria-label="Día del cierre"
           />
         )}
         <Badge variant="info">{closings.length} cierre(s)</Badge>
         <Button variant="secondary" size="sm" onClick={load} loading={loading}>
           <AppIcon name="refresh" size="sm" /> Refrescar
+        </Button>
+        <Button variant="primary" size="sm" onClick={handleExportHtml} loading={exporting}>
+          <AppIcon name="download" size="sm" /> Exportar HTML
+        </Button>
+        <Button variant="secondary" size="sm" onClick={handleCopyWhatsApp}>
+          <AppIcon name="message" size="sm" /> Copiar WhatsApp
         </Button>
       </div>
 
