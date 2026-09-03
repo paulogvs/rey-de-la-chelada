@@ -1,8 +1,9 @@
-# PROMPT FINAL — OpenCode PC PROD OFICIAL (commit 264cce9)
+# PROMPT FINAL — OpenCode PC PROD OFICIAL (HEAD de main)
 
 > **DESTINATARIO:** OpenCode en la PC de PRODUCCIÓN OFICIAL.
 > **REPO:** https://github.com/paulogvs/rey-de-la-chelada (público, branch `main`)
-> **COMMIT OBJETIVO:** `264cce9` (último — incluye v18 del menú + fix layout Admin + scroll horizontal Meseros + **export HTML/WhatsApp en Reportes** + **gráfico de barras en Estadísticas**)
+> **COMMIT OBJETIVO:** `HEAD` de `main` (recomendado) — hoy equivale a `4718cf2`
+> (incluye v18 del menú + fix layout Admin + scroll horizontal Meseros + **export HTML/WhatsApp en Reportes** + **gráfico de barras en Estadísticas**)
 > **OBJETIVO:** Actualizar la app a la versión final **SIN romper nada** y **SIN perder la base de datos de producción** (movimientos, cierres, menú editado). Dejar el servicio **arriba y funcional**.
 
 ---
@@ -11,7 +12,8 @@
 
 Actualiza la app **"Rey de la Chelada"** desde el repo público
 `https://github.com/paulogvs/rey-de-la-chelada` (branch `main`), dejando el repositorio
-**exactamente en el commit `264cce9`** (o el `HEAD` de `main` si ya está más adelante y es
+**exactamente en el `HEAD` de `main`** (hoy `4718cf2` — código más reciente). Baja el código con
+`git pull`; NO es necesario fijar un commit a mano a menos que quieras congelar una versión.
 compatible). Configúralo todo bien, **sin romper la app** y **sin perder la base de datos de
 producción** (`data/rey-de-la-chelada.db`, que tiene movimientos, cierres y menú editado).
 Al final el servicio debe quedar **arriba y funcional**.
@@ -33,6 +35,33 @@ Set-Location $PROD
 ```
 > ⚠️ Usa `$PROD` en TODOS los comandos. NO asumas `D:\OTRO DISCO\REY DE LA CHELADA`.
 
+### CONFIRMAR QUE LA DB DETECTADA ES LA CORRECTA (NO una copia vieja)
+
+Antes de tocar nada, **verifica que `data/rey-de-la-chelada.db` sea la DB de producción REAL**, no una copia
+antigua, de pruebas u otro instalador. Lo confirmas por **tres señales** (deben coincidir):
+
+1. **Es la más reciente** (fecha/hora de modificación reciente, cercana a "hoy"):
+   ```powershell
+   Get-Item "$PROD\data\rey-de-la-chelada.db" | Select-Object FullName, Length, LastWriteTime
+   ```
+2. **Tiene MOVIMIENTOS (si el negoció ya operó)** — la DB real de producción NO debe tener
+   `orders`/`payments`/`cash_closings` en 0 (a menos que sea un día recién arrancado):
+   ```powershell
+   node -e "const d=require('better-sqlite3')('data/rey-de-la-chelada.db');const o=s=>d.prepare(s).get();console.log('pedidos',o('SELECT COUNT(*) n FROM orders').n,'pagos',o('SELECT COUNT(*) n FROM payments').n,'cierres',o('SELECT COUNT(*) n FROM cash_closings').n)"
+   ```
+   > ⚠️ Si ves **0/0/0** y esperabas movimiento real, **ALTO**: puede ser una copia vacía/antigua o la DB equivocada. **PREGÚNTAME** antes de avanzar.
+3. **La columna `area` existe en `menu_categories`** (señal de que es una DB de la versión reciente,
+   o que la migración la agregará de forma aditiva — seguro en ambos casos):
+   ```powershell
+   node -e "const d=require('better-sqlite3')('data/rey-de-la-chelada.db');const cols=d.prepare(\"SELECT name FROM pragma_table_info('menu_categories')\").all().map(c=>c.name);console.log('tiene area:',cols.includes('area'))"
+   ```
+
+**Si el conteo de movimientos NO coincide con lo esperado** (o si hay varias `rey-de-la-chelada.db`
+en la PC y no sabes cuál es la buena), **PREGÚNTAME** con la ruta y los números antes de continuar.
+NO elijas a ciegas: usar la DB equivocada podría dar falsa seguridad (y una lectura incorrecta).
+
+> ✅ **Solo cuando confirmes que `$PROD\data\rey-de-la-chelada.db` es la correcta**, continúa con los pasos.
+
 ## REGLAS OBLIGATORIAS (LEELAS ANTES DE TOCAR NADA)
 
 1. **La DB de producción es REAL y NO se resetea.** Prohibido: `DROP TABLE`, borrar `data/*.db`,
@@ -46,7 +75,7 @@ Set-Location $PROD
 3. **Respeta `MENU_MANAGEMENT`** del `.env` (léelo con `Get-Content .env | Select-String MENU_MANAGEMENT`):
    - **`admin`** → el seed NO se re-importa solo. El menú lo gestiona el Admin UI. NO re-seedea; solo migra schema aditivo.
    - **`seed`** (o ausente) → el seed es la autoridad y al arrancar re-importa el catálogo **OJO**: puede pisar precios editados. **Pregúntame ANTES de arrancar** si quieres re-seedar o conservar el menú actual.
-4. **NO cambies el modelo de cobro, precios ni flujos de pedidos.** Solo actualiza el código a `264cce9`.
+4. **NO cambies el modelo de cobro, precios ni flujos de pedidos.** Solo actualiza el código al `HEAD` de `main`.
 
 ## PASOS DE ACTUALIZACIÓN
 
@@ -56,8 +85,8 @@ Set-Location $PROD
 git fetch origin
 git checkout -- . 2>$null   # descarta cambios locales SIN tocar data/ (data/ no está en git)
 git pull origin main
-git checkout 264cce9        # fija el commit objetivo (o quédate en HEAD de main si ya es ≥ 264cce9 y compatible)
-git log --oneline -1        # confirma: debe mostrar 264cce9 (o uno posterior)
+   git pull origin main
+   git log --oneline -1        # confirma: debe mostrar el HEAD de main (idealm. 4718cf2 o posterior)
 ```
 > Si la carpeta NO es un repo git aún: `git clone https://github.com/paulogvs/rey-de-la-chelada .` dentro de `$PROD`.
 > ⚠️ `data/`, `.env` y `node_modules` NO están en git — `git pull`/`checkout` NO los tocan. No pierdes la DB.
@@ -137,7 +166,7 @@ node -e "const d=require('better-sqlite3')('data/rey-de-la-chelada.db');const o=
 ## QUÉ REPORTARME AL FINAL
 
 - **La ruta `$PROD`** que usaste.
-- **Confirmación** de `git log --oneline -1` (idealmente `264cce9`).
+- **Confirmación** de `git log --oneline -1` (idealmente el `HEAD` de `main`, hoy `4718cf2`).
 - **Health** → `ok`.
 - **Conteos** de `orders` / `payments` / `cash_closings` (que no hayan cambiado vs backup).
 - **Menú**: nº items, nº categorías, si existe categoría "Promociones", nº BAR/COCINA.
